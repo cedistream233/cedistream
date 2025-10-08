@@ -71,42 +71,40 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-purple-800 to-pink-900">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <Sparkles className="w-6 h-6 text-yellow-400" />
-              <span className="text-yellow-400 font-medium">Premium Content Marketplace</span>
+      <section className="relative overflow-hidden bg-hero-radial bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900">
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_20%_20%,rgba(139,92,246,0.25),transparent_60%)]" />
+        <div className="container relative py-24 md:py-36">
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="flex items-center justify-center gap-2 mb-6 text-[15px]">
+              <Sparkles className="w-5 h-5 text-accent-yellow" />
+              <span className="font-medium text-accent-yellow tracking-wide">Premium Content Marketplace</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-              Discover Amazing
-              <span className="block bg-gradient-to-r from-yellow-400 to-pink-400 bg-clip-text text-transparent">
-                Music & Videos
-              </span>
+            <h1 className="font-display text-4xl md:text-6xl font-bold leading-tight tracking-tight mb-6">
+              <span className="block text-white">Discover Amazing</span>
+              <span className="block bg-gradient-to-r from-accent-yellow via-pink-400 to-primary-400 bg-clip-text text-transparent">Music & Videos</span>
             </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
               Support your favorite artists and creators. Purchase exclusive content with secure mobile money or card payments.
             </p>
-            <div className="flex gap-4 justify-center">
-              <Link to={createPageUrl("Albums")}>
-                <Button size="lg" className="bg-white text-purple-900 hover:bg-gray-100">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to={createPageUrl("Albums")}> 
+                <Button size="lg" className="bg-white text-slate-900 hover:bg-gray-100 font-semibold shadow-glow">
                   Browse Albums
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
               <Link to={createPageUrl("Videos")}>
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+                <Button size="lg" variant="ghost" className="text-white hover:bg-white/10 border border-white/10">
                   Explore Videos
                 </Button>
               </Link>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Featured Albums */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  {/* Featured Albums */}
+  <div className="container py-20">
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -148,8 +146,8 @@ export default function Home() {
         )}
       </div>
 
-      {/* Featured Videos */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+  {/* Featured Videos */}
+  <div className="container py-20">
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2">

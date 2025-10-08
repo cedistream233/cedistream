@@ -38,4 +38,25 @@ export const AlbumSchema = {
   required: ["title", "artist", "price"],
 };
 
+const mapOrder = (orderBy) => {
+  if (!orderBy) return { orderBy: 'created_at', direction: 'desc' };
+  const desc = orderBy.startsWith('-');
+  const field = orderBy.replace(/^-/, '').replace('created_date', 'created_at');
+  return { orderBy: field, direction: desc ? 'desc' : 'asc' };
+};
+
+export const Album = {
+  async list(orderBy = '-created_date') {
+    const { orderBy: field, direction } = mapOrder(orderBy);
+    const res = await fetch(`/api/albums?orderBy=${encodeURIComponent(field)}&direction=${encodeURIComponent(direction)}`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+  async get(id) {
+    const res = await fetch(`/api/albums/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return res.json();
+  },
+};
+
 export default AlbumSchema;

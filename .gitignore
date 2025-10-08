@@ -1,0 +1,52 @@
+# Node
+node_modules/
+**/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Build
+/dist
+build/
+**/dist/
+**/build/
+.vite/
+coverage/
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Cache
+.cache/
+**/.cache/
+.eslintcache
+
+# Local data
+*.local
+
+# Vite
+**/.vite/
+
+# Supabase/Secrets (if any local dumps)
+*.dump
+
+# Generated lockfiles (keep one if you prefer)
+# Uncomment one of these lines if you want to ignore lockfiles; otherwise they will be tracked
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
