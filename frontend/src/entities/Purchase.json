@@ -1,0 +1,58 @@
+{
+  "name": "Purchase",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Buyer email"
+    },
+    "item_type": {
+      "type": "string",
+      "enum": [
+        "album",
+        "video"
+      ],
+      "description": "Type of purchased item"
+    },
+    "item_id": {
+      "type": "string",
+      "description": "ID of the purchased album or video"
+    },
+    "item_title": {
+      "type": "string",
+      "description": "Title of purchased item"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Purchase amount in GHS"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "payment_reference": {
+      "type": "string",
+      "description": "Paystack payment reference"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "card",
+        "mobile_money"
+      ],
+      "description": "Payment method used"
+    }
+  },
+  "required": [
+    "user_email",
+    "item_type",
+    "item_id",
+    "item_title",
+    "amount"
+  ]
+}

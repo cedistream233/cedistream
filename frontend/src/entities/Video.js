@@ -1,0 +1,29 @@
+export const VideoSchema = {
+  name: "Video",
+  type: "object",
+  properties: {
+    title: { type: "string", description: "Video title" },
+    creator: { type: "string", description: "Content creator or artist name" },
+    description: { type: "string", description: "Video description" },
+    price: { type: "number", description: "Price in GHS (Ghana Cedis)" },
+    thumbnail: { type: "string", description: "Video thumbnail URL" },
+    video_url: { type: "string", description: "Video file URL" },
+    duration: { type: "string", description: "Video duration (e.g., '3:45')" },
+    category: {
+      type: "string",
+      enum: [
+        "Music Video",
+        "Tutorial",
+        "Entertainment",
+        "Documentary",
+        "Vlog",
+        "Other",
+      ],
+      description: "Video category",
+    },
+    release_date: { type: "string", format: "date" },
+  },
+  required: ["title", "creator", "price"],
+};
+
+export default VideoSchema;

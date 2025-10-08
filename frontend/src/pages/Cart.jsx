@@ -1,0 +1,142 @@
+import React, { useState, useEffect } from "react";
+import { User } from "@/entities/User";
+import { Purchase } from "@/entities/Purchase";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Trash2, ShoppingBag, CreditCard } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+export default function Cart() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    loadCart();
+  }, []);
+
+  const loadCart = async () => {
+    try {
+      const userData = await User.me();
+      setUser(userData);
+      setCart(userData.cart || []);
+    } catch (error) {
+      navigate(createPageUrl("Home"));
+    }
+  };
+
+  const removeFromCart = async (itemId) => {
+    const updatedCart = cart.filter(item => item.item_id !== itemId);
+    await User.updateMyUserData({ cart: updatedCart });
+    setCart(updatedCart);
+  };
+
+  const calculateTotal = () => {
+    return cart.reduce((sum, item) => sum + (item.price || 0), 0);
+  };
+
+  const handleCheckout = async () => {
+    setIsProcessing(true);
+    
+    // Create purchase records
+    for (const item of cart) {
+      await Purchase.create({
+        user_email: user.email,
+        item_type: item.item_type,
+        item_id: item.item_id,
+        item_title: item.title,
+        amount: item.price,
+        payment_status: "pending"
+      });
+    }
+
+    // Navigate to checkout page
+    navigate(createPageUrl("Checkout"));
+  };
+
+  if (cart.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center">
+          <ShoppingBag className="w-24 h-24 mx-auto text-gray-600 mb-6" />
+          <h2 className="text-3xl font-bold text-white mb-4">Your cart is empty</h2>
+          <p className="text-gray-400 mb-8">Discover amazing content and add items to your cart</p>
+          <Button
+            onClick={() => navigate(createPageUrl("Home"))}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          >
+            Browse Content
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <h1 className="text-4xl font-bold text-white mb-8">Shopping Cart</h1>
+
+      <div className="space-y-4 mb-8">
+        {cart.map((item) => (
+          <Card key={item.item_id} className="bg-slate-900/50 border-purple-900/20 p-6">
+            <div className="flex items-center gap-6">
+              {item.image ? (
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  className="w-24 h-24 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gradient-to-br from-purple-900 to-pink-900 rounded-lg" />
+              )}
+
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-white mb-1">{item.title}</h3>
+                <p className="text-sm text-gray-400 capitalize">{item.item_type}</p>
+              </div>
+
+              <div className="text-right">
+                <p className="text-2xl font-bold text-yellow-400 mb-4">
+                  GH₵ {item.price?.toFixed(2)}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeFromCart(item.item_id)}
+                  className="text-red-400 hover:text-red-300"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="bg-slate-900/50 border-purple-900/20 p-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-lg">
+            <span className="text-gray-400">Items:</span>
+            <span className="text-white">{cart.length}</span>
+          </div>
+          <div className="flex items-center justify-between text-2xl font-bold border-t border-purple-900/20 pt-4">
+            <span className="text-white">Total:</span>
+            <span className="text-yellow-400">GH₵ {calculateTotal().toFixed(2)}</span>
+          </div>
+
+          <Button
+            onClick={handleCheckout}
+            disabled={isProcessing}
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg py-6 mt-6"
+          >
+            <CreditCard className="w-5 h-5 mr-2" />
+            {isProcessing ? "Processing..." : "Proceed to Checkout"}
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}

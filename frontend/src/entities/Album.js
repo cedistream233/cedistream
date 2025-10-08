@@ -1,0 +1,41 @@
+export const AlbumSchema = {
+  name: "Album",
+  type: "object",
+  properties: {
+    title: { type: "string", description: "Album title" },
+    artist: { type: "string", description: "Artist or band name" },
+    description: { type: "string", description: "Album description" },
+    price: { type: "number", description: "Price in GHS (Ghana Cedis)" },
+    cover_image: { type: "string", description: "Album cover image URL" },
+    release_date: { type: "string", format: "date", description: "Release date" },
+    genre: {
+      type: "string",
+      enum: [
+        "Afrobeats",
+        "Hip Hop",
+        "Gospel",
+        "Highlife",
+        "R&B",
+        "Reggae",
+        "Pop",
+        "Other"
+      ],
+      description: "Music genre",
+    },
+    songs: {
+      type: "array",
+      description: "List of songs in the album",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          duration: { type: "string" },
+          audio_url: { type: "string" },
+        },
+      },
+    },
+  },
+  required: ["title", "artist", "price"],
+};
+
+export default AlbumSchema;
