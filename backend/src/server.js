@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import morgan from 'morgan';
 import dotenv from 'dotenv';
 import albumsRouter from './routes/albums.js';
 import videosRouter from './routes/videos.js';
@@ -14,7 +13,6 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors({ origin: process.env.APP_URL || 'http://localhost:3000' }));
 app.use(express.json());
-app.use(morgan('dev'));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
