@@ -1,3 +1,4 @@
+import SongDetails from './pages/SongDetails.jsx';
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.jsx';
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/" element={withLayout(Home, 'Home')} />
   <Route path="/albums" element={withLayout(Albums, 'Albums')} />
   <Route path="/songs" element={withLayout(Albums, 'Songs')} />
+  <Route path="/songs/:id" element={withLayout(SongDetails, 'SongDetails')} />
   <Route path="/songs" element={withLayout(Albums, 'Songs')} />
         <Route path="/videos" element={withLayout(Videos, 'Videos')} />
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />

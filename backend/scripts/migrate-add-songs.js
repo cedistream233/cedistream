@@ -4,10 +4,9 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const sqlPath = path.join(__dirname, '..', 'database', 'add_songs.sql');
 

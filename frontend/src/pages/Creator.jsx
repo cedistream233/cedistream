@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ContentCard from '@/components/content/ContentCard';
+import { Song } from '@/entities/Song';
 
 export default function Creator() {
   const { id } = useParams();
   const [creator, setCreator] = useState(null);
   const [content, setContent] = useState({ albums: [], videos: [] });
+  const [singles, setSingles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,6 +20,8 @@ export default function Creator() {
         const res2 = await fetch(`/api/creators/${encodeURIComponent(id)}/content`);
         const data2 = res2.ok ? await res2.json() : { albums: [], videos: [] };
         setContent(data2);
+        const singlesData = await Song.list({ user_id: id });
+        setSingles(singlesData);
       } finally { setLoading(false); }
     })();
   }, [id]);
@@ -48,6 +52,30 @@ export default function Creator() {
       </div>
 
       <div className="space-y-10">
+        <section>
+          <h2 className="text-xl text-white mb-4">Singles</h2>
+          {singles.length === 0 ? (
+            <div className="text-gray-400">No singles yet</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {singles.map((song) => (
+                <ContentCard
+                  key={song.id}
+                  item={{
+                    id: song.id,
+                    title: song.title,
+                    artist: song.artist,
+                    price: song.price,
+                    cover_image: song.cover_image,
+                    songs: []
+                  }}
+                  type="album"
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
         <section>
           <h2 className="text-xl text-white mb-4">Albums</h2>
           {content.albums.length === 0 ? (

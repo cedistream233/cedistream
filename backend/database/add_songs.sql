@@ -26,7 +26,8 @@ CREATE INDEX IF NOT EXISTS idx_songs_album_id ON songs(album_id);
 CREATE INDEX IF NOT EXISTS idx_songs_user_id ON songs(user_id);
 
 -- updated_at trigger
-CREATE TRIGGER IF NOT EXISTS update_songs_updated_at BEFORE UPDATE ON songs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_songs_updated_at ON songs;
+CREATE TRIGGER update_songs_updated_at BEFORE UPDATE ON songs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Extend purchases item_type to include 'song'
 DO $$

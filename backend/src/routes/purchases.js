@@ -5,26 +5,26 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { user_email, payment_status } = req.query;
-    
+    const { user_email, payment_status, item_type } = req.query;
     let sql = 'SELECT * FROM purchases WHERE 1=1';
     const params = [];
     let paramIndex = 1;
-    
     if (user_email) {
       sql += ` AND user_email = $${paramIndex}`;
       params.push(user_email);
       paramIndex++;
     }
-    
     if (payment_status) {
       sql += ` AND payment_status = $${paramIndex}`;
       params.push(payment_status);
       paramIndex++;
     }
-    
+    if (item_type) {
+      sql += ` AND item_type = $${paramIndex}`;
+      params.push(item_type);
+      paramIndex++;
+    }
     sql += ' ORDER BY created_at DESC';
-    
     const result = await query(sql, params);
     res.json(result.rows);
   } catch (err) { next(err); }

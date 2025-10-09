@@ -23,7 +23,10 @@ router.get('/', async (req, res, next) => {
               COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as display_name,
               -- content counts (best-effort if tables exist)
               COALESCE((SELECT COUNT(1) FROM albums a WHERE a.user_id = u.id), 0) as albums_count,
-              COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = u.id), 0) as videos_count
+              COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = u.id), 0) as videos_count,
+              COALESCE((SELECT COUNT(1) FROM songs s WHERE s.user_id = u.id), 0) as songs_count,
+              -- recent songs (top 3)
+              (SELECT COALESCE(json_agg(row_to_json(sq)), '[]'::json) FROM (SELECT id, title, price FROM songs s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 3) sq) as recent_songs
        FROM users u
        LEFT JOIN creator_profiles cp ON cp.user_id = u.id
        ${where}
@@ -44,7 +47,11 @@ router.get('/:id', async (req, res, next) => {
       `SELECT u.id as user_id,
               u.first_name, u.last_name, u.profile_image, u.bio,
               cp.stage_name, cp.genre_specialties, cp.social_media,
-              COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as display_name
+              COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as display_name,
+              COALESCE((SELECT COUNT(1) FROM albums a WHERE a.user_id = u.id), 0) as albums_count,
+              COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = u.id), 0) as videos_count,
+              COALESCE((SELECT COUNT(1) FROM songs s WHERE s.user_id = u.id), 0) as songs_count,
+              (SELECT COALESCE(json_agg(row_to_json(sq)), '[]'::json) FROM (SELECT id, title, price FROM songs s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 6) sq) as recent_songs
        FROM users u
        LEFT JOIN creator_profiles cp ON cp.user_id = u.id
        WHERE u.id = $1`,

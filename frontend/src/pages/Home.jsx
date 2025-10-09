@@ -63,7 +63,7 @@ export default function Home() {
       </section>
 
   {/* Creator results */}
-  <div className="container py-8">
+  <div className="container mt-2 mb-4">
         {query.trim() ? (
           <>
             <h2 className="text-xl text-white mb-4">Creators</h2>
@@ -82,12 +82,23 @@ export default function Home() {
                         className="w-16 h-16 rounded-full object-cover cursor-zoom-in"
                         onClick={(e) => { e.stopPropagation(); openViewer(c.profile_image); }}
                       />
-                      <div className="min-w-0">
-                        <Link to={`/creators/${encodeURIComponent(c.user_id)}`} className="block">
-                          <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>
-                          <div className="text-xs text-gray-400">{c.albums_count} albums • {c.videos_count} videos</div>
-                        </Link>
-                      </div>
+                        <div className="min-w-0">
+                          <Link to={`/creators/${encodeURIComponent(c.user_id)}`} className="block">
+                            <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>
+                            <div className="text-xs text-gray-400">{c.albums_count} albums • {c.videos_count} videos • {c.songs_count} songs</div>
+                          </Link>
+
+                          {c.recent_songs && c.recent_songs.length > 0 && (
+                            <div className="mt-2 grid grid-cols-1 gap-1">
+                              {c.recent_songs.map((s) => (
+                                <div key={s.id} className="text-sm text-gray-300 flex justify-between items-center">
+                                  <span className="truncate">{s.title}</span>
+                                  <span className="text-xs text-yellow-400">GH₵ {parseFloat(s.price)?.toFixed(2) || '0.00'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                     </div>
                   </div>
                 ))}
