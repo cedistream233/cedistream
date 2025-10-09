@@ -346,7 +346,7 @@ export default function Signup() {
                     name="pin"
                     type={showPin ? 'text' : 'password'}
                     inputMode="numeric"
-                    pattern="\\d{4}"
+                    pattern="[0-9]{4}"
                     maxLength={4}
                     required
                     value={formData.pin}
@@ -378,7 +378,7 @@ export default function Signup() {
                     name="confirmPin"
                     type={showConfirmPin ? 'text' : 'password'}
                     inputMode="numeric"
-                    pattern="\\d{4}"
+                    pattern="[0-9]{4}"
                     maxLength={4}
                     required
                     value={formData.confirmPin || ''}

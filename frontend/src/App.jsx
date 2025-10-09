@@ -13,6 +13,8 @@ import Library from './pages/Library.jsx';
 import Admin from './pages/Admin.jsx';
 import Login from './pages/auth/Login.jsx';
 import Signup from './pages/auth/Signup.jsx';
+import ForgotPassword from './pages/auth/ForgotPassword.jsx';
+import ResetPassword from './pages/auth/ResetPassword.jsx';
 import CreatorDashboard from './pages/CreatorDashboard.jsx';
 import Profile from './pages/Profile.jsx';
 
@@ -41,6 +43,8 @@ export default function App() {
         {/* Auth routes without layout */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+  <Route path="/reset-password" element={<ResetPassword />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { query } from './database.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const RESET_JWT_SECRET = process.env.RESET_JWT_SECRET || JWT_SECRET;
 
 export const generateToken = (user) => {
   return jwt.sign(
@@ -19,6 +20,23 @@ export const generateToken = (user) => {
 export const verifyToken = (token) => {
   try {
     return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+};
+
+// Generate a short-lived password reset token
+export const generateResetToken = (userId) => {
+  return jwt.sign(
+    { uid: userId },
+    RESET_JWT_SECRET,
+    { expiresIn: '30m' }
+  );
+};
+
+export const verifyResetToken = (token) => {
+  try {
+    return jwt.verify(token, RESET_JWT_SECRET);
   } catch (error) {
     return null;
   }

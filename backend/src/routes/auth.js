@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../lib/database.js';
-import { generateToken, authenticateToken } from '../lib/auth.js';
+import { generateToken, authenticateToken, generateResetToken, verifyResetToken } from '../lib/auth.js';
 
 const router = express.Router();
 const MAX_PIN_ATTEMPTS = 5; // configurable
@@ -280,13 +280,9 @@ router.post('/reset/start', async (req, res) => {
     // Reset attempts on success
     await query('UPDATE users SET pin_attempts = 0, pin_lock_until = NULL WHERE id = $1', [user.id]);
 
-    // Issue a short-lived reset token stored in-memory-less: we can return a one-time token encoded with user id and timestamp
-    // For simplicity: return a minimal opaque token derived from DB with time-bound encoded in JWT-like manner using existing token generator is overkill since it adds username/role; implement a simple signed token here
-    const resetTokenResult = await query('SELECT NOW() as now');
-    const issuedAt = resetTokenResult.rows[0].now;
-    // Return a server-side-free token: include user id and issuedAt encoded base64, client must send back to complete endpoint
-    const payload = Buffer.from(JSON.stringify({ uid: user.id, iat: issuedAt })).toString('base64url');
-    return res.json({ ok: true, resetToken: payload });
+  // Issue a signed JWT reset token (30m expiry)
+  const resetToken = generateResetToken(user.id);
+  return res.json({ ok: true, resetToken });
   } catch (error) {
     console.error('Reset start error:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -304,31 +300,13 @@ router.post('/reset/complete', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    // Decode token
-    let decoded;
-    try {
-      decoded = JSON.parse(Buffer.from(String(resetToken), 'base64url').toString());
-    } catch (e) {
-      return res.status(400).json({ error: 'Invalid reset token' });
-    }
-    const { uid, iat } = decoded || {};
-    if (!uid || !iat) {
-      return res.status(400).json({ error: 'Invalid reset token' });
-    }
-
-    // Optional expiry: 30 minutes
-    const expiryCheck = await query('SELECT NOW() as now');
-    const now = new Date(expiryCheck.rows[0].now);
-    const issued = new Date(iat);
-    const diffMinutes = (now.getTime() - issued.getTime()) / 60000;
-    if (diffMinutes > 30) {
-      return res.status(400).json({ error: 'Reset token expired' });
-    }
+    const decoded = verifyResetToken(resetToken);
+    if (!decoded?.uid) return res.status(400).json({ error: 'Invalid or expired reset token' });
 
     // Update password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
-    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, uid]);
+  await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, decoded.uid]);
 
     return res.json({ ok: true, message: 'Password updated successfully' });
   } catch (error) {
