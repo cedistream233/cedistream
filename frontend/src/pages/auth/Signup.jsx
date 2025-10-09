@@ -50,8 +50,15 @@ export default function Signup() {
   // Optional: username availability check with debounce
   useEffect(() => {
     const value = formData.username?.trim();
+    // reset availability while typing
+    setUsernameAvailable(null);
     if (!value) {
-      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+    // skip very short usernames
+    if (value.length < 3) {
+      setCheckingUsername(false);
       return;
     }
     const controller = new AbortController();

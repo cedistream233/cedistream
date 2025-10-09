@@ -9,7 +9,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const sqlPath = path.join(__dirname, '..', '..', 'database', 'users_seed.sql');
+const sqlPath = path.join(__dirname, '..', 'database', 'users_seed.sql');
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL not set in environment. Aborting.');

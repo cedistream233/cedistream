@@ -25,6 +25,50 @@ Your app now uses a **hybrid approach**:
    - Execute the script
 
 5. **Add sample data** (optional):
+6. **Add Users + Username/PIN migrations** (required for auth):
+    You can apply from your local terminal or paste into Neon SQL editor.
+
+    Local (Windows cmd):
+
+    - Set up env: ensure `backend/.env` has `DATABASE_URL=...`
+    - Apply base users migration (creates `users` and `creator_profiles` tables):
+       ```cmd
+       cd /d backend
+       npm run migrate-users
+       ```
+    - Add username + PIN columns:
+       ```cmd
+       npm run migrate-add-username-pin
+       ```
+    - Add PIN rate limiting fields:
+       ```cmd
+       npm run migrate-add-pin-rate-limit
+       ```
+
+    Or paste these SQL files into Neon SQL editor in order:
+    - `database/users_migration.sql`
+    - `database/add_username_pin.sql`
+    - `database/add_pin_rate_limit.sql`
+
+    Verify columns exist:
+    ```sql
+    -- Should return columns including username, pin_hash, pin_attempts, pin_lock_until
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name IN ('username', 'pin_hash', 'pin_attempts', 'pin_lock_until');
+    ```
+
+    Quick fallback (only if needed) to manually add username column:
+    ```sql
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100);
+    DO $$
+    BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_username_key') THEN
+          ALTER TABLE users ADD CONSTRAINT users_username_key UNIQUE (username);
+       END IF;
+    END $$;
+    ```
+
    - Copy and paste the contents of `database/seed.sql`
    - Execute the script
 
