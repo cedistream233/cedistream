@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.jsx';
+import { ImageViewerProvider } from './contexts/ImageViewerContext.jsx';
 import Layout from './Layout.jsx';
 import Home from './pages/Home.jsx';
 import Albums from './pages/Albums.jsx';
@@ -27,7 +28,8 @@ const withLayout = (Component, name) => (
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
+      <ImageViewerProvider>
+        <Routes>
         <Route path="/" element={withLayout(Home, 'Home')} />
         <Route path="/albums" element={withLayout(Albums, 'Albums')} />
         <Route path="/videos" element={withLayout(Videos, 'Videos')} />
@@ -47,7 +49,8 @@ export default function App() {
   <Route path="/reset-password" element={<ResetPassword />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        </Routes>
+      </ImageViewerProvider>
     </AuthProvider>
   );
 }

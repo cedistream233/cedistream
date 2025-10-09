@@ -19,12 +19,14 @@ import { motion } from 'framer-motion';
 import { Edit2, X } from 'lucide-react';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function CreatorDashboard() {
   const [user, setUser] = useState(null);
   const { token, updateUser } = useAuth();
   const navigate = useNavigate();
+  const { open: openViewer } = useImageViewer();
   const [showRemoveConfirm, setShowRemoveConfirm] = React.useState(false);
   const [stats, setStats] = useState({
     totalEarnings: 0,
@@ -158,7 +160,8 @@ export default function CreatorDashboard() {
             {/* Avatar */}
             <div className="flex items-center justify-center mb-4">
               <div className="relative">
-                <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border-4 border-white/5 flex items-center justify-center text-2xl font-bold text-white">
+       <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border-4 border-white/5 flex items-center justify-center text-2xl font-bold text-white cursor-pointer"
+         onClick={() => { if (user?.profile_image) openViewer(user.profile_image); }}>
                   {user?.profile_image ? (
                     <img src={user.profile_image} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (

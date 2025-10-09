@@ -51,7 +51,7 @@ export const DropdownMenuContent = ({ children, align = 'start', className = '' 
   const ctx = useContext(MenuContext);
   if (!ctx || !ctx.open) return null;
   return (
-    <div className={`absolute mt-2 min-w-[12rem] rounded-md border border-white/10 bg-slate-900 p-2 shadow-lg ${align === 'end' ? 'right-0' : 'left-0'} ${className}`}>
+    <div className={`absolute mt-2 min-w-[12rem] rounded-md border border-white/10 bg-slate-900 p-1 shadow-lg ${align === 'end' ? 'right-0' : 'left-0'} ${className}`}>
       {children}
     </div>
   );
@@ -65,13 +65,13 @@ export const DropdownMenuItem = ({ children, className = '', asChild, ...props }
   };
   if (asChild) {
     return React.cloneElement(children, {
-      className: `cursor-pointer select-none rounded-sm px-3 py-2 text-sm text-gray-200 hover:bg-white/10 ${className}`,
+      className: `cursor-pointer select-none rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-slate-800/70 focus:bg-slate-800/70 active:bg-slate-800/80 transition-colors w-full block ${className}`,
       ...props,
       onClick: handleClick,
     });
   }
   return (
-    <div className={`cursor-pointer select-none rounded-sm px-3 py-2 text-sm text-gray-200 hover:bg-white/10 ${className}`} {...props} onClick={handleClick}>
+    <div className={`cursor-pointer select-none rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-slate-800/70 focus:bg-slate-800/70 active:bg-slate-800/80 transition-colors w-full ${className}`} {...props} onClick={handleClick}>
       {children}
     </div>
   );

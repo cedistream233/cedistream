@@ -40,7 +40,7 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title = 'Conf
         </DialogHeader>
 
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0">
-          <Button variant="secondary" onClick={onClose} disabled={loading} className="border-slate-600 text-white hover:bg-slate-800">
+          <Button variant="secondary" onClick={onClose} disabled={loading} className="border-slate-600 hover:bg-slate-800">
             {cancelText}
           </Button>
           <Button onClick={handleConfirm} disabled={loading} className="bg-red-600 hover:bg-red-700 text-white">

@@ -1,18 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Layout from '../Layout.jsx';
 import ProfilePin from './profile/ProfilePin.jsx';
+import ImagePreviewModal from '@/components/ui/ImagePreviewModal';
+import CropperModal from '@/components/ui/CropperModal';
+import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 export default function ProfilePage() {
+  const { open: openViewer } = useImageViewer();
   const { token, user, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [viewingImage, setViewingImage] = useState(null);
   const [form, setForm] = useState({ firstName: '', lastName: '', bio: '', phone: '', country: '' });
 
   useEffect(() => {
@@ -132,15 +139,17 @@ export default function ProfilePage() {
   };
 
   return (
-    <Layout currentPageName="Profile">
-      <div className="max-w-3xl mx-auto p-6">
-        <h2 className="text-2xl font-semibold text-white mb-4">Profile Settings</h2>
+    <div className="max-w-3xl mx-auto p-6">
+      <h2 className="text-2xl font-semibold text-white mb-4">Profile Settings</h2>
         {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
         {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
         <div className="bg-slate-900/50 p-4 rounded-lg border border-purple-900/20 flex gap-6 items-center">
           {/* Profile image */}
           <div className="flex flex-col items-center">
-            <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border border-slate-700">
+            <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border border-slate-700 cursor-pointer" onClick={() => {
+              if (profile?.profile_image) openViewer(profile.profile_image);
+              else fileInputRef.current?.click();
+            }}>
               {profile?.profile_image ? (
                 <img src={profile.profile_image} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -157,7 +166,12 @@ export default function ProfilePage() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => onUploadImage(e.target.files?.[0])}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  setSelectedFile(f);
+                  setShowCropper(true);
+                }}
               />
             </div>
           </div>
@@ -199,7 +213,26 @@ export default function ProfilePage() {
         <div className="mt-6">
           <ProfilePin />
         </div>
-      </div>
-    </Layout>
+      
+      <ImagePreviewModal
+        isOpen={showPreview}
+        onClose={() => { setShowPreview(false); setSelectedFile(null); fileInputRef.current && (fileInputRef.current.value = ''); }}
+        file={selectedFile}
+        onConfirm={async (file) => {
+          await onUploadImage(file);
+        }}
+      />
+      
+      <CropperModal
+        isOpen={showCropper}
+        onClose={() => { setShowCropper(false); setSelectedFile(null); fileInputRef.current && (fileInputRef.current.value = ''); }}
+        file={selectedFile}
+        onConfirm={async (blob) => {
+          const fileToUpload = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+          await onUploadImage(fileToUpload);
+        }}
+      />
+
+    </div>
   );
 }

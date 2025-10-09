@@ -48,10 +48,10 @@ export default function LogoutConfirmModal({ isOpen, onClose, onConfirm, userNam
         
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={onClose}
             disabled={isLoggingOut}
-            className="border-slate-600 text-white hover:bg-slate-800"
+            className="border-slate-600 hover:bg-slate-800"
           >
             Cancel
           </Button>
