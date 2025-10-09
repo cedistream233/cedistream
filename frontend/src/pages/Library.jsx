@@ -75,7 +75,7 @@ export default function Library() {
         <TabsList className="bg-slate-900/50 mb-8">
           <TabsTrigger value="albums" className="flex items-center gap-2">
             <Music className="w-4 h-4" />
-            Albums ({purchasedItems.albums.length})
+            Songs ({purchasedItems.albums.length})
           </TabsTrigger>
           <TabsTrigger value="videos" className="flex items-center gap-2">
             <VideoIcon className="w-4 h-4" />

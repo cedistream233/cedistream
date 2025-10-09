@@ -32,7 +32,7 @@ export default function Layout({ children, currentPageName }) {
 
 	const navItems = [
 		{ name: "Home", url: createPageUrl("Home"), icon: Home },
-		{ name: "Albums", url: createPageUrl("Albums"), icon: Music },
+		{ name: "Songs", url: createPageUrl("Songs"), icon: Music },
 		{ name: "Videos", url: createPageUrl("Videos"), icon: Video },
 		...(isAuthenticated ? [{ name: "My Library", url: createPageUrl("Library"), icon: Library }] : []),
 	];

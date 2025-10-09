@@ -7,6 +7,7 @@ import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';
 import paystackRouter from './routes/paystack.js';
 import authRouter from './routes/auth.js';
+import creatorsRouter from './routes/creators.js';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use('/api/albums', albumsRouter);
 app.use('/api/videos', videosRouter);
 app.use('/api/purchases', purchasesRouter);
 app.use('/api/paystack', paystackRouter);
+app.use('/api/creators', creatorsRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

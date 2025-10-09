@@ -18,6 +18,7 @@ import ForgotPassword from './pages/auth/ForgotPassword.jsx';
 import ResetPassword from './pages/auth/ResetPassword.jsx';
 import CreatorDashboard from './pages/CreatorDashboard.jsx';
 import Profile from './pages/Profile.jsx';
+import Creator from './pages/Creator.jsx';
 
 const withLayout = (Component, name) => (
   <Layout currentPageName={name}>
@@ -31,10 +32,12 @@ export default function App() {
       <ImageViewerProvider>
         <Routes>
         <Route path="/" element={withLayout(Home, 'Home')} />
-        <Route path="/albums" element={withLayout(Albums, 'Albums')} />
+  <Route path="/albums" element={withLayout(Albums, 'Albums')} />
+  <Route path="/songs" element={withLayout(Albums, 'Songs')} />
         <Route path="/videos" element={withLayout(Videos, 'Videos')} />
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />
+  <Route path="/creators/:id" element={withLayout(Creator, 'Creator')} />
         <Route path="/cart" element={withLayout(Cart, 'Cart')} />
         <Route path="/checkout" element={withLayout(Checkout, 'Checkout')} />
         <Route path="/library" element={withLayout(Library, 'Library')} />

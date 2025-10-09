@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Video } from "@/entities/Video";
 import { User } from "@/entities/User";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -51,9 +50,7 @@ export default function Videos() {
       );
     }
 
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter(video => video.category === selectedCategory);
-    }
+    // category filter removed per new requirements
 
     setFilteredVideos(filtered);
   };
@@ -102,23 +99,7 @@ export default function Videos() {
             className="pl-9 bg-slate-900/50 border-purple-900/20 text-white placeholder:text-gray-500 h-10"
           />
         </div>
-        <div className="flex items-center gap-2 md:w-64">
-          <Filter className="w-4 h-4 text-gray-400" />
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="bg-slate-900/50 border-purple-900/20 text-white h-10">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-900 border-purple-900/20">
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="Music Video">Music Video</SelectItem>
-              <SelectItem value="Tutorial">Tutorial</SelectItem>
-              <SelectItem value="Entertainment">Entertainment</SelectItem>
-              <SelectItem value="Documentary">Documentary</SelectItem>
-              <SelectItem value="Vlog">Vlog</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* removed category select */}
       </div>
 
       {isLoading ? (

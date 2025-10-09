@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Album } from "@/entities/Album";
 import { User } from "@/entities/User";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -51,9 +50,7 @@ export default function Albums() {
       );
     }
 
-    if (selectedGenre !== "all") {
-      filtered = filtered.filter(album => album.genre === selectedGenre);
-    }
+    // genre/category filtering removed per new requirements
 
     setFilteredAlbums(filtered);
   };
@@ -101,25 +98,6 @@ export default function Albums() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9 bg-slate-900/50 border-purple-900/20 text-white placeholder:text-gray-500 h-10"
           />
-        </div>
-        <div className="flex items-center gap-2 md:w-64">
-          <Filter className="w-4 h-4 text-gray-400" />
-          <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-            <SelectTrigger className="bg-slate-900/50 border-purple-900/20 text-white h-10">
-              <SelectValue placeholder="Genre" />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-900 border-purple-900/20">
-              <SelectItem value="all">All Genres</SelectItem>
-              <SelectItem value="Afrobeats">Afrobeats</SelectItem>
-              <SelectItem value="Hip Hop">Hip Hop</SelectItem>
-              <SelectItem value="Gospel">Gospel</SelectItem>
-              <SelectItem value="Highlife">Highlife</SelectItem>
-              <SelectItem value="R&B">R&B</SelectItem>
-              <SelectItem value="Reggae">Reggae</SelectItem>
-              <SelectItem value="Pop">Pop</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
