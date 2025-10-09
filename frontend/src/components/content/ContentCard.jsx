@@ -58,7 +58,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
             <p className="text-sm text-gray-400 truncate mb-3">{creator}</p>
             <div className="flex items-center justify-between">
               <span className="text-lg font-bold text-yellow-400">
-                GH₵ {price?.toFixed(2)}
+                GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}
               </span>
               {type === "album" && item.songs?.length > 0 && (
                 <span className="text-xs text-gray-500">

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import './lib/database.js'; // Initialize database connection
 import albumsRouter from './routes/albums.js';
 import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';

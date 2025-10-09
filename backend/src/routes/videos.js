@@ -1,25 +1,42 @@
 import { Router } from 'express';
-import { supabase } from '../lib/supabase.js';
+import { query } from '../lib/database.js';
 
 const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
     const { orderBy = 'created_at', direction = 'desc' } = req.query;
-    if (!supabase) return res.json([]);
-    const { data, error } = await supabase.from('videos').select('*').order(orderBy, { ascending: direction !== 'desc' });
-    if (error) throw error;
-    res.json(data || []);
+    
+    // Validate orderBy to prevent SQL injection
+    const validOrderFields = ['created_at', 'title', 'creator', 'price', 'release_date'];
+    const validDirections = ['asc', 'desc'];
+    
+    const orderField = validOrderFields.includes(orderBy) ? orderBy : 'created_at';
+    const orderDirection = validDirections.includes(direction.toLowerCase()) ? direction.toUpperCase() : 'DESC';
+    
+    const result = await query(
+      `SELECT * FROM videos ORDER BY ${orderField} ${orderDirection}`,
+      []
+    );
+    
+    res.json(result.rows);
   } catch (err) { next(err); }
 });
 
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    if (!supabase) return res.status(404).json({ error: 'Not found' });
-    const { data, error } = await supabase.from('videos').select('*').eq('id', id).single();
-    if (error) throw error;
-    res.json(data);
+    
+    const result = await query(
+      'SELECT * FROM videos WHERE id = $1',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    
+    res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
 

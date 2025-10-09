@@ -1,39 +1,68 @@
 import { Router } from 'express';
-import { supabase } from '../lib/supabase.js';
+import { query } from '../lib/database.js';
 
 const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
     const { user_email, payment_status } = req.query;
-    if (!supabase) return res.json([]);
-    let query = supabase.from('purchases').select('*');
-    if (user_email) query = query.eq('user_email', user_email);
-    if (payment_status) query = query.eq('payment_status', payment_status);
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json(data || []);
+    
+    let sql = 'SELECT * FROM purchases WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (user_email) {
+      sql += ` AND user_email = $${paramIndex}`;
+      params.push(user_email);
+      paramIndex++;
+    }
+    
+    if (payment_status) {
+      sql += ` AND payment_status = $${paramIndex}`;
+      params.push(payment_status);
+      paramIndex++;
+    }
+    
+    sql += ' ORDER BY created_at DESC';
+    
+    const result = await query(sql, params);
+    res.json(result.rows);
   } catch (err) { next(err); }
 });
 
 router.post('/', async (req, res, next) => {
   try {
-    const payload = req.body;
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const { data, error } = await supabase.from('purchases').insert(payload).select('*').single();
-    if (error) throw error;
-    res.status(201).json(data);
+    const { user_email, item_type, item_id, item_title, amount, payment_status = 'pending', payment_reference, payment_method } = req.body;
+    
+    const result = await query(
+      'INSERT INTO purchases (user_email, item_type, item_id, item_title, amount, payment_status, payment_reference, payment_method) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [user_email, item_type, item_id, item_title, amount, payment_status, payment_reference, payment_method]
+    );
+    
+    res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
 });
 
 router.patch('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const patch = req.body;
-    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
-    const { data, error } = await supabase.from('purchases').update(patch).eq('id', id).select('*').single();
-    if (error) throw error;
-    res.json(data);
+    const updates = req.body;
+    
+    // Build dynamic update query
+    const updateFields = Object.keys(updates);
+    const setClause = updateFields.map((field, index) => `${field} = $${index + 2}`).join(', ');
+    const values = [id, ...Object.values(updates)];
+    
+    const result = await query(
+      `UPDATE purchases SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      values
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    
+    res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
 
