@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 export default function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    identifier: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -88,16 +88,16 @@ export default function Login() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-300">Email</Label>
+                <Label htmlFor="identifier" className="text-gray-300">Email or Username</Label>
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="identifier"
+                  name="identifier"
+                  type="text"
                   required
-                  value={formData.email}
+                  value={formData.identifier}
                   onChange={handleInputChange}
                   className="bg-slate-800 border-slate-700 text-white"
-                  placeholder="Enter your email"
+                  placeholder="your@email.com or username"
                 />
               </div>
 

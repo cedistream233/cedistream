@@ -14,6 +14,7 @@ import Admin from './pages/Admin.jsx';
 import Login from './pages/auth/Login.jsx';
 import Signup from './pages/auth/Signup.jsx';
 import CreatorDashboard from './pages/CreatorDashboard.jsx';
+import Profile from './pages/Profile.jsx';
 
 const withLayout = (Component, name) => (
   <Layout currentPageName={name}>
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/library" element={withLayout(Library, 'Library')} />
         <Route path="/admin" element={withLayout(Admin, 'Admin')} />
         <Route path="/dashboard" element={withLayout(CreatorDashboard, 'Dashboard')} />
+  <Route path="/profile" element={withLayout(Profile, 'Profile')} />
         
         {/* Auth routes without layout */}
         <Route path="/login" element={<Login />} />

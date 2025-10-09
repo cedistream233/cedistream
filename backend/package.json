@@ -9,7 +9,9 @@
     "migrate": "node ./scripts/migrate.js",
     "seed": "node ./scripts/seed.js",
     "migrate-users": "node ./scripts/migrate-users.js",
-    "seed-users": "node ./scripts/seed-users.js"
+    "seed-users": "node ./scripts/seed-users.js",
+    "migrate-add-username-pin": "node ./scripts/migrate-add-username-pin.js",
+    "migrate-add-pin-rate-limit": "node ./scripts/migrate-add-pin-rate-limit.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

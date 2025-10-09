@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Music2, User, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -13,19 +12,25 @@ export default function Signup() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
+    username: '',
     password: '',
     confirmPassword: '',
     firstName: '',
     lastName: '',
     role: '',
     stageName: '',
-    bio: '',
+    pin: '',
     genreSpecialties: []
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [roleOpen, setRoleOpen] = useState(false);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -42,12 +47,40 @@ export default function Signup() {
     });
   };
 
+  // Optional: username availability check with debounce
+  useEffect(() => {
+    const value = formData.username?.trim();
+    if (!value) {
+      setUsernameAvailable(null);
+      return;
+    }
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        setCheckingUsername(true);
+        const resp = await fetch(`/api/auth/username-available?username=${encodeURIComponent(value)}`, { signal: controller.signal });
+        const data = await resp.json();
+        setUsernameAvailable(Boolean(data?.available));
+      } catch (_) {
+        setUsernameAvailable(null);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 400);
+    return () => { clearTimeout(t); controller.abort(); };
+  }, [formData.username]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      return;
+    }
+
+    if (formData.pin !== formData.confirmPin) {
+      setError('PINs do not match');
       return;
     }
 
@@ -61,6 +94,11 @@ export default function Signup() {
       return;
     }
 
+    if (!/^\d{4}$/.test(formData.pin)) {
+      setError('PIN must be exactly 4 digits');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -71,12 +109,13 @@ export default function Signup() {
         },
         body: JSON.stringify({
           email: formData.email,
+          username: formData.username,
           password: formData.password,
+          pin: formData.pin,
           firstName: formData.firstName,
           lastName: formData.lastName,
           role: formData.role,
           stageName: formData.stageName || null,
-          bio: formData.bio || null,
           genreSpecialties: formData.genreSpecialties
         }),
       });
@@ -84,7 +123,7 @@ export default function Signup() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token and user data
+  // Store token and user data
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
@@ -174,26 +213,58 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role" className="text-gray-300">I want to join as</Label>
-                <Select onValueChange={handleRoleChange} required>
-                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
-                    <SelectItem value="supporter">
-                      <div className="flex items-center space-x-2">
-                        <User className="w-4 h-4" />
-                        <span>Supporter - Buy and enjoy content</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="creator">
-                      <div className="flex items-center space-x-2">
-                        <Music2 className="w-4 h-4" />
-                        <span>Creator - Sell your music & videos</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="username" className="text-gray-300">Username</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  className={`bg-slate-800 border-slate-700 text-white ${usernameAvailable === false ? 'border-red-500' : ''}`}
+                  placeholder="john_doe"
+                />
+                {formData.username && (
+                  <p className="text-xs">
+                    {checkingUsername ? (
+                      <span className="text-gray-400">Checking availability…</span>
+                    ) : usernameAvailable === true ? (
+                      <span className="text-green-400">Username is available</span>
+                    ) : usernameAvailable === false ? (
+                      <span className="text-red-400">Username is taken</span>
+                    ) : null}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2 relative">
+                <Label className="text-gray-300">I want to join as</Label>
+                <div>
+                  <div onClick={() => setRoleOpen(!roleOpen)}>
+                    <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                      <SelectValue value={formData.role === 'creator' ? 'Creator - Sell your music & videos' : formData.role === 'supporter' ? 'Supporter - Buy and enjoy content' : ''} placeholder="Select your role" />
+                    </SelectTrigger>
+                  </div>
+
+                  {roleOpen && (
+                    <div className="absolute z-50 mt-2 w-full">
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectItem value="supporter" onClick={() => { handleRoleChange('supporter'); setRoleOpen(false); }}>
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4" />
+                            <span>Supporter - Buy and enjoy content</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="creator" onClick={() => { handleRoleChange('creator'); setRoleOpen(false); }}>
+                          <div className="flex items-center space-x-2">
+                            <Music2 className="w-4 h-4" />
+                            <span>Creator - Sell your music & videos</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {formData.role === 'creator' && (
@@ -221,7 +292,7 @@ export default function Signup() {
                     required
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="bg-slate-800 border-slate-700 text-white pr-10"
+                    className={`bg-slate-800 border-slate-700 text-white pr-10 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? 'border-red-500' : ''}`}
                     placeholder="Min 6 characters"
                   />
                   <button
@@ -244,7 +315,7 @@ export default function Signup() {
                     required
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className="bg-slate-800 border-slate-700 text-white pr-10"
+                    className={`bg-slate-800 border-slate-700 text-white pr-10 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? 'border-red-500' : ''}`}
                     placeholder="Confirm your password"
                   />
                   <button
@@ -255,19 +326,73 @@ export default function Signup() {
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                  <p className="text-xs text-red-400">Passwords do not match</p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="bio" className="text-gray-300">Bio (Optional)</Label>
-                <Textarea
-                  id="bio"
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleInputChange}
-                  className="bg-slate-800 border-slate-700 text-white"
-                  placeholder="Tell us about yourself..."
-                  rows={3}
-                />
+                <Label htmlFor="pin" className="text-gray-300">4-digit PIN (for password reset)</Label>
+                <div className="relative">
+                  <Input
+                    id="pin"
+                    name="pin"
+                    type={showPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    pattern="\\d{4}"
+                    maxLength={4}
+                    required
+                    value={formData.pin}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                      setFormData({ ...formData, pin: value });
+                    }}
+                    className={`bg-slate-800 border-slate-700 text-white pr-10 ${formData.pin && formData.pin.length < 4 ? 'border-red-500' : ''}`}
+                    placeholder="e.g. 1234"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {formData.pin && !/^\d{4}$/.test(formData.pin) && (
+                  <p className="text-xs text-red-400">PIN must be exactly 4 digits</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPin" className="text-gray-300">Confirm PIN</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPin"
+                    name="confirmPin"
+                    type={showConfirmPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    pattern="\\d{4}"
+                    maxLength={4}
+                    required
+                    value={formData.confirmPin || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                      setFormData({ ...formData, confirmPin: value });
+                    }}
+                    className={`bg-slate-800 border-slate-700 text-white pr-10 ${formData.confirmPin && formData.confirmPin !== formData.pin ? 'border-red-500' : ''}`}
+                    placeholder="Confirm your PIN"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPin(!showConfirmPin)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    {showConfirmPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {formData.confirmPin && formData.confirmPin !== formData.pin && (
+                  <p className="text-xs text-red-400">PINs do not match</p>
+                )}
               </div>
 
               <Button
