@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
 import { Sparkles, Search } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
+import { useImageViewer } from "@/contexts/ImageViewerContext.jsx";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const { open: openViewer } = useImageViewer();
 
   useEffect(() => {
     (async () => {
@@ -45,7 +47,7 @@ export default function Home() {
               <h1 className="font-display text-4xl md:text-5xl font-bold leading-tight tracking-tight mb-2 text-white">Discover creators and support them</h1>
               <p className="text-lg text-gray-400">Instantly search for creators and browse their albums and videos.</p>
             </div>
-            <div className="mx-auto max-w-xl">
+            <div className="mx-auto max-w-xl sticky top-20 z-10">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -72,21 +74,30 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {results.map((c) => (
-                  <Link key={c.user_id} to={`/creators/${encodeURIComponent(c.user_id)}`} className="block group">
+                  <div key={c.user_id} className="block group">
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50 border border-purple-900/20 hover:border-purple-500/40 transition">
-                      <img src={c.profile_image || 'https://via.placeholder.com/80?text=%F0%9F%8E%B5'} alt={c.display_name} className="w-16 h-16 rounded-full object-cover" />
-                      <div>
-                        <div className="text-white font-semibold group-hover:text-purple-300">{c.display_name}</div>
-                        <div className="text-xs text-gray-400">{c.albums_count} albums • {c.videos_count} videos</div>
+                      <img
+                        src={c.profile_image || 'https://via.placeholder.com/80?text=%F0%9F%8E%B5'}
+                        alt={c.display_name}
+                        className="w-16 h-16 rounded-full object-cover cursor-zoom-in"
+                        onClick={(e) => { e.stopPropagation(); openViewer(c.profile_image); }}
+                      />
+                      <div className="min-w-0">
+                        <Link to={`/creators/${encodeURIComponent(c.user_id)}`} className="block">
+                          <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>
+                          <div className="text-xs text-gray-400">{c.albums_count} albums • {c.videos_count} videos</div>
+                        </Link>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
           </>
-        ) : (
+        ) : user ? (
           <div className="text-gray-400">Search to discover creators. Or browse <Link to={createPageUrl('Songs')} className="text-purple-300 underline">songs</Link> and <Link to={createPageUrl('Videos')} className="text-purple-300 underline">videos</Link>.</div>
+        ) : (
+          <div className="text-gray-400">Search to discover creators.</div>
         )}
       </div>
     </div>

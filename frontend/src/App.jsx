@@ -34,6 +34,7 @@ export default function App() {
         <Route path="/" element={withLayout(Home, 'Home')} />
   <Route path="/albums" element={withLayout(Albums, 'Albums')} />
   <Route path="/songs" element={withLayout(Albums, 'Songs')} />
+  <Route path="/songs" element={withLayout(Albums, 'Songs')} />
         <Route path="/videos" element={withLayout(Videos, 'Videos')} />
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />

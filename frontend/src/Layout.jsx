@@ -5,6 +5,7 @@ import { Home, Music, Video, ShoppingCart, Library, Settings, LogOut, User as Us
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import LogoutConfirmModal from "@/components/ui/LogoutConfirmModal";
+import BackToTop from "@/components/ui/BackToTop.jsx";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -32,9 +33,11 @@ export default function Layout({ children, currentPageName }) {
 
 	const navItems = [
 		{ name: "Home", url: createPageUrl("Home"), icon: Home },
-		{ name: "Songs", url: createPageUrl("Songs"), icon: Music },
-		{ name: "Videos", url: createPageUrl("Videos"), icon: Video },
-		...(isAuthenticated ? [{ name: "My Library", url: createPageUrl("Library"), icon: Library }] : []),
+		...(isAuthenticated ? [
+			{ name: "Songs", url: createPageUrl("Songs"), icon: Music },
+			{ name: "Videos", url: createPageUrl("Videos"), icon: Video },
+			{ name: "My Library", url: createPageUrl("Library"), icon: Library },
+		] : []),
 	];
 
 	const getUserDisplayName = () => {
@@ -195,6 +198,9 @@ export default function Layout({ children, currentPageName }) {
 			<main className="pb-20 md:pb-8">
 				{children}
 			</main>
+
+			{/* Back to top */}
+			<BackToTop />
 
 			{/* Logout Confirmation Modal */}
 			<LogoutConfirmModal

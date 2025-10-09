@@ -4,17 +4,22 @@ import { User } from "@/entities/User";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { Song } from "@/entities/Song";
 
 export default function Albums() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSongs = location.pathname.toLowerCase().startsWith('/songs');
+  const [tab, setTab] = useState('albums'); // 'singles' | 'albums'
   const [albums, setAlbums] = useState([]);
   const [filteredAlbums, setFilteredAlbums] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [singles, setSingles] = useState([]);
 
   useEffect(() => {
     loadAlbums();
@@ -34,9 +39,13 @@ export default function Albums() {
 
   const loadAlbums = async () => {
     setIsLoading(true);
-    const data = await Album.list("-created_date");
-    setAlbums(data);
-    setFilteredAlbums(data);
+    const [albumsData, singlesData] = await Promise.all([
+      Album.list("-created_date"),
+      isSongs ? Song.list({ orderBy: '-created_date' }) : Promise.resolve([])
+    ]);
+    setAlbums(albumsData);
+    setFilteredAlbums(albumsData);
+    setSingles(singlesData);
     setIsLoading(false);
   };
 
@@ -55,14 +64,14 @@ export default function Albums() {
     setFilteredAlbums(filtered);
   };
 
-  const handleAddToCart = async (album) => {
+  const handleAddToCart = async (album, asSong = false) => {
     if (!user) {
       await User.login();
       return;
     }
 
     const cartItem = {
-      item_type: "album",
+      item_type: asSong ? "song" : "album",
       item_id: album.id,
       title: album.title,
       price: album.price,
@@ -85,9 +94,22 @@ export default function Albums() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="mb-6">
-        <h1 className="text-4xl font-bold text-white mb-2">Albums</h1>
-        <p className="text-gray-400">Discover amazing music from talented artists</p>
+        <h1 className="text-4xl font-bold text-white mb-2">{isSongs ? 'Songs' : 'Albums'}</h1>
+        <p className="text-gray-400">{isSongs ? 'Browse singles and full albums' : 'Discover amazing music from talented artists'}</p>
       </div>
+
+      {isSongs && (
+        <div className="mb-6 flex items-center gap-2">
+          <button
+            onClick={() => setTab('singles')}
+            className={`px-4 py-2 rounded-lg ${tab==='singles' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white hover:bg-purple-900/30'}`}
+          >Singles</button>
+          <button
+            onClick={() => setTab('albums')}
+            className={`px-4 py-2 rounded-lg ${tab==='albums' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white hover:bg-purple-900/30'}`}
+          >Albums</button>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
@@ -111,6 +133,30 @@ export default function Albums() {
             </div>
           ))}
         </div>
+      ) : isSongs && tab === 'singles' ? (
+        singles.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">No singles found</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {singles.map((song) => (
+              <ContentCard
+                key={song.id}
+                // ContentCard expects album/video shape; map song fields accordingly
+                item={{
+                  id: song.id,
+                  title: song.title,
+                  artist: song.artist,
+                  price: song.price,
+                  cover_image: song.cover_image,
+                  songs: []
+                }}
+                type="album"
+                onAddToCart={() => handleAddToCart({ id: song.id, title: song.title, price: song.price, cover_image: song.cover_image }, true)}
+                onViewDetails={() => { /* optional: navigate to a SongDetails page later */ }}
+              />
+            ))}
+          </div>
+        )
       ) : filteredAlbums.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-gray-400 text-lg">No albums found</p>
