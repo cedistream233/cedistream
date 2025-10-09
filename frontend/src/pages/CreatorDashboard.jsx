@@ -16,9 +16,16 @@ import {
   BarChart3
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Edit2, X } from 'lucide-react';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function CreatorDashboard() {
   const [user, setUser] = useState(null);
+  const { token, updateUser } = useAuth();
+  const navigate = useNavigate();
+  const [showRemoveConfirm, setShowRemoveConfirm] = React.useState(false);
   const [stats, setStats] = useState({
     totalEarnings: 0,
     totalSales: 0,
@@ -85,6 +92,24 @@ export default function CreatorDashboard() {
     }
   };
 
+  const handleRemoveImage = async () => {
+    try {
+      const res = await fetch('/api/auth/profile/image', {
+        method: 'DELETE',
+        headers: { Authorization: token ? `Bearer ${token}` : '' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to remove image');
+      // refresh profile data
+      setUser(data.user);
+      updateUser?.(data.user);
+    } catch (err) {
+      console.error('Remove image error:', err);
+    } finally {
+      setShowRemoveConfirm(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center">
@@ -130,6 +155,46 @@ export default function CreatorDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
+            {/* Avatar */}
+            <div className="flex items-center justify-center mb-4">
+              <div className="relative">
+                <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border-4 border-white/5 flex items-center justify-center text-2xl font-bold text-white">
+                  {user?.profile_image ? (
+                    <img src={user.profile_image} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    (() => {
+                      const first = user?.first_name || user?.firstName || '';
+                      const last = user?.last_name || user?.lastName || '';
+                      if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+                      const base = user?.username || user?.email || 'U';
+                      return String(base[0]).toUpperCase();
+                    })()
+                  )}
+                </div>
+
+                {/* overlay controls for small screens only (stacked) */}
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-3 md:hidden">
+                  <button onClick={() => setShowRemoveConfirm(true)} type="button" className="bg-white rounded-full p-2 shadow-md text-red-500 border border-slate-200" aria-label="Remove photo">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button onClick={()=>navigate('/profile')} type="button" className="bg-white rounded-full p-2 shadow-md text-blue-500 border border-slate-200" aria-label="Edit photo">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Desktop controls: visible on md+ screens, placed next to avatar */}
+              <div className="hidden md:flex flex-col ml-4 gap-2">
+                <button onClick={()=>navigate('/profile')} type="button" className="flex items-center gap-2 px-3 py-1 rounded-md bg-white text-blue-600 hover:bg-slate-100 shadow" aria-label="Edit photo desktop">
+                  <Edit2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Edit Photo</span>
+                </button>
+                <button onClick={() => setShowRemoveConfirm(true)} type="button" className="flex items-center gap-2 px-3 py-1 rounded-md bg-white text-red-600 hover:bg-slate-100 shadow" aria-label="Remove photo desktop">
+                  <X className="w-4 h-4" />
+                  <span className="text-sm font-medium">Remove Photo</span>
+                </button>
+              </div>
+            </div>
             <h1 className="text-3xl font-bold text-white mb-2">
               {(() => {
                 const first = user?.first_name || user?.firstName;
@@ -348,6 +413,15 @@ export default function CreatorDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+      <ConfirmModal
+        isOpen={showRemoveConfirm}
+        onClose={() => setShowRemoveConfirm(false)}
+        onConfirm={handleRemoveImage}
+        title="Remove profile photo"
+        description="Are you sure you want to remove your profile photo? This action can be undone by uploading a new photo later."
+        confirmText="Remove"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
