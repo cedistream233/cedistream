@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Music2, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login, updateUser } = useAuth();
   const [formData, setFormData] = useState({
     identifier: '',
     password: ''
@@ -41,16 +43,22 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token and user data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
+        // Update auth context immediately
+        login(data.user, data.token);
+
+        // Optionally hydrate with full profile to ensure consistent fields
+        try {
+          const profRes = await fetch('/api/auth/profile', {
+            headers: { Authorization: `Bearer ${data.token}` }
+          });
+          if (profRes.ok) {
+            const prof = await profRes.json();
+            updateUser?.(prof);
+          }
+        } catch {}
+
         // Redirect based on role
-        if (data.user.role === 'creator') {
-          navigate('/dashboard');
-        } else {
-          navigate('/');
-        }
+        navigate(data.user.role === 'creator' ? '/dashboard' : '/');
       } else {
         setError(data.error || 'Login failed');
       }

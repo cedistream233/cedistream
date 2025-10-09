@@ -1,11 +1,14 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { query } from '../lib/database.js';
 import { generateToken, authenticateToken, generateResetToken, verifyResetToken } from '../lib/auth.js';
+import { supabase } from '../lib/supabase.js';
 
 const router = express.Router();
 const MAX_PIN_ATTEMPTS = 5; // configurable
 const LOCKOUT_MINUTES = 15; // configurable
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
 
 // Register new user
 router.post('/register', async (req, res) => {
@@ -226,6 +229,88 @@ router.patch('/profile', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Profile update error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Upload/Change profile image
+router.post('/profile/image', authenticateToken, upload.single('image'), async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+    const userId = req.user.id;
+    if (!req.file) return res.status(400).json({ error: 'No image provided' });
+
+    // Generate a unique path
+    const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
+    const filePath = `profiles/${userId}/${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET || 'public')
+      .upload(filePath, req.file.buffer, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: req.file.mimetype || 'image/jpeg',
+      });
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload image' });
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(process.env.SUPABASE_BUCKET || 'public')
+      .getPublicUrl(filePath);
+
+    const imageUrl = publicUrlData?.publicUrl;
+
+    // Update user profile_image
+    const result = await query(
+      `UPDATE users SET profile_image = $1, updated_at = NOW() WHERE id = $2
+       RETURNING id, email, username, first_name, last_name, role, profile_image`,
+      [imageUrl, userId]
+    );
+
+    return res.json({ ok: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('Profile image upload error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Remove profile image
+router.delete('/profile/image', authenticateToken, async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+    const userId = req.user.id;
+    // Load current image to attempt deletion
+    const result = await query('SELECT profile_image FROM users WHERE id = $1', [userId]);
+    const current = result.rows[0]?.profile_image;
+    if (current) {
+      try {
+        const url = new URL(current);
+        // Supabase public URL contains the path after "/object/public/<bucket>/"
+        const parts = url.pathname.split('/');
+        const idx = parts.findIndex(p => p === 'public');
+        const objectPath = idx >= 0 ? parts.slice(idx + 2).join('/') : null; // skip 'public' and bucket
+        if (objectPath) {
+          await supabase.storage
+            .from(process.env.SUPABASE_BUCKET || 'public')
+            .remove([objectPath]);
+        }
+      } catch (e) {
+        // Continue even if delete fails
+        console.warn('Failed to parse/delete old profile image:', e?.message || e);
+      }
+    }
+
+    const updated = await query(
+      `UPDATE users SET profile_image = NULL, updated_at = NOW() WHERE id = $1
+       RETURNING id, email, username, first_name, last_name, role, profile_image`,
+      [userId]
+    );
+
+    return res.json({ ok: true, user: updated.rows[0] });
+  } catch (error) {
+    console.error('Profile image remove error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

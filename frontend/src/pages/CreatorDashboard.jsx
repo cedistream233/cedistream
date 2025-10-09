@@ -131,7 +131,14 @@ export default function CreatorDashboard() {
             transition={{ duration: 0.5 }}
           >
             <h1 className="text-3xl font-bold text-white mb-2">
-              Welcome back, {user?.creatorProfile?.stage_name || `${user?.first_name} ${user?.last_name}`}!
+              {(() => {
+                const first = user?.first_name || user?.firstName;
+                const last = user?.last_name || user?.lastName;
+                const full = first && last ? `${first} ${last}` : (first || last);
+                const fallback = user?.username || user?.email || 'there';
+                const display = user?.creatorProfile?.stage_name || full || fallback;
+                return `Welcome back, ${display}!`;
+              })()}
             </h1>
             <p className="text-gray-400">Here's what's happening with your content</p>
           </motion.div>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Home, Music, Video, ShoppingCart, Library, Settings, LogOut, User as UserIcon, BarChart3 } from "lucide-react";
+import { Home, Music, Video, ShoppingCart, Library, Settings, LogOut, User as UserIcon, BarChart3, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import LogoutConfirmModal from "@/components/ui/LogoutConfirmModal";
@@ -39,17 +39,19 @@ export default function Layout({ children, currentPageName }) {
 
 	const getUserDisplayName = () => {
 		if (!user) return '';
-		return user.firstName && user.lastName 
-			? `${user.firstName} ${user.lastName}`
-			: user.email;
+		const first = user.firstName || user.first_name;
+		const last = user.lastName || user.last_name;
+		if (first && last) return `${first} ${last}`;
+		return user.username || user.email || '';
 	};
 
 	const getUserInitials = () => {
 		if (!user) return 'U';
-		if (user.firstName && user.lastName) {
-			return `${user.firstName[0]}${user.lastName[0]}`;
-		}
-		return user.email[0].toUpperCase();
+		const first = user.firstName || user.first_name;
+		const last = user.lastName || user.last_name;
+		if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+		const base = user.username || user.email || 'U';
+		return String(base[0] || 'U').toUpperCase();
 	};
 
 	return (
@@ -108,10 +110,8 @@ export default function Layout({ children, currentPageName }) {
 							{isAuthenticated ? (
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
-										<Button variant="ghost" className="text-gray-300 hover:text-white">
-											<div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-												{getUserInitials()}
-											</div>
+										<Button variant="ghost" size="icon" aria-label="Open menu" className="text-gray-300 hover:text-white">
+											<Menu className="w-6 h-6" />
 										</Button>
 									</DropdownMenuTrigger>
 									<DropdownMenuContent align="end" className="bg-slate-900 border-purple-900/20 min-w-[200px]">
