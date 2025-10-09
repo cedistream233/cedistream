@@ -9,8 +9,19 @@ export const DropdownMenuContent = ({ children, align = 'start', className = '' 
     {children}
   </div>
 );
-export const DropdownMenuItem = ({ children, className = '', ...props }) => (
-  <div className={`cursor-pointer select-none rounded-sm px-3 py-2 text-sm text-gray-200 hover:bg-white/10 ${className}`} {...props}>
-    {children}
-  </div>
+export const DropdownMenuItem = ({ children, className = '', asChild, ...props }) => {
+  if (asChild) {
+    return React.cloneElement(children, {
+      className: `cursor-pointer select-none rounded-sm px-3 py-2 text-sm text-gray-200 hover:bg-white/10 ${className}`,
+      ...props
+    });
+  }
+  return (
+    <div className={`cursor-pointer select-none rounded-sm px-3 py-2 text-sm text-gray-200 hover:bg-white/10 ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+export const DropdownMenuSeparator = ({ className = '' }) => (
+  <div className={`my-1 h-px bg-slate-700 ${className}`} />
 );

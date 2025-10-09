@@ -9,6 +9,7 @@
     "preview": "vite preview --port 3000"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.451.0",

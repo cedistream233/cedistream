@@ -86,26 +86,26 @@ export default function Albums() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="mb-6">
         <h1 className="text-4xl font-bold text-white mb-2">Albums</h1>
         <p className="text-gray-400">Discover amazing music from talented artists</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search albums or artists..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-slate-900/50 border-purple-900/20 text-white placeholder:text-gray-500"
+            className="pl-9 bg-slate-900/50 border-purple-900/20 text-white placeholder:text-gray-500 h-10"
           />
         </div>
         <div className="flex items-center gap-2 md:w-64">
-          <Filter className="w-5 h-5 text-gray-400" />
+          <Filter className="w-4 h-4 text-gray-400" />
           <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-            <SelectTrigger className="bg-slate-900/50 border-purple-900/20 text-white">
+            <SelectTrigger className="bg-slate-900/50 border-purple-900/20 text-white h-10">
               <SelectValue placeholder="Genre" />
             </SelectTrigger>
             <SelectContent className="bg-slate-900 border-purple-900/20">

@@ -7,14 +7,18 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "migrate": "node ./scripts/migrate.js",
-    "seed": "node ./scripts/seed.js"
+    "seed": "node ./scripts/seed.js",
+    "migrate-users": "node ./scripts/migrate-users.js",
+    "seed-users": "node ./scripts/seed-users.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "axios": "^1.7.7",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3",
     "supabase": "^2.5.0"
   },

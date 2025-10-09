@@ -6,6 +6,7 @@ import albumsRouter from './routes/albums.js';
 import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';
 import paystackRouter from './routes/paystack.js';
+import authRouter from './routes/auth.js';
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
+app.use('/api/auth', authRouter);
 app.use('/api/albums', albumsRouter);
 app.use('/api/videos', videosRouter);
 app.use('/api/purchases', purchasesRouter);
