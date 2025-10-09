@@ -243,8 +243,9 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
     const filePath = `profiles/${userId}/${Date.now()}.${ext}`;
 
+    const bucket = process.env.SUPABASE_BUCKET || 'profiles';
     const { error: uploadError } = await supabase.storage
-      .from(process.env.SUPABASE_BUCKET || 'public')
+      .from(bucket)
       .upload(filePath, req.file.buffer, {
         cacheControl: '3600',
         upsert: true,
@@ -256,7 +257,7 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from(process.env.SUPABASE_BUCKET || 'public')
+      .from(bucket)
       .getPublicUrl(filePath);
 
     const imageUrl = publicUrlData?.publicUrl;
@@ -284,17 +285,26 @@ router.delete('/profile/image', authenticateToken, async (req, res) => {
     const result = await query('SELECT profile_image FROM users WHERE id = $1', [userId]);
     const current = result.rows[0]?.profile_image;
     if (current) {
-      try {
-        const url = new URL(current);
-        // Supabase public URL contains the path after "/object/public/<bucket>/"
-        const parts = url.pathname.split('/');
-        const idx = parts.findIndex(p => p === 'public');
-        const objectPath = idx >= 0 ? parts.slice(idx + 2).join('/') : null; // skip 'public' and bucket
-        if (objectPath) {
-          await supabase.storage
-            .from(process.env.SUPABASE_BUCKET || 'public')
-            .remove([objectPath]);
-        }
+    try {
+      const url = new URL(current);
+      // Supabase public URL contains the path after "/object/public/<bucket>/"
+      const parts = url.pathname.split('/');
+      const idx = parts.findIndex(p => p === 'object');
+      const bucket = process.env.SUPABASE_BUCKET || 'profiles';
+      let objectPath = null;
+      if (idx >= 0) {
+        // format: /object/public/<bucket>/<path>
+        objectPath = parts.slice(idx + 3).join('/');
+      } else {
+        // fallback: attempt to remove leading slash and bucket name
+        const bucketIdx = parts.findIndex(p => p === bucket);
+        objectPath = bucketIdx >= 0 ? parts.slice(bucketIdx + 1).join('/') : parts.slice(1).join('/');
+      }
+      if (objectPath) {
+        await supabase.storage
+          .from(bucket)
+          .remove([objectPath]);
+      }
       } catch (e) {
         // Continue even if delete fails
         console.warn('Failed to parse/delete old profile image:', e?.message || e);
