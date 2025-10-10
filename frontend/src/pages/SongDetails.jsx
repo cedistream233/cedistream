@@ -61,8 +61,8 @@ export default function SongDetails() {
         ) : (
           <div className="w-full text-center text-xs text-gray-400">No preview available. Purchase to listen.</div>
         )}
-  <div className="text-yellow-400 font-bold text-lg">From GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
-        <div className="w-full text-center text-sm text-gray-400 mt-2">Supporters can pay more than the minimum to support the creator — set your amount at checkout.</div>
+  <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
+    <div className="w-full text-center text-sm text-gray-400 mt-2">You can choose to pay more to support the creator. Minimum applies.</div>
         <div className="w-full flex gap-3 mt-4">
           <button onClick={async () => {
             const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
