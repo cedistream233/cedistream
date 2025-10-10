@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ContentCard from '@/components/content/ContentCard';
+import ContentRow from '@/components/content/ContentRow';
 import { Song } from '@/entities/Song';
 
 export default function Creator() {
   const { id } = useParams();
+  const [tab, setTab] = useState('songs'); // 'songs' | 'albums' | 'videos'
   const [creator, setCreator] = useState(null);
   const [content, setContent] = useState({ albums: [], videos: [] });
   const [singles, setSingles] = useState([]);
@@ -51,27 +53,37 @@ export default function Creator() {
         </div>
       </div>
 
+      {/* Top horizontal filter */}
+      <div className="mb-6 flex items-center gap-2 overflow-x-auto">
+        {['songs','albums','videos'].map(k => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap ${tab===k ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white hover:bg-purple-900/30'}`}
+          >{k}</button>
+        ))}
+      </div>
+
       <div className="space-y-10">
-        <section>
-          <h2 className="text-xl text-white mb-4">Singles</h2>
-          {singles.length === 0 ? (
-            <div className="text-gray-400">No singles yet</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {singles.map((song) => (
-                <ContentCard
-                  key={song.id}
-                  item={{
-                    id: song.id,
-                    title: song.title,
-                    artist: song.artist,
-                    price: song.price,
-                    cover_image: song.cover_image,
-                    audio_url: song.audio_url,
-                    songs: []
-                  }}
-                  type="album"
-                  onAddToCart={() => {
+        {tab === 'songs' && (
+          <section>
+            <h2 className="text-xl text-white mb-4">Singles</h2>
+            {singles.length === 0 ? (
+              <div className="text-gray-400">No singles yet</div>
+            ) : (
+              <div className="space-y-3">
+                {singles.map((song) => (
+                  <ContentRow
+                    key={song.id}
+                    item={{
+                      id: song.id,
+                      title: song.title,
+                      artist: song.artist,
+                      price: song.price,
+                      cover_image: song.cover_image,
+                    }}
+                    type="song"
+                    onAddToCart={() => {
                     // open ChooseAmountModal via simple flow used in Albums/Videos: emulate adding to cart by triggering login or modal
                     (async () => {
                       try {
@@ -111,15 +123,16 @@ export default function Creator() {
                         console.error(e);
                       }
                     })();
-                  }}
-                  onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+                    }}
+                    onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        <section>
+        {tab === 'albums' && (<section>
           <h2 className="text-xl text-white mb-4">Albums</h2>
           {content.albums.length === 0 ? (
             <div className="text-gray-400">No albums yet</div>
@@ -130,9 +143,9 @@ export default function Creator() {
               ))}
             </div>
           )}
-        </section>
+        </section>)}
 
-        <section>
+        {tab === 'videos' && (<section>
           <h2 className="text-xl text-white mb-4">Videos</h2>
           {content.videos.length === 0 ? (
             <div className="text-gray-400">No videos yet</div>
@@ -143,7 +156,7 @@ export default function Creator() {
               ))}
             </div>
           )}
-        </section>
+        </section>)}
       </div>
     </div>
   );
