@@ -10,6 +10,7 @@ export default function SongDetails() {
   const [loading, setLoading] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
   const [purchased, setPurchased] = useState(false);
+  const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
 
   useEffect(() => {
     (async () => {
@@ -47,7 +48,16 @@ export default function SongDetails() {
         <h1 className="text-2xl font-bold text-white mb-1">{song.title}</h1>
         <div className="text-gray-400 mb-2">{song.artist}</div>
         {audioUrl ? (
-          <AudioPlayer src={audioUrl} title={song.title} showPreviewBadge={!purchased} />
+          <AudioPlayer
+            src={audioUrl}
+            title={song.title}
+            showPreviewBadge={!purchased}
+            hasPrev={false}
+            hasNext={false}
+            loopMode={loopMode}
+            onLoopModeChange={setLoopMode}
+            embedded
+          />
         ) : (
           <div className="w-full text-center text-xs text-gray-400">No preview available. Purchase to listen.</div>
         )}

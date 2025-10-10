@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
+import AudioPlayer from '@/components/media/AudioPlayer';
 
 export default function AlbumDetails() {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ export default function AlbumDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [purchased, setPurchased] = useState(false);
   const [trackAudioUrls, setTrackAudioUrls] = useState({});
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
 
   useEffect(() => {
@@ -79,6 +82,17 @@ export default function AlbumDetails() {
       setTrackAudioUrls(map);
     })();
   }, [album?.songs, purchased]);
+
+  const onPrev = () => {
+    if (!album?.songs?.length) return;
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+    else if (loopMode === 'all') setCurrentIndex(album.songs.length - 1);
+  };
+  const onNext = () => {
+    if (!album?.songs?.length) return;
+    if (currentIndex < album.songs.length - 1) setCurrentIndex(currentIndex + 1);
+    else if (loopMode === 'all') setCurrentIndex(0);
+  };
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -226,11 +240,25 @@ export default function AlbumDetails() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-[220px] sm:min-w-[320px] w-full sm:w-auto sm:max-w-md">
                       {trackAudioUrls[song.id] ? (
-                        <audio controls src={trackAudioUrls[song.id]} className="max-w-xs">
-                          Your browser does not support the audio element.
-                        </audio>
+                        <AudioPlayer
+                          src={trackAudioUrls[song.id]}
+                          title={song.title}
+                          artwork={album.cover_image}
+                          showPreviewBadge={!purchased}
+                          onEnded={() => {
+                            if (loopMode === 'one') return; // replay same via loop handled internally
+                            if (index === currentIndex) onNext();
+                          }}
+                          onPrev={() => { setCurrentIndex(index); onPrev(); }}
+                          onNext={() => { setCurrentIndex(index); onNext(); }}
+                          hasPrev={album.songs.length > 1}
+                          hasNext={album.songs.length > 1}
+                          loopMode={loopMode}
+                          onLoopModeChange={setLoopMode}
+                          embedded
+                        />
                       ) : (
                         <span className="text-xs text-gray-500">No preview</span>
                       )}
