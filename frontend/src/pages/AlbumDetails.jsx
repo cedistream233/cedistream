@@ -69,7 +69,6 @@ export default function AlbumDetails() {
       if (!album?.songs?.length) return;
       const map = {};
       for (const s of album.songs) {
-        // if purchased, try get signed url else fallback to preview if exists
         let url = null;
         if (purchased) {
           url = await Song.getSignedUrl(s.id, localStorage.getItem('token'));
@@ -225,11 +224,32 @@ export default function AlbumDetails() {
 
       {album.songs?.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold text-white mb-6">Tracklist</h2>
+          <h2 className="text-2xl font-bold text-white mb-6">Now Playing</h2>
+          <div className="mb-6">
+            <AudioPlayer
+              src={trackAudioUrls[album.songs[currentIndex]?.id]}
+              title={album.songs[currentIndex]?.title || 'Track'}
+              artwork={album.cover_image}
+              showPreviewBadge={!purchased}
+              onEnded={() => { if (loopMode !== 'one') onNext(); }}
+              onPrev={onPrev}
+              onNext={onNext}
+              hasPrev={album.songs.length > 1}
+              hasNext={album.songs.length > 1}
+              loopMode={loopMode}
+              onLoopModeChange={setLoopMode}
+            />
+          </div>
+
+          <h3 className="text-xl font-semibold text-white mb-3">Tracklist</h3>
           <Card className="bg-slate-900/50 border-purple-900/20">
             <div className="divide-y divide-purple-900/20">
               {album.songs.map((song, index) => (
-                <div key={song.id || index} className="p-4 hover:bg-purple-900/10 transition-colors">
+                <button
+                  key={song.id || index}
+                  onClick={() => setCurrentIndex(index)}
+                  className={`w-full text-left p-4 hover:bg-purple-900/10 transition-colors ${index===currentIndex?'bg-purple-900/10':''}`}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <span className="text-gray-500 font-medium w-8">{index + 1}</span>
@@ -240,31 +260,11 @@ export default function AlbumDetails() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 min-w-[220px] sm:min-w-[320px] w-full sm:w-auto sm:max-w-md">
-                      {trackAudioUrls[song.id] ? (
-                        <AudioPlayer
-                          src={trackAudioUrls[song.id]}
-                          title={song.title}
-                          artwork={album.cover_image}
-                          showPreviewBadge={!purchased}
-                          onEnded={() => {
-                            if (loopMode === 'one') return; // replay same via loop handled internally
-                            if (index === currentIndex) onNext();
-                          }}
-                          onPrev={() => { setCurrentIndex(index); onPrev(); }}
-                          onNext={() => { setCurrentIndex(index); onNext(); }}
-                          hasPrev={album.songs.length > 1}
-                          hasNext={album.songs.length > 1}
-                          loopMode={loopMode}
-                          onLoopModeChange={setLoopMode}
-                          embedded
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-500">No preview</span>
-                      )}
+                    <div className="text-xs text-gray-400">
+                      {trackAudioUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No preview'}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </Card>

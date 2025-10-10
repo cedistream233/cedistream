@@ -47,7 +47,8 @@ export default function Albums() {
     ]);
     setAlbums(albumsData);
     setFilteredAlbums(albumsData);
-    setSingles(singlesData);
+    // only standalone singles (exclude songs that belong to albums)
+    setSingles(Array.isArray(singlesData) ? singlesData.filter(s => !s.album_id) : []);
     setIsLoading(false);
   };
 

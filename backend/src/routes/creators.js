@@ -24,9 +24,17 @@ router.get('/', async (req, res, next) => {
               -- content counts (best-effort if tables exist)
               COALESCE((SELECT COUNT(1) FROM albums a WHERE a.user_id = u.id), 0) as albums_count,
               COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = u.id), 0) as videos_count,
-              COALESCE((SELECT COUNT(1) FROM songs s WHERE s.user_id = u.id), 0) as songs_count,
-              -- recent songs (top 3)
-              (SELECT COALESCE(json_agg(row_to_json(sq)), '[]'::json) FROM (SELECT id, title, price FROM songs s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 3) sq) as recent_songs
+              COALESCE((SELECT COUNT(1) FROM songs s WHERE s.user_id = u.id AND s.album_id IS NULL), 0) as songs_count,
+              -- recent singles (top 3)
+              (SELECT COALESCE(json_agg(row_to_json(sq)), '[]'::json)
+                 FROM (
+                   SELECT id, title, price
+                   FROM songs s
+                   WHERE s.user_id = u.id AND s.album_id IS NULL
+                   ORDER BY s.created_at DESC
+                   LIMIT 3
+                 ) sq
+              ) as recent_songs
        FROM users u
        LEFT JOIN creator_profiles cp ON cp.user_id = u.id
        ${where}
@@ -50,8 +58,16 @@ router.get('/:id', async (req, res, next) => {
               COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as display_name,
               COALESCE((SELECT COUNT(1) FROM albums a WHERE a.user_id = u.id), 0) as albums_count,
               COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = u.id), 0) as videos_count,
-              COALESCE((SELECT COUNT(1) FROM songs s WHERE s.user_id = u.id), 0) as songs_count,
-              (SELECT COALESCE(json_agg(row_to_json(sq)), '[]'::json) FROM (SELECT id, title, price FROM songs s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 6) sq) as recent_songs
+              COALESCE((SELECT COUNT(1) FROM songs s WHERE s.user_id = u.id AND s.album_id IS NULL), 0) as songs_count,
+              (SELECT COALESCE(json_agg(row_to_json(sq)), '[]'::json)
+                 FROM (
+                   SELECT id, title, price
+                   FROM songs s
+                   WHERE s.user_id = u.id AND s.album_id IS NULL
+                   ORDER BY s.created_at DESC
+                   LIMIT 6
+                 ) sq
+              ) as recent_songs
        FROM users u
        LEFT JOIN creator_profiles cp ON cp.user_id = u.id
        WHERE u.id = $1`,
@@ -87,7 +103,7 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/content', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const [albumsRes, videosRes, songsRes] = await Promise.all([
+  const [albumsRes, videosRes, songsRes] = await Promise.all([
       query(
         `SELECT a.*, COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as artist
          FROM albums a
@@ -106,7 +122,7 @@ router.get('/:id/content', async (req, res, next) => {
       )
         ,
         query(
-          `SELECT s.id, s.title, s.price, s.created_at, s.cover_image, s.preview_url
+          `SELECT s.id, s.title, s.price, s.created_at, s.cover_image, s.preview_url, s.album_id
            FROM songs s
            WHERE s.user_id = $1
            ORDER BY s.created_at DESC`,
@@ -161,10 +177,12 @@ router.get('/:id/songs', async (req, res, next) => {
     let p = 2;
     const { search } = req.query;
     if (search) { conds.push(`LOWER(s.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
+    // show only standalone singles (exclude tracks that belong to albums)
+    conds.push('s.album_id IS NULL');
     const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([
       query(
-        `SELECT s.id, s.title, s.price, s.status, s.created_at, s.cover_image, s.preview_url
+        `SELECT s.id, s.title, s.price, s.status, s.created_at, s.cover_image, s.preview_url, s.album_id
          FROM songs s
          ${where}
          ORDER BY s.created_at DESC
