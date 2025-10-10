@@ -62,6 +62,25 @@ export default function SongDetails() {
           <div className="w-full text-center text-xs text-gray-400">No preview available. Purchase to listen.</div>
         )}
   <div className="text-yellow-400 font-bold text-lg">From GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
+        <div className="w-full text-center text-sm text-gray-400 mt-2">Supporters can pay more than the minimum to support the creator — set your amount at checkout.</div>
+        <div className="w-full flex gap-3 mt-4">
+          <button onClick={async () => {
+            const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
+            if (!u) { const { User } = await import('@/entities/User'); await User.login(); window.location.reload(); return; }
+            // add to cart simple flow
+            const cartItem = { item_type: 'song', item_id: song.id, title: song.title, price: Number(song.price||0), min_price: Number(song.price||0), image: song.cover_image };
+            const u2 = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+            u2.cart = u2.cart || [];
+            if (!u2.cart.some(i => i.item_id === song.id)) {
+              u2.cart.push(cartItem);
+              localStorage.setItem('demo_user', JSON.stringify(u2));
+              window.location.href = '/cart';
+            } else {
+              window.location.href = '/cart';
+            }
+          }} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg">Add to Cart</button>
+          <button onClick={() => window.location.href = `/songs/${encodeURIComponent(song.id)}` } className="flex-1 bg-slate-800 text-gray-300 py-3 rounded-lg">More Details</button>
+        </div>
         {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}
       </Card>
     </div>

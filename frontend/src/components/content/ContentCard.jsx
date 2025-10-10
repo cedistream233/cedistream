@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, ShoppingCart, Music2 } from "lucide-react";
+import { Play, ShoppingCart, Music2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import { Pause, RotateCcw } from "lucide-react";
 
@@ -17,6 +17,8 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
   const [playing, setPlaying] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [user, setUser] = useState(null);
+  const [owned, setOwned] = useState(false);
 
   useEffect(() => {
     // Prefer a dedicated preview endpoint for songs. We detect songs by presence of audio_url on the card item
@@ -36,6 +38,19 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
       } finally { setLoadingPreview(false); }
     }
     loadPreview();
+    (async () => {
+      try {
+        const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
+        setUser(u);
+        if (u && Array.isArray(u.purchases)) {
+          setOwned(u.purchases.some(p => p.item_id === item.id));
+        } else {
+          setOwned(false);
+        }
+      } catch {
+        setUser(null);
+      }
+    })();
     return () => { if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current); };
   }, [item?.id, item?.audio_url]);
 
@@ -106,6 +121,18 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
             )}
             
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              {/* Locked badge + preview indicator */}
+              <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
+                {!owned && (
+                  <div className="text-[11px] uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    <span>Locked</span>
+                  </div>
+                )}
+                {previewUrl && (
+                  <div className="text-[11px] uppercase tracking-wider bg-purple-600 text-white px-2 py-0.5 rounded">Preview</div>
+                )}
+              </div>
               <div className="absolute bottom-4 left-4 right-4 flex gap-2 items-center">
                 {type === 'album' && previewUrl && (
                   <Button
