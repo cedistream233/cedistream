@@ -21,6 +21,7 @@ export default function UploadVideo() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [progress, setProgress] = useState(0);
+  const [eta, setEta] = useState('');
   const [showProgress, setShowProgress] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [created, setCreated] = useState(null);
@@ -47,12 +48,24 @@ export default function UploadVideo() {
   if (preview) fd.append('preview', preview);
       const token = localStorage.getItem('token');
       setProgress(5); setShowProgress(true);
+      const start = Date.now(); let lastLoaded = 0; let lastTime = start;
       const res = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/uploads/videos');
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.min(99, (e.loaded / e.total) * 100));
+          if (e.lengthComputable) {
+            setProgress(Math.min(99, (e.loaded / e.total) * 100));
+            const now = Date.now();
+            const deltaBytes = e.loaded - lastLoaded; const deltaTime = (now - lastTime) / 1000;
+            if (deltaTime > 0) {
+              const speed = deltaBytes / deltaTime;
+              const remaining = e.total - e.loaded;
+              const seconds = speed > 0 ? Math.ceil(remaining / speed) : 0;
+              if (isFinite(seconds)) setEta(seconds > 0 ? `~${seconds}s remaining` : 'Almost done…');
+            }
+            lastLoaded = e.loaded; lastTime = now;
+          }
         };
         xhr.onreadystatechange = () => { if (xhr.readyState === 4) resolve(xhr); };
         xhr.onerror = reject;
@@ -171,7 +184,7 @@ export default function UploadVideo() {
         }}
       />
 
-      <UploadProgressModal open={showProgress} title="Uploading Video" description="Your video is uploading. This may take a while depending on size and network." percent={progress} />
+  <UploadProgressModal open={showProgress} title="Uploading Video" description="Your video is uploading. This may take a while depending on size and network." percent={progress} info={eta||'Preparing…'} />
       <PublishSuccessModal
         open={showSuccess}
         title="Video Published!"

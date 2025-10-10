@@ -42,7 +42,14 @@ export default function MySongs() {
                <div className="w-full h-28 rounded bg-slate-800 overflow-hidden mb-2">
                  {s.cover_image ? <img className="w-full h-full object-cover" src={s.cover_image}/> : null}
                </div>
-               <div className="text-white font-medium truncate">{s.title}</div>
+               <div className="flex items-center gap-2">
+                 <div className="text-white font-medium truncate flex-1">{s.title}</div>
+                 <span className={`text-[10px] px-2 py-0.5 rounded uppercase tracking-wide ${
+                   (s.status||'published')==='published' ? 'bg-green-600/20 text-green-400 border border-green-700/30' :
+                   (s.status||'published')==='processing' ? 'bg-yellow-600/20 text-yellow-400 border border-yellow-700/30' :
+                   'bg-slate-600/20 text-slate-300 border border-slate-700/30'
+                 }`}>{(s.status||'published')}</span>
+               </div>
                <div className="text-xs text-gray-400">Min GHS {parseFloat(s.price||0).toFixed(2)}</div>
                <div className="flex gap-2 mt-2">
                  <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={()=>navigate(`/songs/${s.id}`)}>Open</Button>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, SkipBack, SkipForward, Repeat } from 'lucide-react';
 
 export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false }) {
   const ref = useRef(null);
@@ -7,6 +7,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const [muted, setMuted] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
+  const [loop, setLoop] = useState(false);
 
   useEffect(() => {
     const v = ref.current; if (!v) return;
@@ -39,6 +40,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const replay = () => { const v = ref.current; if (!v) return; v.currentTime = 0; v.play().catch(()=>{}); setPlaying(true); };
   const toggleMute = () => { const v = ref.current; if (!v) return; v.muted = !v.muted; setMuted(v.muted); };
   const fullscreen = () => { const v = ref.current?.parentElement; if (!v) return; if (v.requestFullscreen) v.requestFullscreen(); };
+  const skip = (sec) => { const v = ref.current; if (!v) return; v.currentTime = Math.max(0, Math.min((v.currentTime||0)+sec, duration||0)); };
+  const toggleLoop = () => { const v = ref.current; if (!v) return; v.loop = !v.loop; setLoop(v.loop); };
 
   return (
     <div className="relative bg-black rounded-xl overflow-hidden">
@@ -48,13 +51,16 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       )}
       <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
         <div className="flex items-center gap-2">
+          <button onClick={()=>skip(-10)} className="w-9 h-9 rounded bg-white/10 text-white flex items-center justify-center"><SkipBack className="w-4 h-4"/></button>
           <button onClick={toggle} className="w-9 h-9 rounded-full bg-white text-slate-900 flex items-center justify-center">
             {playing ? <Pause className="w-5 h-5"/> : <Play className="w-5 h-5 ml-0.5"/>}
           </button>
+          <button onClick={()=>skip(10)} className="w-9 h-9 rounded bg-white/10 text-white flex items-center justify-center"><SkipForward className="w-4 h-4"/></button>
           <input type="range" min={0} max={isFinite(duration)? duration:0} value={current} step={0.1} onChange={seek} className="flex-1 accent-purple-500" />
           <div className="text-xs text-white/90 w-16 text-right">{format(current)} / {format(duration)}</div>
           <button onClick={replay} className="w-9 h-9 rounded bg-white/10 text-white flex items-center justify-center"><RotateCcw className="w-4 h-4"/></button>
           <button onClick={toggleMute} className="w-9 h-9 rounded bg-white/10 text-white flex items-center justify-center">{muted? <VolumeX className="w-4 h-4"/> : <Volume2 className="w-4 h-4"/>}</button>
+          <button onClick={toggleLoop} className={`w-9 h-9 rounded ${loop? 'bg-purple-600 text-white':'bg-white/10 text-white'} flex items-center justify-center`}><Repeat className="w-4 h-4"/></button>
           <button onClick={fullscreen} className="w-9 h-9 rounded bg-white/10 text-white flex items-center justify-center"><Maximize2 className="w-4 h-4"/></button>
         </div>
       </div>

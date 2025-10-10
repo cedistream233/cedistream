@@ -21,6 +21,7 @@ export default function UploadSong() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [progress, setProgress] = useState(0);
+  const [eta, setEta] = useState('');
   const [showProgress, setShowProgress] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [created, setCreated] = useState(null);
@@ -46,6 +47,7 @@ export default function UploadSong() {
       if (preview) fd.append('preview', preview);
       const token = localStorage.getItem('token');
       setProgress(5); setShowProgress(true);
+      const start = Date.now(); let lastLoaded = 0; let lastTime = start;
       const res = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/uploads/songs');
@@ -54,6 +56,15 @@ export default function UploadSong() {
           if (e.lengthComputable) {
             const pct = (e.loaded / e.total) * 100;
             setProgress(Math.min(99, pct));
+            const now = Date.now();
+            const deltaBytes = e.loaded - lastLoaded; const deltaTime = (now - lastTime) / 1000;
+            if (deltaTime > 0) {
+              const speed = deltaBytes / deltaTime; // bytes per sec
+              const remaining = e.total - e.loaded;
+              const seconds = speed > 0 ? Math.ceil(remaining / speed) : 0;
+              if (isFinite(seconds)) setEta(seconds > 0 ? `~${seconds}s remaining` : 'Almost done…');
+            }
+            lastLoaded = e.loaded; lastTime = now;
           }
         };
         xhr.onreadystatechange = () => {
@@ -156,7 +167,7 @@ export default function UploadSong() {
         <Button onClick={submit} disabled={busy} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{busy? 'Publishing...' : 'Publish Song'}</Button>
       </div>
 
-      <UploadProgressModal open={showProgress} title="Uploading Song" description="We're uploading your files to storage. Please keep this page open." percent={progress} />
+  <UploadProgressModal open={showProgress} title="Uploading Song" description="We're uploading your files to storage. Please keep this page open." percent={progress} info={eta||'Preparing…'} />
       <PublishSuccessModal
         open={showSuccess}
         title="Song Published!"
