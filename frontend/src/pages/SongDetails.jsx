@@ -51,7 +51,7 @@ export default function SongDetails() {
         {!audioUrl && (
           <div className="text-xs text-gray-400">No preview available. Purchase to listen.</div>
         )}
-        <div className="text-yellow-400 font-bold text-lg">GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
+  <div className="text-yellow-400 font-bold text-lg">From GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
         {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}
       </Card>
     </div>

@@ -83,12 +83,18 @@ export default function AlbumDetails() {
       await User.login();
       return;
     }
+    const minPrice = Number(album.price || 0);
+    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
+    if (amountStr == null) return;
+    let amount = parseFloat(amountStr);
+    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
 
     const cartItem = {
       item_type: "album",
       item_id: album.id,
       title: album.title,
-      price: album.price,
+      price: amount,
+      min_price: minPrice,
       image: album.cover_image
     };
 
@@ -185,8 +191,8 @@ export default function AlbumDetails() {
 
           <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between">
-              <span className="text-gray-400">Price:</span>
-              <span className="text-3xl font-bold text-yellow-400">GH₵ {album.price?.toFixed(2)}</span>
+              <span className="text-gray-400">Minimum price:</span>
+              <span className="text-3xl font-bold text-yellow-400">From GH₵ {album.price?.toFixed(2)}</span>
             </div>
           </div>
 

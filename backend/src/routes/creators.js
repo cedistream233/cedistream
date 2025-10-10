@@ -136,12 +136,7 @@ router.get('/:id/albums', async (req, res, next) => {
     const conds = ['a.user_id = $1'];
     const params = [id];
     let p = 2;
-    const { status, from, to, minPrice, maxPrice, search } = req.query;
-    if (status && ['draft','published'].includes(String(status))) { conds.push(`a.status = $${p}`); params.push(status); p++; }
-    if (from) { conds.push(`a.created_at >= $${p}`); params.push(new Date(from)); p++; }
-    if (to) { conds.push(`a.created_at <= $${p}`); params.push(new Date(to)); p++; }
-    if (minPrice) { conds.push(`a.price >= $${p}`); params.push(parseFloat(minPrice)); p++; }
-    if (maxPrice) { conds.push(`a.price <= $${p}`); params.push(parseFloat(maxPrice)); p++; }
+    const { search } = req.query;
     if (search) { conds.push(`LOWER(a.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
     const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([
@@ -164,12 +159,7 @@ router.get('/:id/songs', async (req, res, next) => {
     const conds = ['s.user_id = $1'];
     const params = [id];
     let p = 2;
-    const { status, from, to, minPrice, maxPrice, search } = req.query;
-    if (status && ['draft','published'].includes(String(status))) { conds.push(`s.status = $${p}`); params.push(status); p++; }
-    if (from) { conds.push(`s.created_at >= $${p}`); params.push(new Date(from)); p++; }
-    if (to) { conds.push(`s.created_at <= $${p}`); params.push(new Date(to)); p++; }
-    if (minPrice) { conds.push(`s.price >= $${p}`); params.push(parseFloat(minPrice)); p++; }
-    if (maxPrice) { conds.push(`s.price <= $${p}`); params.push(parseFloat(maxPrice)); p++; }
+    const { search } = req.query;
     if (search) { conds.push(`LOWER(s.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
     const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([
@@ -196,13 +186,7 @@ router.get('/:id/videos', async (req, res, next) => {
     const conds = ['v.user_id = $1'];
     const params = [id];
     let p = 2;
-    const { status, from, to, minPrice, maxPrice, category, search } = req.query;
-    if (status && ['draft','published'].includes(String(status))) { conds.push(`v.status = $${p}`); params.push(status); p++; }
-    if (from) { conds.push(`v.created_at >= $${p}`); params.push(new Date(from)); p++; }
-    if (to) { conds.push(`v.created_at <= $${p}`); params.push(new Date(to)); p++; }
-    if (minPrice) { conds.push(`v.price >= $${p}`); params.push(parseFloat(minPrice)); p++; }
-    if (maxPrice) { conds.push(`v.price <= $${p}`); params.push(parseFloat(maxPrice)); p++; }
-    if (category) { conds.push(`LOWER(v.category) = LOWER($${p})`); params.push(String(category)); p++; }
+    const { search } = req.query;
     if (search) { conds.push(`LOWER(v.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
     const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([

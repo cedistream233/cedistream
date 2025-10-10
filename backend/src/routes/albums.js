@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { orderBy = 'created_at', direction = 'desc', genre } = req.query;
+    const { orderBy = 'created_at', direction = 'desc', q } = req.query;
     
     // Validate orderBy to prevent SQL injection
     const validOrderFields = ['created_at', 'title', 'price', 'release_date'];
@@ -15,13 +15,14 @@ router.get('/', async (req, res, next) => {
     const orderField = validOrderFields.includes(orderBy) ? orderBy : 'created_at';
     const orderDirection = validDirections.includes(direction.toLowerCase()) ? direction.toUpperCase() : 'DESC';
     
-    let whereClause = '';
-    let queryParams = [];
-    
-    if (genre && genre !== 'All Genres') {
-      whereClause = 'WHERE a.genre = $1';
-      queryParams.push(genre);
+    const conds = [];
+    const queryParams = [];
+    if (q && String(q).trim() !== '') {
+      const needle = `%${String(q).toLowerCase()}%`;
+      queryParams.push(needle, needle);
+      conds.push(`(LOWER(a.title) LIKE $1 OR LOWER(COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name)) LIKE $2)`);
     }
+    const whereClause = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     
     const result = await query(
       `SELECT a.*, 

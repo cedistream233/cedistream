@@ -35,7 +35,7 @@ export default function Cart() {
   };
 
   const calculateTotal = () => {
-    return cart.reduce((sum, item) => sum + (item.price || 0), 0);
+    return cart.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
   };
 
   const handleCheckout = async () => {
@@ -99,9 +99,22 @@ export default function Cart() {
               </div>
 
               <div className="text-right">
-                <p className="text-2xl font-bold text-yellow-400 mb-4">
-                  GH₵ {item.price?.toFixed(2)}
-                </p>
+                <div className="mb-2 text-xs text-gray-400">Minimum: GH₵ {(Number(item.min_price||item.price)||0).toFixed(2)}</div>
+                <div className="flex items-center gap-2 mb-4 justify-end">
+                  <span className="text-gray-300 text-sm">Amount:</span>
+                  <input
+                    type="number"
+                    min={Number(item.min_price||item.price)||0}
+                    value={Number(item.price||0)}
+                    onChange={async (e) => {
+                      const val = Math.max(Number(item.min_price||0), Number(e.target.value||0));
+                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: val } : ci);
+                      setCart(nextCart);
+                      await User.updateMyUserData({ cart: nextCart });
+                    }}
+                    className="w-28 bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-right"
+                  />
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"

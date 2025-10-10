@@ -67,12 +67,18 @@ export default function VideoDetails() {
       await User.login();
       return;
     }
+    const minPrice = Number(video.price || 0);
+    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
+    if (amountStr == null) return;
+    let amount = parseFloat(amountStr);
+    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
 
     const cartItem = {
       item_type: "video",
       item_id: video.id,
       title: video.title,
-      price: video.price,
+      price: amount,
+      min_price: minPrice,
       image: video.thumbnail
     };
 
@@ -183,8 +189,8 @@ export default function VideoDetails() {
 
           <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between">
-              <span className="text-gray-400">Price:</span>
-              <span className="text-3xl font-bold text-yellow-400">GH₵ {video.price?.toFixed(2)}</span>
+              <span className="text-gray-400">Minimum price:</span>
+              <span className="text-3xl font-bold text-yellow-400">From GH₵ {video.price?.toFixed(2)}</span>
             </div>
           </div>
 

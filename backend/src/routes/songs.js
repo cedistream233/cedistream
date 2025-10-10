@@ -17,7 +17,11 @@ router.get('/', async (req, res, next) => {
     let i = 1;
     if (user_id) { where.push(`s.user_id = $${i++}`); params.push(user_id); }
     if (album_id) { where.push(`s.album_id = $${i++}`); params.push(album_id); }
-    if (q) { where.push(`LOWER(s.title) LIKE $${i++}`); params.push(`%${q.toLowerCase()}%`); }
+    if (q) {
+      where.push(`(LOWER(s.title) LIKE $${i} OR LOWER(COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name)) LIKE $${i+1})`);
+      params.push(`%${q.toLowerCase()}%`, `%${q.toLowerCase()}%`);
+      i += 2;
+    }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const result = await query(

@@ -22,7 +22,7 @@ export default function UploadVideo() {
   const videoRef = useRef(null);
   const previewRef = useRef(null);
 
-  const submit = async (publish) => {
+  const submit = async () => {
     setError(''); setSuccess(''); setBusy(true);
     try {
       if (!title || !price || !video) throw new Error('Title, price and video are required');
@@ -32,7 +32,7 @@ export default function UploadVideo() {
       fd.append('price', price);
       if (category) fd.append('category', category);
       if (releaseDate) fd.append('release_date', releaseDate);
-      fd.append('publish', String(publish));
+      // backend always publishes now
       fd.append('video', video);
       if (thumbnail) fd.append('thumbnail', thumbnail);
   if (preview) fd.append('preview', preview);
@@ -44,7 +44,7 @@ export default function UploadVideo() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setSuccess(publish ? 'Video published!' : 'Draft saved');
+      setSuccess('Video published!');
   setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null); setPreview(null);
     } catch (e) {
       setError(e.message);
@@ -70,7 +70,7 @@ export default function UploadVideo() {
               <Input value={title} onChange={e=>setTitle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Price (GHS)</label>
+              <label className="block text-xs text-gray-400 mb-1">Minimum Price (GHS)</label>
               <Input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
             </div>
           </div>
@@ -125,8 +125,7 @@ export default function UploadVideo() {
       </Card>
 
       <div className="flex gap-3">
-        <Button onClick={()=>submit(false)} disabled={busy} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">Save Draft</Button>
-        <Button onClick={()=>submit(true)} disabled={busy} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{busy? 'Publishing...' : 'Publish Video'}</Button>
+        <Button onClick={()=>submit()} disabled={busy} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{busy? 'Publishing...' : 'Publish Video'}</Button>
       </div>
     </div>
   );

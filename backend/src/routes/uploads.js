@@ -36,7 +36,8 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
     const price = parseFloat(fields.price || '0');
     const genre = fields.genre || null;
     const releaseDate = fields.release_date || null;
-    const publish = String(fields.publish || 'false').toLowerCase() === 'true';
+  // Always publish immediately; no drafts or scheduling
+  const publish = true;
 
     if (!title || !Number.isFinite(price)) {
       return res.status(400).json({ error: 'title and numeric price are required' });
@@ -53,7 +54,7 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
     const albumRes = await query(
       `INSERT INTO albums (title, description, price, cover_image, release_date, genre, user_id, status, published_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [title, description, price, coverUrl, releaseDate, genre, userId, publish ? 'published' : 'draft', publish ? new Date() : null]
+      [title, description, price, coverUrl, releaseDate, genre, userId, 'published', new Date()]
     );
     const album = albumRes.rows[0];
 
@@ -83,9 +84,9 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
         previewUrl = await uploadToStorage(previewBucket, pathPrev, f.buffer, f.mimetype || 'audio/mpeg');
       }
       const ins = await query(
-        `INSERT INTO songs (user_id, album_id, title, price, duration, cover_image, audio_url, preview_url, track_number)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-        [userId, album.id, stitle, sprice, sduration, coverUrl, audioUrl, previewUrl, trackNo]
+        `INSERT INTO songs (user_id, album_id, title, price, duration, cover_image, audio_url, preview_url, track_number, status, published_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        [userId, album.id, stitle, sprice, sduration, coverUrl, audioUrl, previewUrl, trackNo, 'published', new Date()]
       );
       insertedSongs.push(ins.rows[0]);
     }
@@ -114,9 +115,10 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
   try {
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
     const userId = req.user.id;
-    const { title, description = null, price, category = null, release_date = null, publish } = req.body;
+  const { title, description = null, price, category = null, release_date = null } = req.body;
     if (!title || !price) return res.status(400).json({ error: 'title and price are required' });
-    const publishNow = String(publish || 'false').toLowerCase() === 'true';
+  // Always publish immediately
+  const publishNow = true;
 
     const videoFile = req.files?.video?.[0];
     if (!videoFile) return res.status(400).json({ error: 'video file is required' });
@@ -148,7 +150,7 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
     const ins = await query(
       `INSERT INTO videos (title, description, price, thumbnail, video_url, preview_url, category, release_date, user_id, status, published_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [title, description, parseFloat(price), thumbUrl, videoUrl, previewUrl, category, release_date || null, userId, publishNow ? 'published' : 'draft', publishNow ? new Date() : null]
+      [title, description, parseFloat(price), thumbUrl, videoUrl, previewUrl, category, release_date || null, userId, 'published', new Date()]
     );
     return res.status(201).json(ins.rows[0]);
   } catch (err) {

@@ -30,10 +30,9 @@ export default function UploadAlbum() {
     return next;
   });
 
-  const onPublish = async () => handleSubmit(true);
-  const onSaveDraft = async () => handleSubmit(false);
+  const onPublish = async () => handleSubmit();
 
-  const handleSubmit = async (publish) => {
+  const handleSubmit = async () => {
     setError(''); setSuccess(''); setPublishing(true);
     try {
       if (!title || !price) throw new Error('Title and price are required');
@@ -43,7 +42,7 @@ export default function UploadAlbum() {
       fd.append('price', price);
       if (genre) fd.append('genre', genre);
       if (releaseDate) fd.append('release_date', releaseDate);
-      fd.append('publish', String(publish));
+      // backend always publishes now; no drafts or scheduling
       if (cover) fd.append('cover', cover);
       const songs = tracks.map((t, i) => ({
         title: t.title,
@@ -64,9 +63,9 @@ export default function UploadAlbum() {
         headers: { Authorization: token ? `Bearer ${token}` : '' },
         body: fd
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setSuccess(publish ? 'Album published!' : 'Draft saved');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  setSuccess('Album published!');
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setTracks([]);
     } catch (e) {
       setError(e.message);
@@ -92,7 +91,7 @@ export default function UploadAlbum() {
               <Input value={title} onChange={e=>setTitle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Price (GHS)</label>
+              <label className="block text-xs text-gray-400 mb-1">Minimum Price (GHS)</label>
               <Input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
             </div>
           </div>
@@ -152,7 +151,7 @@ export default function UploadAlbum() {
                   <Input value={t.title} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,title:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Price (GHS)</label>
+                  <label className="block text-xs text-gray-400 mb-1">Minimum Price (GHS)</label>
                   <Input type="number" value={t.price} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,price:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
                 </div>
                 <div>
@@ -174,7 +173,6 @@ export default function UploadAlbum() {
       </Card>
 
       <div className="mt-6 flex gap-3">
-        <Button onClick={onSaveDraft} disabled={publishing} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">Save Draft</Button>
         <Button onClick={onPublish} disabled={publishing} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{publishing? 'Publishing...' : 'Publish Album'}</Button>
       </div>
     </div>

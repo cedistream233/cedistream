@@ -5,7 +5,7 @@ export const PurchaseSchema = {
     user_email: { type: "string", description: "Buyer email" },
     item_type: {
       type: "string",
-      enum: ["album", "video"],
+      enum: ["album", "video", "song"],
       description: "Type of purchased item",
     },
     item_id: { type: "string", description: "ID of the purchased album or video" },

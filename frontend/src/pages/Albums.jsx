@@ -69,12 +69,18 @@ export default function Albums() {
       await User.login();
       return;
     }
+    const minPrice = Number(album.price || 0);
+    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
+    if (amountStr == null) return; // cancelled
+    let amount = parseFloat(amountStr);
+    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
 
     const cartItem = {
       item_type: asSong ? "song" : "album",
       item_id: album.id,
       title: album.title,
-      price: album.price,
+      price: amount,
+      min_price: minPrice,
       image: album.cover_image
     };
 

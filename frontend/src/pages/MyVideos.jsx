@@ -10,12 +10,7 @@ export default function MyVideos() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [category, setCategory] = useState('');
+  // advanced filters removed
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,17 +19,11 @@ export default function MyVideos() {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: '12' });
     if (search) params.set('search', search);
-    if (status) params.set('status', status);
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
-    if (minPrice) params.set('minPrice', minPrice);
-    if (maxPrice) params.set('maxPrice', maxPrice);
-    if (category) params.set('category', category);
     fetch(`/api/creators/${user.id}/videos?${params.toString()}`)
       .then(r => r.json())
       .then(d => { setItems(d.items||[]); setPages(d.pages||1); setTotal(d.total||0); })
       .finally(()=>setLoading(false));
-  }, [page, search, status, from, to, minPrice, maxPrice, category]);
+  }, [page, search]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black p-4 md:p-8">
@@ -42,18 +31,8 @@ export default function MyVideos() {
         <h1 className="text-white text-2xl md:text-3xl font-bold">My Videos ({total})</h1>
         <Button className="bg-pink-600 hover:bg-pink-700" onClick={()=>navigate('/upload/video')}>Add Video</Button>
       </div>
-      <div className="bg-slate-900/50 border border-purple-900/20 rounded p-3 mb-4 grid grid-cols-2 md:grid-cols-7 gap-2">
+      <div className="bg-slate-900/50 border border-purple-900/20 rounded p-3 mb-4 grid grid-cols-2 md:grid-cols-2 gap-2">
         <input value={search} onChange={e=>{setPage(1);setSearch(e.target.value);}} placeholder="Search title" className="col-span-2 md:col-span-2 bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
-        <input value={category} onChange={e=>{setPage(1);setCategory(e.target.value);}} placeholder="Category" className="bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
-        <select value={status} onChange={e=>{setPage(1);setStatus(e.target.value);}} className="bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700">
-          <option value="">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-        </select>
-        <input type="date" value={from} onChange={e=>{setPage(1);setFrom(e.target.value);}} className="bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
-        <input type="date" value={to} onChange={e=>{setPage(1);setTo(e.target.value);}} className="bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
-        <input type="number" min="0" value={minPrice} onChange={e=>{setPage(1);setMinPrice(e.target.value);}} placeholder="Min price" className="bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
-        <input type="number" min="0" value={maxPrice} onChange={e=>{setPage(1);setMaxPrice(e.target.value);}} placeholder="Max price" className="bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
         {loading ? Array.from({length:8}).map((_,i)=>(<div key={i} className="h-40 bg-slate-800/40 rounded animate-pulse"/>)) :
@@ -64,18 +43,10 @@ export default function MyVideos() {
                  {v.thumbnail ? <img className="w-full h-full object-cover" src={v.thumbnail}/> : null}
                </div>
                <div className="text-white font-medium truncate">{v.title}</div>
-               <div className="text-xs text-gray-400">GHS {parseFloat(v.price||0).toFixed(2)} · {v.status||'draft'}</div>
+               <div className="text-xs text-gray-400">Min GHS {parseFloat(v.price||0).toFixed(2)}</div>
                <div className="flex gap-2 mt-2">
                  <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={()=>navigate(`/videos/${v.id}`)}>Open</Button>
-                 <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async()=>{
-                   const token = localStorage.getItem('token');
-                   const next = v.status === 'published' ? 'draft' : 'published';
-                   const res = await fetch(`/api/uploads/videos/${v.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
-                   if (res.ok) {
-                     const updated = await res.json();
-                     setItems(list=>list.map(x=>x.id===v.id?updated:x));
-                   }
-                 }}>{v.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
+                 {/* publish toggle removed */}
                </div>
              </CardContent>
            </Card>

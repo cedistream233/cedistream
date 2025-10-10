@@ -31,6 +31,23 @@ router.get('/', authenticateToken, async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { user_email, item_type, item_id, item_title, amount, payment_status = 'pending', payment_reference, payment_method } = req.body;
+    // Pay-what-you-want support: enforce minimum price from item table
+    let minPrice = 0;
+    if (item_type === 'album') {
+      const r = await query('SELECT price FROM albums WHERE id = $1', [item_id]);
+      minPrice = parseFloat(r.rows[0]?.price || 0);
+    } else if (item_type === 'video') {
+      const r = await query('SELECT price FROM videos WHERE id = $1', [item_id]);
+      minPrice = parseFloat(r.rows[0]?.price || 0);
+    } else if (item_type === 'song') {
+      const r = await query('SELECT price FROM songs WHERE id = $1', [item_id]);
+      minPrice = parseFloat(r.rows[0]?.price || 0);
+    } else {
+      return res.status(400).json({ error: 'Invalid item_type' });
+    }
+    if (Number.isFinite(minPrice) && parseFloat(amount) < minPrice) {
+      return res.status(400).json({ error: `Amount must be at least minimum price GH₵ ${minPrice.toFixed(2)}` });
+    }
     
     const result = await query(
       'INSERT INTO purchases (user_email, item_type, item_id, item_title, amount, payment_status, payment_reference, payment_method) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',

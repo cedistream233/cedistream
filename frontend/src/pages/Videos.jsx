@@ -60,12 +60,18 @@ export default function Videos() {
       await User.login();
       return;
     }
+    const minPrice = Number(video.price || 0);
+    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
+    if (amountStr == null) return;
+    let amount = parseFloat(amountStr);
+    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
 
     const cartItem = {
       item_type: "video",
       item_id: video.id,
       title: video.title,
-      price: video.price,
+      price: amount,
+      min_price: minPrice,
       image: video.thumbnail
     };
 
