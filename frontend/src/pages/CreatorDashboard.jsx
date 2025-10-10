@@ -14,7 +14,8 @@ import {
   Download,
   Calendar,
   PieChart,
-  BarChart3
+  BarChart3,
+  ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Edit2, X } from 'lucide-react';
@@ -354,118 +355,44 @@ export default function CreatorDashboard() {
           </TabsContent>
 
           <TabsContent value="content" className="space-y-6">
-            <div className="flex justify-between items-center flex-col sm:flex-row gap-3 sm:gap-0">
+            <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-white">My Content</h2>
-              <div className="flex space-x-2 w-full sm:w-auto justify-stretch sm:justify-end">
-                <Button onClick={() => navigate('/upload/album')} className="bg-purple-600 hover:bg-purple-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Album
-                </Button>
-                <Button onClick={() => navigate('/upload/song')} className="bg-indigo-600 hover:bg-indigo-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Song
-                </Button>
-                <Button onClick={() => navigate('/upload/video')} className="bg-pink-600 hover:bg-pink-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Video
-                </Button>
-              </div>
             </div>
             {contentLoading ? (
               <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
                 <CardContent className="p-6 text-gray-400">Loading your content…</CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-                <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                  <CardHeader><CardTitle className="text-white">Albums</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    {myContent.albums?.length ? myContent.albums.map(a => (
-                      <div key={a.id} className="p-3 rounded-lg bg-slate-800/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded bg-slate-700 overflow-hidden">
-                            {a.cover_image ? <img src={a.cover_image} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Music2 className="w-5 h-5"/></div>}
-                          </div>
-                          <div>
-                            <div className="text-white font-medium">{a.title}</div>
-                            <div className="text-xs text-gray-400">GHS {parseFloat(a.price||0).toFixed(2)} · {a.status || 'draft'}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async ()=>{
-                            const token = localStorage.getItem('token');
-                            const next = a.status === 'published' ? 'draft' : 'published';
-                            const res = await fetch(`/api/uploads/albums/${a.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
-                            if (res.ok) {
-                              const updated = await res.json();
-                              setMyContent(mc=>({ ...mc, albums: mc.albums.map(x=>x.id===a.id?updated:x) }));
-                            }
-                          }}>{a.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
-                        </div>
-                      </div>
-                    )) : <div className="text-gray-400">No albums yet</div>}
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                  <CardHeader><CardTitle className="text-white">Songs</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    {myContent.songs?.length ? myContent.songs.map(s => (
-                      <div key={s.id} className="p-3 rounded-lg bg-slate-800/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded bg-slate-700 overflow-hidden">
-                            {s.cover_image ? <img src={s.cover_image} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Music2 className="w-5 h-5"/></div>}
-                          </div>
-                          <div>
-                            <div className="text-white font-medium">{s.title}</div>
-                            <div className="text-xs text-gray-400">GHS {parseFloat(s.price||0).toFixed(2)} · {s.status || 'draft'}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async ()=>{
-                            const token = localStorage.getItem('token');
-                            const next = s.status === 'published' ? 'draft' : 'published';
-                            const res = await fetch(`/api/uploads/songs/${s.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
-                            if (res.ok) {
-                              const updated = await res.json();
-                              setMyContent(mc=>({ ...mc, songs: mc.songs.map(x=>x.id===s.id?updated:x) }));
-                            }
-                          }}>{s.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
-                        </div>
-                      </div>
-                    )) : <div className="text-gray-400">No songs yet</div>}
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                  <CardHeader><CardTitle className="text-white">Videos</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    {myContent.videos?.length ? myContent.videos.map(v => (
-                      <div key={v.id} className="p-3 rounded-lg bg-slate-800/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-10 rounded bg-slate-700 overflow-hidden">
-                            {v.thumbnail ? <img src={v.thumbnail} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Video className="w-5 h-5"/></div>}
-                          </div>
-                          <div>
-                            <div className="text-white font-medium">{v.title}</div>
-                            <div className="text-xs text-gray-400">GHS {parseFloat(v.price||0).toFixed(2)} · {v.status || 'draft'}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async ()=>{
-                            const token = localStorage.getItem('token');
-                            const next = v.status === 'published' ? 'draft' : 'published';
-                            const res = await fetch(`/api/uploads/videos/${v.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
-                            if (res.ok) {
-                              const updated = await res.json();
-                              setMyContent(mc=>({ ...mc, videos: mc.videos.map(x=>x.id===v.id?updated:x) }));
-                            }
-                          }}>{v.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
-                        </div>
-                      </div>
-                    )) : <div className="text-gray-400">No videos yet</div>}
-                  </CardContent>
-                </Card>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+                {[{
+                  label: 'Albums',
+                  icon: Music2,
+                  desc: 'View and manage all your albums',
+                  href: '/my/albums'
+                },{
+                  label: 'Songs',
+                  icon: Music,
+                  desc: 'View and manage all your songs',
+                  href: '/my/songs'
+                },{
+                  label: 'Videos',
+                  icon: Video,
+                  desc: 'View and manage all your videos',
+                  href: '/my/videos'
+                }].map((t, i) => (
+                  <Card key={i} onClick={()=>navigate(t.href)} className="group bg-slate-900/50 border-purple-900/20 backdrop-blur-sm cursor-pointer hover:bg-slate-900/70 transition">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <t.icon className="w-5 h-5 text-purple-400" /> {t.label}
+                        <ChevronRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition ml-auto" />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-400 text-sm">{t.desc}</p>
+                      <p className="text-xs text-slate-500 mt-2">Tap to view all</p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </TabsContent>

@@ -22,6 +22,9 @@ import Profile from './pages/Profile.jsx';
 import Creator from './pages/Creator.jsx';
 import UploadAlbum from './pages/UploadAlbum.jsx';
 import UploadVideo from './pages/UploadVideo.jsx';
+import MyAlbums from './pages/MyAlbums.jsx';
+import MySongs from './pages/MySongs.jsx';
+import MyVideos from './pages/MyVideos.jsx';
 
 const withLayout = (Component, name) => (
   <Layout currentPageName={name}>
@@ -48,6 +51,9 @@ export default function App() {
         <Route path="/library" element={withLayout(Library, 'Library')} />
         <Route path="/admin" element={withLayout(Admin, 'Admin')} />
         <Route path="/dashboard" element={withLayout(CreatorDashboard, 'Dashboard')} />
+  <Route path="/my/albums" element={withLayout(MyAlbums, 'My Albums')} />
+  <Route path="/my/songs" element={withLayout(MySongs, 'My Songs')} />
+  <Route path="/my/videos" element={withLayout(MyVideos, 'My Videos')} />
   <Route path="/profile" element={withLayout(Profile, 'Profile')} />
     <Route path="/upload/album" element={withLayout(UploadAlbum, 'Upload Album')} />
     <Route path="/upload/video" element={withLayout(UploadVideo, 'Upload Video')} />

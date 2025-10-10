@@ -119,3 +119,66 @@ router.get('/:id/content', async (req, res, next) => {
 });
 
 export default router;
+
+// Helpers: pagination parsing
+function getPagination(qs) {
+  const page = Math.max(1, parseInt(qs.page || '1', 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(qs.limit || '12', 10) || 12));
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+}
+
+// GET /api/creators/:id/albums?page=&limit=
+router.get('/:id/albums', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { page, limit, offset } = getPagination(req.query);
+    const [itemsRes, countRes] = await Promise.all([
+      query(
+        `SELECT a.* FROM albums a WHERE a.user_id = $1 ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`,
+        [id, limit, offset]
+      ),
+      query(`SELECT COUNT(1)::int AS total FROM albums WHERE user_id = $1`, [id])
+    ]);
+    const total = countRes.rows[0]?.total || 0;
+    res.json({ items: itemsRes.rows, page, limit, total, pages: Math.ceil(total / limit) });
+  } catch (err) { next(err); }
+});
+
+// GET /api/creators/:id/songs?page=&limit=
+router.get('/:id/songs', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { page, limit, offset } = getPagination(req.query);
+    const [itemsRes, countRes] = await Promise.all([
+      query(
+        `SELECT s.id, s.title, s.price, s.status, s.created_at, s.cover_image, s.preview_url
+         FROM songs s
+         WHERE s.user_id = $1
+         ORDER BY s.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [id, limit, offset]
+      ),
+      query(`SELECT COUNT(1)::int AS total FROM songs WHERE user_id = $1`, [id])
+    ]);
+    const total = countRes.rows[0]?.total || 0;
+    res.json({ items: itemsRes.rows, page, limit, total, pages: Math.ceil(total / limit) });
+  } catch (err) { next(err); }
+});
+
+// GET /api/creators/:id/videos?page=&limit=
+router.get('/:id/videos', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { page, limit, offset } = getPagination(req.query);
+    const [itemsRes, countRes] = await Promise.all([
+      query(
+        `SELECT v.* FROM videos v WHERE v.user_id = $1 ORDER BY v.created_at DESC LIMIT $2 OFFSET $3`,
+        [id, limit, offset]
+      ),
+      query(`SELECT COUNT(1)::int AS total FROM videos WHERE user_id = $1`, [id])
+    ]);
+    const total = countRes.rows[0]?.total || 0;
+    res.json({ items: itemsRes.rows, page, limit, total, pages: Math.ceil(total / limit) });
+  } catch (err) { next(err); }
+});
