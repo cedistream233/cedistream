@@ -10,11 +10,9 @@ import {
   TrendingUp, 
   Users, 
   Eye,
-  Plus,
   Download,
   Calendar,
   PieChart,
-  BarChart3,
   ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -46,22 +44,27 @@ export default function CreatorDashboard() {
   const [songsLoading, setSongsLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
 
+  // hydrate basic user info from localStorage on first mount
   useEffect(() => {
     const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-    fetchDashboardData();
+    if (userData) setUser(JSON.parse(userData));
   }, []);
+
+  // Fetch dashboard data whenever auth token becomes available/changes
+  useEffect(() => {
+    if (!token) return; // wait until token is ready so creator-protected routes succeed
+    fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const tokenLocal = token || localStorage.getItem('token');
       
       // Fetch user profile with creator data
       const profileResponse = await fetch('/api/auth/profile', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${tokenLocal}`
         }
       });
       
@@ -108,7 +111,7 @@ export default function CreatorDashboard() {
 
       // Recent sales for this creator
       const salesRes = await fetch('/api/uploads/recent-sales', {
-        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+        headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
       });
       if (salesRes.ok) {
         const rows = await salesRes.json();
@@ -148,6 +151,31 @@ export default function CreatorDashboard() {
       console.error('Remove image error:', err);
     } finally {
       setShowRemoveConfirm(false);
+    }
+  };
+
+  // Export recent sales as CSV (client-side)
+  const downloadSalesCsv = () => {
+    try {
+      const headers = ['Date','Type','Item','Amount'];
+      const rows = recentSales.map(s => [s.date, s.type, s.item, s.amount.toFixed(2)]);
+      const csv = [headers, ...rows]
+        .map(r => r.map(v => {
+          const val = String(v ?? '');
+          return /[",\n]/.test(val) ? '"' + val.replace(/"/g,'""') + '"' : val;
+        }).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().slice(0,10);
+      a.download = `cedistream-sales-${date}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('CSV export failed', e);
     }
   };
 
@@ -295,8 +323,8 @@ export default function CreatorDashboard() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Activity */}
+            <div className="grid grid-cols-1 gap-6">
+              {/* Recent Activity - always visible with empty state */}
               <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center">
@@ -305,52 +333,44 @@ export default function CreatorDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {recentSales.map((sale) => (
-                      <div key={sale.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-purple-600/20 rounded-lg">
-                            {sale.type === 'album' ? 
-                              <Music2 className="w-4 h-4 text-purple-400" /> : 
-                              <Video className="w-4 h-4 text-pink-400" />
-                            }
+                  {recentSales.length === 0 ? (
+                    <div className="flex items-center justify-center h-28 rounded-md border border-dashed border-slate-700 bg-slate-900/40">
+                      <p className="text-slate-400 text-sm">No sales yet. Your latest sales will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {recentSales.map((sale) => (
+                        <div key={sale.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-800/50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-purple-600/20 rounded-lg">
+                              {sale.type === 'album' ? (
+                                <Music2 className="w-4 h-4 text-purple-400" />
+                              ) : sale.type === 'song' ? (
+                                <Music className="w-4 h-4 text-yellow-400" />
+                              ) : (
+                                <Video className="w-4 h-4 text-pink-400" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-white font-medium break-words">{sale.item}</p>
+                              <p className="text-gray-400 text-sm">{sale.buyer} • {sale.date}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-white font-medium">{sale.item}</p>
-                            <p className="text-gray-400 text-sm">{sale.buyer} • {sale.date}</p>
-                          </div>
+                          <div className="text-green-400 font-bold mt-2 sm:mt-0">+GH₵ {sale.amount.toFixed(2)}</div>
                         </div>
-                        <div className="text-green-400 font-bold">+GH₵ {sale.amount.toFixed(2)}</div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Quick Actions */}
-              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-white">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button onClick={() => navigate('/upload/album')} className="w-full justify-start bg-purple-600 hover:bg-purple-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Upload New Album
-                  </Button>
-                  <Button onClick={() => navigate('/upload/video')} className="w-full justify-start bg-pink-600 hover:bg-pink-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Upload New Video
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start border-slate-700 text-white hover:bg-slate-800">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Sales Report
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start border-slate-700 text-white hover:bg-slate-800">
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    View Analytics
-                  </Button>
-                </CardContent>
-              </Card>
+              {/* Export Report - same look as Earnings section */}
+              <div className="flex">
+                <Button onClick={downloadSalesCsv} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Report
+                </Button>
+              </div>
             </div>
           </TabsContent>
 

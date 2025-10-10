@@ -161,22 +161,27 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
 router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (req, res) => {
   try {
     const userId = req.user.id;
-    // purchases joined with albums/videos by item_id
-    const result = await query(
-      `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.created_at as date
-       FROM purchases p
-       WHERE p.payment_status = 'completed'
-         AND (
-           (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
-           (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
-           (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
-         )
-       ORDER BY p.created_at DESC
-       LIMIT 10`,
-      [userId]
-    );
-    res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to load recent sales' }); }
+    // purchases joined with albums/videos by item_id; includes songs if table exists
+    const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.created_at as date
+                 FROM purchases p
+                 WHERE p.payment_status = 'completed'
+                   AND (
+                     (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+                     (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+                     (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+                   )
+                 ORDER BY p.created_at DESC
+                 LIMIT 10`;
+    const result = await query(sql, [userId]);
+    return res.json(result.rows);
+  } catch (err) {
+    // If schema isn't fully migrated yet (e.g., songs table or user_id columns missing), return empty list gracefully
+    if (err && (err.code === '42P01' /* undefined_table */ || err.code === '42703' /* undefined_column */)) {
+      return res.json([]);
+    }
+    console.error('recent-sales error:', err);
+    return res.status(500).json({ error: 'Failed to load recent sales' });
+  }
 });
 
 export default router;
