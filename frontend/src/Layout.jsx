@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Home, Music, Video, ShoppingCart, Library, Settings, LogOut, User as UserIcon, BarChart3, Menu } from "lucide-react";
+import { Home, Music, ShoppingCart, Library, LogOut, User as UserIcon, BarChart3, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import LogoutConfirmModal from "@/components/ui/LogoutConfirmModal";
@@ -34,8 +34,7 @@ export default function Layout({ children, currentPageName }) {
 	const navItems = [
 		{ name: "Home", url: createPageUrl("Home"), icon: Home },
 		...(isAuthenticated ? [
-			{ name: "Songs", url: createPageUrl("Songs"), icon: Music },
-			{ name: "Videos", url: createPageUrl("Videos"), icon: Video },
+			...(isCreator ? [{ name: "Dashboard", url: "/dashboard", icon: BarChart3 }] : []),
 			{ name: "My Library", url: createPageUrl("Library"), icon: Library },
 		] : []),
 	];

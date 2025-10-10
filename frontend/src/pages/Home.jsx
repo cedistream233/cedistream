@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
 import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
-import { Sparkles, Search } from "lucide-react";
+import { Sparkles, Search, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useImageViewer } from "@/contexts/ImageViewerContext.jsx";
 
@@ -105,10 +105,24 @@ export default function Home() {
               </div>
             )}
           </>
-        ) : user ? (
-          <div className="text-gray-400">Search to discover creators. Or browse <Link to={createPageUrl('Songs')} className="text-purple-300 underline">songs</Link> and <Link to={createPageUrl('Videos')} className="text-purple-300 underline">videos</Link>.</div>
         ) : (
-          <div className="text-gray-400">Search to discover creators.</div>
+          <div className="space-y-4">
+            <div className="text-gray-400">Search to discover creators.</div>
+            {user?.role === 'creator' && (
+              <div className="p-4 rounded-xl bg-slate-900/50 border border-purple-900/20 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-600/20">
+                    <BarChart3 className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <div className="text-white font-semibold">Creator Dashboard</div>
+                    <div className="text-sm text-gray-400">Manage your albums, songs and videos</div>
+                  </div>
+                </div>
+                <Button onClick={()=>navigate('/dashboard')} className="bg-purple-600 hover:bg-purple-700">Open</Button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

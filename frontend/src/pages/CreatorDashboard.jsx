@@ -44,10 +44,12 @@ export default function CreatorDashboard() {
   const [songsLoading, setSongsLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
 
-  // hydrate basic user info from localStorage on first mount
+  // hydrate basic user info and trigger an initial fetch without needing a manual refresh
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) setUser(JSON.parse(userData));
+    // fire an initial fetch using token from localStorage if available
+    fetchDashboardData();
   }, []);
 
   // Fetch dashboard data whenever auth token becomes available/changes
@@ -56,6 +58,18 @@ export default function CreatorDashboard() {
     fetchDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Refresh when tab gains focus or page becomes visible
+  useEffect(() => {
+    const onFocus = () => fetchDashboardData();
+    const onVis = () => { if (document.visibilityState === 'visible') fetchDashboardData(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
