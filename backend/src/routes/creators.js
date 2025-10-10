@@ -133,12 +133,23 @@ router.get('/:id/albums', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { page, limit, offset } = getPagination(req.query);
+    const conds = ['a.user_id = $1'];
+    const params = [id];
+    let p = 2;
+    const { status, from, to, minPrice, maxPrice, search } = req.query;
+    if (status && ['draft','published'].includes(String(status))) { conds.push(`a.status = $${p}`); params.push(status); p++; }
+    if (from) { conds.push(`a.created_at >= $${p}`); params.push(new Date(from)); p++; }
+    if (to) { conds.push(`a.created_at <= $${p}`); params.push(new Date(to)); p++; }
+    if (minPrice) { conds.push(`a.price >= $${p}`); params.push(parseFloat(minPrice)); p++; }
+    if (maxPrice) { conds.push(`a.price <= $${p}`); params.push(parseFloat(maxPrice)); p++; }
+    if (search) { conds.push(`LOWER(a.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
+    const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([
       query(
-        `SELECT a.* FROM albums a WHERE a.user_id = $1 ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`,
-        [id, limit, offset]
+        `SELECT a.* FROM albums a ${where} ORDER BY a.created_at DESC LIMIT $${p} OFFSET $${p+1}`,
+        [...params, limit, offset]
       ),
-      query(`SELECT COUNT(1)::int AS total FROM albums WHERE user_id = $1`, [id])
+      query(`SELECT COUNT(1)::int AS total FROM albums a ${where}`, params)
     ]);
     const total = countRes.rows[0]?.total || 0;
     res.json({ items: itemsRes.rows, page, limit, total, pages: Math.ceil(total / limit) });
@@ -150,16 +161,27 @@ router.get('/:id/songs', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { page, limit, offset } = getPagination(req.query);
+    const conds = ['s.user_id = $1'];
+    const params = [id];
+    let p = 2;
+    const { status, from, to, minPrice, maxPrice, search } = req.query;
+    if (status && ['draft','published'].includes(String(status))) { conds.push(`s.status = $${p}`); params.push(status); p++; }
+    if (from) { conds.push(`s.created_at >= $${p}`); params.push(new Date(from)); p++; }
+    if (to) { conds.push(`s.created_at <= $${p}`); params.push(new Date(to)); p++; }
+    if (minPrice) { conds.push(`s.price >= $${p}`); params.push(parseFloat(minPrice)); p++; }
+    if (maxPrice) { conds.push(`s.price <= $${p}`); params.push(parseFloat(maxPrice)); p++; }
+    if (search) { conds.push(`LOWER(s.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
+    const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([
       query(
         `SELECT s.id, s.title, s.price, s.status, s.created_at, s.cover_image, s.preview_url
          FROM songs s
-         WHERE s.user_id = $1
+         ${where}
          ORDER BY s.created_at DESC
-         LIMIT $2 OFFSET $3`,
-        [id, limit, offset]
+         LIMIT $${p} OFFSET $${p+1}`,
+        [...params, limit, offset]
       ),
-      query(`SELECT COUNT(1)::int AS total FROM songs WHERE user_id = $1`, [id])
+      query(`SELECT COUNT(1)::int AS total FROM songs s ${where}`, params)
     ]);
     const total = countRes.rows[0]?.total || 0;
     res.json({ items: itemsRes.rows, page, limit, total, pages: Math.ceil(total / limit) });
@@ -171,12 +193,24 @@ router.get('/:id/videos', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { page, limit, offset } = getPagination(req.query);
+    const conds = ['v.user_id = $1'];
+    const params = [id];
+    let p = 2;
+    const { status, from, to, minPrice, maxPrice, category, search } = req.query;
+    if (status && ['draft','published'].includes(String(status))) { conds.push(`v.status = $${p}`); params.push(status); p++; }
+    if (from) { conds.push(`v.created_at >= $${p}`); params.push(new Date(from)); p++; }
+    if (to) { conds.push(`v.created_at <= $${p}`); params.push(new Date(to)); p++; }
+    if (minPrice) { conds.push(`v.price >= $${p}`); params.push(parseFloat(minPrice)); p++; }
+    if (maxPrice) { conds.push(`v.price <= $${p}`); params.push(parseFloat(maxPrice)); p++; }
+    if (category) { conds.push(`LOWER(v.category) = LOWER($${p})`); params.push(String(category)); p++; }
+    if (search) { conds.push(`LOWER(v.title) LIKE $${p}`); params.push(`%${String(search).toLowerCase()}%`); p++; }
+    const where = `WHERE ${conds.join(' AND ')}`;
     const [itemsRes, countRes] = await Promise.all([
       query(
-        `SELECT v.* FROM videos v WHERE v.user_id = $1 ORDER BY v.created_at DESC LIMIT $2 OFFSET $3`,
-        [id, limit, offset]
+        `SELECT v.* FROM videos v ${where} ORDER BY v.created_at DESC LIMIT $${p} OFFSET $${p+1}`,
+        [...params, limit, offset]
       ),
-      query(`SELECT COUNT(1)::int AS total FROM videos WHERE user_id = $1`, [id])
+      query(`SELECT COUNT(1)::int AS total FROM videos v ${where}`, params)
     ]);
     const total = countRes.rows[0]?.total || 0;
     res.json({ items: itemsRes.rows, page, limit, total, pages: Math.ceil(total / limit) });

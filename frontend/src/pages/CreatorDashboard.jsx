@@ -365,17 +365,17 @@ export default function CreatorDashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
                 {[{
-                  label: 'Albums',
+                  label: `Albums (${stats.albumCount})`,
                   icon: Music2,
                   desc: 'View and manage all your albums',
                   href: '/my/albums'
                 },{
-                  label: 'Songs',
+                  label: `Songs (${stats.songsCount})`,
                   icon: Music,
                   desc: 'View and manage all your songs',
                   href: '/my/songs'
                 },{
-                  label: 'Videos',
+                  label: `Videos (${stats.videoCount})`,
                   icon: Video,
                   desc: 'View and manage all your videos',
                   href: '/my/videos'
