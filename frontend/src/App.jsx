@@ -23,6 +23,7 @@ import Profile from './pages/Profile.jsx';
 import Creator from './pages/Creator.jsx';
 import UploadAlbum from './pages/UploadAlbum.jsx';
 import UploadVideo from './pages/UploadVideo.jsx';
+import UploadSong from './pages/UploadSong.jsx';
 import MyAlbums from './pages/MyAlbums.jsx';
 import MySongs from './pages/MySongs.jsx';
 import MyVideos from './pages/MyVideos.jsx';
@@ -42,7 +43,6 @@ export default function App() {
   <Route path="/albums" element={withLayout(Albums, 'Albums')} />
   <Route path="/songs" element={withLayout(Albums, 'Songs')} />
   <Route path="/songs/:id" element={withLayout(SongDetails, 'SongDetails')} />
-  <Route path="/songs" element={withLayout(Albums, 'Songs')} />
         <Route path="/videos" element={withLayout(Videos, 'Videos')} />
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />
@@ -56,8 +56,9 @@ export default function App() {
   <Route path="/my/songs" element={<ProtectedRoute>{withLayout(MySongs, 'My Songs')}</ProtectedRoute>} />
   <Route path="/my/videos" element={<ProtectedRoute>{withLayout(MyVideos, 'My Videos')}</ProtectedRoute>} />
   <Route path="/profile" element={<ProtectedRoute>{withLayout(Profile, 'Profile')}</ProtectedRoute>} />
-    <Route path="/upload/album" element={<ProtectedRoute>{withLayout(UploadAlbum, 'Upload Album')}</ProtectedRoute>} />
-    <Route path="/upload/video" element={<ProtectedRoute>{withLayout(UploadVideo, 'Upload Video')}</ProtectedRoute>} />
+  <Route path="/upload/album" element={<ProtectedRoute>{withLayout(UploadAlbum, 'Upload Album')}</ProtectedRoute>} />
+  <Route path="/upload/song" element={<ProtectedRoute>{withLayout(UploadSong, 'Upload Song')}</ProtectedRoute>} />
+  <Route path="/upload/video" element={<ProtectedRoute>{withLayout(UploadVideo, 'Upload Video')}</ProtectedRoute>} />
         
         {/* Auth routes without layout */}
         <Route path="/login" element={<Login />} />

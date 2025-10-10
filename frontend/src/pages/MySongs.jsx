@@ -29,7 +29,7 @@ export default function MySongs() {
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black p-4 md:p-8">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-white text-2xl md:text-3xl font-bold">My Songs ({total})</h1>
-        <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={()=>navigate('/upload/album')}>Add Song</Button>
+  <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={()=>navigate('/upload/song')}>Add Song</Button>
       </div>
       <div className="bg-slate-900/50 border border-purple-900/20 rounded p-3 mb-4 grid grid-cols-2 md:grid-cols-2 gap-2">
         <input value={search} onChange={e=>{setPage(1);setSearch(e.target.value);}} placeholder="Search title" className="col-span-2 md:col-span-2 bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>

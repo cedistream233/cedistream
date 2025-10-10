@@ -159,6 +159,58 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
   }
 });
 
+// Upload a single song (no album). Fields: title, description, price, genre, release_date; files: audio (required), cover (optional), preview (optional)
+router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields([
+  { name: 'audio', maxCount: 1 },
+  { name: 'cover', maxCount: 1 },
+  { name: 'preview', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { title, description = null, price, release_date = null } = req.body;
+    if (!title || !price) return res.status(400).json({ error: 'title and price are required' });
+
+    const audioFile = req.files?.audio?.[0];
+    if (!audioFile) return res.status(400).json({ error: 'audio file is required' });
+    const coverFile = req.files?.cover?.[0];
+    const previewFile = req.files?.preview?.[0];
+
+    // upload audio
+    const aext = (audioFile.originalname.split('.').pop() || 'mp3').toLowerCase();
+    const apath = `songs/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${aext}`;
+    const mediaBucket = process.env.SUPABASE_BUCKET_MEDIA || 'media';
+    const audioUrl = await uploadToStorage(mediaBucket, apath, audioFile.buffer, audioFile.mimetype || 'audio/mpeg');
+
+    // optional cover
+    let coverUrl = null;
+    if (coverFile) {
+      const cext = (coverFile.originalname.split('.').pop() || 'jpg').toLowerCase();
+      const cpath = `songs/${userId}/covers/${Date.now()}-${Math.random().toString(36).slice(2)}.${cext}`;
+      const coverBucket = process.env.SUPABASE_BUCKET_ALBUMS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+      coverUrl = await uploadToStorage(coverBucket, cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
+    }
+
+    // optional preview
+    let previewUrl = null;
+    if (previewFile) {
+      const pext = (previewFile.originalname.split('.').pop() || 'mp3').toLowerCase();
+      const ppath = `songs/${userId}/previews/${Date.now()}-${Math.random().toString(36).slice(2)}.${pext}`;
+      const previewBucket = process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+      previewUrl = await uploadToStorage(previewBucket, ppath, previewFile.buffer, previewFile.mimetype || 'audio/mpeg');
+    }
+
+    const ins = await query(
+      `INSERT INTO songs (user_id, album_id, title, description, price, cover_image, audio_url, preview_url, release_date, status, published_at)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, 'published', NOW()) RETURNING *`,
+      [userId, title, description, parseFloat(price), coverUrl, audioUrl, previewUrl, release_date || null]
+    );
+    return res.status(201).json(ins.rows[0]);
+  } catch (err) {
+    console.error('Song upload error:', err);
+    res.status(500).json({ error: 'Failed to upload song' });
+  }
+});
+
 // Recent sales for creator: aggregates last 10 completed purchases on creator's items
 router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (req, res) => {
   try {

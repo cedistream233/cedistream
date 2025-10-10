@@ -1,9 +1,10 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, MoveVertical, Upload, Music, Image as ImageIcon } from 'lucide-react';
+import CropperModal from '@/components/ui/CropperModal';
 
 export default function UploadAlbum() {
   const [title, setTitle] = useState('');
@@ -17,6 +18,8 @@ export default function UploadAlbum() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const coverInputRef = useRef(null);
+  const [showCoverCropper, setShowCoverCropper] = useState(false);
+  const [pendingCover, setPendingCover] = useState(null);
 
   const addTrack = () => setTracks(t => [...t, { id: crypto.randomUUID(), title: '', price: '', duration: '', audio: null, preview: null }]);
   const removeTrack = (id) => setTracks(t => t.filter(x => x.id !== id));
@@ -120,7 +123,18 @@ export default function UploadAlbum() {
                 )}
               </div>
               <div>
-                <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e)=>setCover(e.target.files?.[0]||null)} />
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e)=>{
+                    const f = e.target.files?.[0] || null;
+                    if (!f) return;
+                    setPendingCover(f);
+                    setShowCoverCropper(true);
+                  }}
+                />
                 <Button onClick={()=>coverInputRef.current?.click()} className="bg-purple-600 hover:bg-purple-700"><Upload className="w-4 h-4 mr-2"/>Select Cover</Button>
               </div>
             </div>
@@ -175,6 +189,20 @@ export default function UploadAlbum() {
       <div className="mt-6 flex gap-3">
         <Button onClick={onPublish} disabled={publishing} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{publishing? 'Publishing...' : 'Publish Album'}</Button>
       </div>
+
+      {/* Cover cropper */}
+      <CropperModal
+        isOpen={showCoverCropper}
+        onClose={()=>{ setShowCoverCropper(false); setPendingCover(null); if (coverInputRef.current) coverInputRef.current.value=''; }}
+        file={pendingCover}
+        aspect={1}
+        title="Crop Album Cover"
+        description="Adjust the square crop. This is how your album cover will appear."
+        onConfirm={async (blob)=>{
+          const file = new File([blob], 'album-cover.jpg', { type: 'image/jpeg' });
+          setCover(file);
+        }}
+      />
     </div>
   );
 }

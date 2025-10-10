@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { getCroppedImg } from '@/utils/crop';
 
-export default function CropperModal({ isOpen, onClose, file, onConfirm }) {
+export default function CropperModal({ isOpen, onClose, file, onConfirm, aspect = 1, title = 'Crop Image', description = 'Drag to position and use zoom to adjust framing.' }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -36,8 +36,8 @@ export default function CropperModal({ isOpen, onClose, file, onConfirm }) {
     <Dialog open={!!isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-2xl">
         <DialogHeader className="text-center">
-          <DialogTitle className="text-lg font-semibold">Crop Profile Image</DialogTitle>
-          <DialogDescription className="text-gray-400">Drag to position and use zoom to adjust framing. The final image will be cropped to a circle.</DialogDescription>
+          <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+          <DialogDescription className="text-gray-400">{description}</DialogDescription>
         </DialogHeader>
 
         <div className="relative w-full h-96 bg-slate-800 mt-4">
@@ -47,7 +47,7 @@ export default function CropperModal({ isOpen, onClose, file, onConfirm }) {
               crop={crop}
               zoom={zoom}
               rotation={rotation}
-              aspect={1}
+              aspect={aspect}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onRotationChange={setRotation}
@@ -63,7 +63,7 @@ export default function CropperModal({ isOpen, onClose, file, onConfirm }) {
 
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0 mt-4">
           <Button variant="secondary" onClick={onClose} className="border-slate-600 hover:bg-slate-800">Cancel</Button>
-          <Button onClick={handleConfirm} className="bg-purple-600 hover:bg-purple-700">Crop & Upload</Button>
+          <Button onClick={handleConfirm} className="bg-purple-600 hover:bg-purple-700">Crop & Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
