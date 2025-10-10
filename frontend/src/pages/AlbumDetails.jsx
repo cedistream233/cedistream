@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Album } from "@/entities/Album";
 import { User } from "@/entities/User";
+import { Song } from "@/entities/Song";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, ShoppingCart, Music, Clock, Calendar } from "lucide-react";
@@ -16,6 +17,8 @@ export default function AlbumDetails() {
   const [album, setAlbum] = useState(null);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [purchased, setPurchased] = useState(false);
+  const [trackAudioUrls, setTrackAudioUrls] = useState({});
 
   useEffect(() => {
     if (albumId) {
@@ -38,6 +41,42 @@ export default function AlbumDetails() {
     setAlbum(foundAlbum);
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    (async () => {
+      if (!album || !user) return;
+      try {
+        // naive ownership check: look for completed album purchase
+        const token = localStorage.getItem('token');
+        if (!token) { setPurchased(false); return; }
+        // Optional: You might have a dedicated endpoint; keeping simple here
+  const res = await fetch(`/api/purchases?item_type=album&me=true`, { headers: { Authorization: `Bearer ${token}` }});
+        if (res.ok) {
+          const rows = await res.json();
+          setPurchased(rows?.some(r => r.item_id === album.id && r.payment_status === 'completed'));
+        } else { setPurchased(false); }
+      } catch { setPurchased(false); }
+    })();
+  }, [album?.id, user?.id]);
+
+  useEffect(() => {
+    (async () => {
+      if (!album?.songs?.length) return;
+      const map = {};
+      for (const s of album.songs) {
+        // if purchased, try get signed url else fallback to preview if exists
+        let url = null;
+        if (purchased) {
+          url = await Song.getSignedUrl(s.id, localStorage.getItem('token'));
+        }
+        if (!url) {
+          url = await Song.getPreviewUrl(s.id);
+        }
+        if (url) map[s.id] = url;
+      }
+      setTrackAudioUrls(map);
+    })();
+  }, [album?.songs, purchased]);
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -168,7 +207,7 @@ export default function AlbumDetails() {
           <Card className="bg-slate-900/50 border-purple-900/20">
             <div className="divide-y divide-purple-900/20">
               {album.songs.map((song, index) => (
-                <div key={index} className="p-4 hover:bg-purple-900/10 transition-colors">
+                <div key={song.id || index} className="p-4 hover:bg-purple-900/10 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <span className="text-gray-500 font-medium w-8">{index + 1}</span>
@@ -178,6 +217,15 @@ export default function AlbumDetails() {
                           <p className="text-sm text-gray-400">{song.duration}</p>
                         )}
                       </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {trackAudioUrls[song.id] ? (
+                        <audio controls src={trackAudioUrls[song.id]} className="max-w-xs">
+                          Your browser does not support the audio element.
+                        </audio>
+                      ) : (
+                        <span className="text-xs text-gray-500">No preview</span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -15,6 +15,8 @@ export default function VideoDetails() {
   const [video, setVideo] = useState(null);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [canAccess, setCanAccess] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState(null);
 
   useEffect(() => {
     if (videoId) {
@@ -37,6 +39,28 @@ export default function VideoDetails() {
     setVideo(foundVideo);
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    (async () => {
+      if (!video) return;
+      const token = localStorage.getItem('token');
+      // try to get signed full video URL if authorized
+      let signed = null;
+      if (token) {
+        const res = await fetch(`/api/media/video/${video.id}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json(); signed = d.url; setCanAccess(true); setMediaUrl(d.url); return;
+        }
+      }
+      // fallback to preview
+      const prevRes = await fetch(`/api/media/video/${video.id}/preview`);
+      if (prevRes.ok) {
+        const d = await prevRes.json(); setMediaUrl(d.url); setCanAccess(false);
+      } else {
+        setMediaUrl(null); setCanAccess(false);
+      }
+    })();
+  }, [video?.id]);
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -100,23 +124,30 @@ export default function VideoDetails() {
 
       <div className="grid md:grid-cols-2 gap-8">
         <div>
-          {video.thumbnail ? (
-            <div className="relative group">
-              <img
-                src={video.thumbnail}
-                alt={video.title}
-                className="w-full rounded-2xl shadow-2xl"
-              />
-              <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
-                  <Play className="w-10 h-10 text-purple-900 ml-1" />
-                </div>
-              </div>
+          {mediaUrl ? (
+            <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black">
+              <video controls src={mediaUrl} className="w-full h-full object-cover" />
+              {!canAccess && <div className="absolute top-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Preview</div>}
             </div>
           ) : (
-            <div className="w-full aspect-video bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl flex items-center justify-center">
-              <Play className="w-32 h-32 text-purple-300" />
-            </div>
+            video.thumbnail ? (
+              <div className="relative group">
+                <img
+                  src={video.thumbnail}
+                  alt={video.title}
+                  className="w-full rounded-2xl shadow-2xl"
+                />
+                <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
+                    <Play className="w-10 h-10 text-purple-900 ml-1" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full aspect-video bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl flex items-center justify-center">
+                <Play className="w-32 h-32 text-purple-300" />
+              </div>
+            )
           )}
         </div>
 

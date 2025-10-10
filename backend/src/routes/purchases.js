@@ -1,20 +1,18 @@
 import { Router } from 'express';
 import { query } from '../lib/database.js';
 import { authenticateToken } from '../lib/auth.js';
+import { authenticateToken } from '../lib/auth.js';
 
 const router = Router();
 
-router.get('/', async (req, res, next) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const { user_email, payment_status, item_type } = req.query;
+    const { user_id, me, payment_status, item_type } = req.query;
     let sql = 'SELECT * FROM purchases WHERE 1=1';
     const params = [];
     let paramIndex = 1;
-    if (user_email) {
-      sql += ` AND user_email = $${paramIndex}`;
-      params.push(user_email);
-      paramIndex++;
-    }
+    const uid = String(me) === 'true' ? req.user?.id : user_id;
+    if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
     if (payment_status) {
       sql += ` AND payment_status = $${paramIndex}`;
       params.push(payment_status);

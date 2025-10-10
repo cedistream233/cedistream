@@ -38,6 +38,8 @@ export default function CreatorDashboard() {
   });
   const [recentSales, setRecentSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [myContent, setMyContent] = useState({ albums: [], videos: [] });
+  const [contentLoading, setContentLoading] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -58,9 +60,11 @@ export default function CreatorDashboard() {
         }
       });
       
+      let authedId = null;
       if (profileResponse.ok) {
         const profileData = await profileResponse.json();
         setUser(profileData);
+        authedId = profileData?.id;
         
         if (profileData.creatorProfile) {
           setStats(prevStats => ({
@@ -69,6 +73,22 @@ export default function CreatorDashboard() {
             totalSales: profileData.creatorProfile.total_sales || 0
           }));
         }
+      }
+
+      // Load my content (albums/videos for this creator)
+      if (authedId || user?.id) {
+        try {
+          setContentLoading(true);
+          const idToUse = authedId || user?.id;
+          if (idToUse) {
+            const cRes = await fetch(`/api/creators/${idToUse}/content`);
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              setMyContent({ albums: cData.albums || [], videos: cData.videos || [] });
+            }
+          }
+        } catch {}
+        finally { setContentLoading(false); }
       }
 
       // Recent sales for this creator
@@ -336,19 +356,73 @@ export default function CreatorDashboard() {
                 </Button>
               </div>
             </div>
-            
-            <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="text-center py-12">
-                  <Music2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No content yet</h3>
-                  <p className="text-gray-400 mb-6">Start by uploading your first album or video</p>
-                  <Button onClick={() => navigate('/upload/album')} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                    Upload Content
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            {contentLoading ? (
+              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
+                <CardContent className="p-6 text-gray-400">Loading your content…</CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
+                  <CardHeader><CardTitle className="text-white">Albums</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {myContent.albums?.length ? myContent.albums.map(a => (
+                      <div key={a.id} className="p-3 rounded-lg bg-slate-800/50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded bg-slate-700 overflow-hidden">
+                            {a.cover_image ? <img src={a.cover_image} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Music2 className="w-5 h-5"/></div>}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{a.title}</div>
+                            <div className="text-xs text-gray-400">GHS {parseFloat(a.price||0).toFixed(2)} · {a.status || 'draft'}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async ()=>{
+                            const token = localStorage.getItem('token');
+                            const next = a.status === 'published' ? 'draft' : 'published';
+                            const res = await fetch(`/api/uploads/albums/${a.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
+                            if (res.ok) {
+                              const updated = await res.json();
+                              setMyContent(mc=>({ ...mc, albums: mc.albums.map(x=>x.id===a.id?updated:x) }));
+                            }
+                          }}>{a.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
+                        </div>
+                      </div>
+                    )) : <div className="text-gray-400">No albums yet</div>}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
+                  <CardHeader><CardTitle className="text-white">Videos</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {myContent.videos?.length ? myContent.videos.map(v => (
+                      <div key={v.id} className="p-3 rounded-lg bg-slate-800/50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-10 rounded bg-slate-700 overflow-hidden">
+                            {v.thumbnail ? <img src={v.thumbnail} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Video className="w-5 h-5"/></div>}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{v.title}</div>
+                            <div className="text-xs text-gray-400">GHS {parseFloat(v.price||0).toFixed(2)} · {v.status || 'draft'}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async ()=>{
+                            const token = localStorage.getItem('token');
+                            const next = v.status === 'published' ? 'draft' : 'published';
+                            const res = await fetch(`/api/uploads/videos/${v.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
+                            if (res.ok) {
+                              const updated = await res.json();
+                              setMyContent(mc=>({ ...mc, videos: mc.videos.map(x=>x.id===v.id?updated:x) }));
+                            }
+                          }}>{v.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
+                        </div>
+                      </div>
+                    )) : <div className="text-gray-400">No videos yet</div>}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">

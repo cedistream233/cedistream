@@ -79,7 +79,8 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
         const f = byField[s.preview];
         const ext = (f.originalname.split('.').pop() || 'mp3').toLowerCase();
         const pathPrev = `albums/${userId}/${album.id}/previews/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        previewUrl = await uploadToStorage(process.env.SUPABASE_BUCKET_MEDIA || 'media', pathPrev, f.buffer, f.mimetype || 'audio/mpeg');
+        const previewBucket = process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+        previewUrl = await uploadToStorage(previewBucket, pathPrev, f.buffer, f.mimetype || 'audio/mpeg');
       }
       const ins = await query(
         `INSERT INTO songs (user_id, album_id, title, price, duration, cover_image, audio_url, preview_url, track_number)
@@ -107,7 +108,8 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
 // files: video (required), thumbnail (optional)
 router.post('/videos', authenticateToken, requireRole(['creator']), upload.fields([
   { name: 'video', maxCount: 1 },
-  { name: 'thumbnail', maxCount: 1 }
+  { name: 'thumbnail', maxCount: 1 },
+  { name: 'preview', maxCount: 1 }
 ]), async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
@@ -122,19 +124,31 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
 
     const vext = (videoFile.originalname.split('.').pop() || 'mp4').toLowerCase();
     const vpath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${vext}`;
-    const videoUrl = await uploadToStorage(process.env.SUPABASE_BUCKET_MEDIA || 'media', vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4');
+    const videoBucket = process.env.SUPABASE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+    const videoUrl = await uploadToStorage(videoBucket, vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4');
 
     let thumbUrl = null;
     if (thumbFile) {
       const text = (thumbFile.originalname.split('.').pop() || 'jpg').toLowerCase();
-      const tpath = `videos/${userId}/thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.${text}`;
-      thumbUrl = await uploadToStorage(process.env.SUPABASE_BUCKET_VIDEOS || 'videos', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+      const tpath = `thumbnails/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${text}`;
+      const thumbBucket = process.env.SUPABASE_BUCKET_THUMBNAILS || process.env.SUPABASE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+      thumbUrl = await uploadToStorage(thumbBucket, tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+    }
+
+    // optional preview file for video
+    let previewUrl = null;
+    const previewField = req.files?.preview?.[0];
+    if (previewField) {
+      const pext = (previewField.originalname.split('.').pop() || 'mp4').toLowerCase();
+      const ppath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}-preview.${pext}`;
+      const previewBucket = process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+      previewUrl = await uploadToStorage(previewBucket, ppath, previewField.buffer, previewField.mimetype || 'video/mp4');
     }
 
     const ins = await query(
-      `INSERT INTO videos (title, description, price, thumbnail, video_url, category, release_date, user_id, status, published_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [title, description, parseFloat(price), thumbUrl, videoUrl, category, release_date || null, userId, publishNow ? 'published' : 'draft', publishNow ? new Date() : null]
+      `INSERT INTO videos (title, description, price, thumbnail, video_url, preview_url, category, release_date, user_id, status, published_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [title, description, parseFloat(price), thumbUrl, videoUrl, previewUrl, category, release_date || null, userId, publishNow ? 'published' : 'draft', publishNow ? new Date() : null]
     );
     return res.status(201).json(ins.rows[0]);
   } catch (err) {
@@ -166,3 +180,45 @@ router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (
 });
 
 export default router;
+// Toggle album publish status
+router.patch('/albums/:id/status', authenticateToken, requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    if (!['draft','published'].includes(String(status))) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    // ensure ownership
+    const own = await query('SELECT user_id FROM albums WHERE id = $1', [id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Album not found' });
+    if (own.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const publishedAt = status === 'published' ? new Date() : null;
+    const upd = await query(
+      `UPDATE albums SET status = $2, published_at = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, status, publishedAt]
+    );
+    return res.json(upd.rows[0]);
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'Internal Server Error' }); }
+});
+
+// Toggle video publish status
+router.patch('/videos/:id/status', authenticateToken, requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    if (!['draft','published'].includes(String(status))) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const own = await query('SELECT user_id FROM videos WHERE id = $1', [id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Video not found' });
+    if (own.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const publishedAt = status === 'published' ? new Date() : null;
+    const upd = await query(
+      `UPDATE videos SET status = $2, published_at = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, status, publishedAt]
+    );
+    return res.json(upd.rows[0]);
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'Internal Server Error' }); }
+});

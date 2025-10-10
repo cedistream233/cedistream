@@ -13,12 +13,14 @@ export default function UploadVideo() {
   const [releaseDate, setReleaseDate] = useState('');
   const [thumbnail, setThumbnail] = useState(null);
   const [video, setVideo] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const thumbRef = useRef(null);
   const videoRef = useRef(null);
+  const previewRef = useRef(null);
 
   const submit = async (publish) => {
     setError(''); setSuccess(''); setBusy(true);
@@ -33,6 +35,7 @@ export default function UploadVideo() {
       fd.append('publish', String(publish));
       fd.append('video', video);
       if (thumbnail) fd.append('thumbnail', thumbnail);
+  if (preview) fd.append('preview', preview);
       const token = localStorage.getItem('token');
       const res = await fetch('/api/uploads/videos', {
         method: 'POST',
@@ -42,7 +45,7 @@ export default function UploadVideo() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setSuccess(publish ? 'Video published!' : 'Draft saved');
-      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null);
+  setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null); setPreview(null);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -106,6 +109,17 @@ export default function UploadVideo() {
                 <Button onClick={()=>videoRef.current?.click()} className="bg-pink-600 hover:bg-pink-700"><Upload className="w-4 h-4 mr-2"/>Select Video</Button>
               </div>
             </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Preview (optional)</label>
+            <div className="flex items-center gap-3">
+              <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                {preview ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+              </div>
+              <input ref={previewRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setPreview(e.target.files?.[0]||null)} />
+              <Button onClick={()=>previewRef.current?.click()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800"><Upload className="w-4 h-4 mr-2"/>Select Preview</Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Tip: keep previews short (e.g. 15–30 seconds) to optimize load time.</p>
           </div>
         </CardContent>
       </Card>

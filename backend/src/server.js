@@ -7,6 +7,7 @@ import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';
 import paystackRouter from './routes/paystack.js';
 import uploadsRouter from './routes/uploads.js';
+import mediaRouter from './routes/media.js';
 import authRouter from './routes/auth.js';
 import creatorsRouter from './routes/creators.js';
 import songsRouter from './routes/songs.js';
@@ -31,6 +32,7 @@ app.use('/api/purchases', purchasesRouter);
 app.use('/api/paystack', paystackRouter);
 app.use('/api/creators', creatorsRouter);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/media', mediaRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

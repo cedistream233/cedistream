@@ -1,3 +1,17 @@
+async function getPreviewUrl(id) {
+  const res = await fetch(`/api/media/song/${id}/preview`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.url || null;
+}
+async function getSignedUrl(id, token) {
+  const res = await fetch(`/api/media/song/${id}`, {
+    headers: { Authorization: token ? `Bearer ${token}` : '' }
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.url || null;
+}
 export const SongSchema = {
   name: "Song",
   type: "object",
@@ -39,7 +53,9 @@ export const Song = {
     const res = await fetch(`/api/songs/${encodeURIComponent(id)}`);
     if (!res.ok) return null;
     return res.json();
-  }
+  },
+  getPreviewUrl,
+  getSignedUrl
 };
 
 export default SongSchema;
