@@ -28,7 +28,8 @@ export default function UploadAlbum() {
   const [showCoverCropper, setShowCoverCropper] = useState(false);
   const [pendingCover, setPendingCover] = useState(null);
 
-  const addTrack = () => setTracks(t => [...t, { id: crypto.randomUUID(), title: '', price: '', duration: '', audio: null, preview: null }]);
+  // Tracks for albums do not collect per-track price or duration; album price covers access
+  const addTrack = () => setTracks(t => [...t, { id: crypto.randomUUID(), title: '', audio: null, preview: null }]);
   const removeTrack = (id) => setTracks(t => t.filter(x => x.id !== id));
   const moveTrack = (id, dir) => setTracks(t => {
     const idx = t.findIndex(x => x.id === id);
@@ -54,10 +55,10 @@ export default function UploadAlbum() {
       if (releaseDate) fd.append('release_date', releaseDate);
       // backend always publishes now; no drafts or scheduling
       if (cover) fd.append('cover', cover);
+      // for albums, individual tracks inherit album access; send price as 0 for each track
       const songs = tracks.map((t, i) => ({
         title: t.title,
-        price: Number(t.price || 0),
-        duration: t.duration,
+        price: 0,
         audio: `audio_${t.id}`,
         preview: t.preview ? `preview_${t.id}` : undefined,
         track_number: i + 1,
@@ -187,18 +188,10 @@ export default function UploadAlbum() {
                 <div className="text-gray-300 font-medium flex items-center gap-2"><MoveVertical className="w-4 h-4"/> Track {idx+1}</div>
                 <Button variant="outline" onClick={()=>removeTrack(t.id)} className="border-slate-700 text-red-300 hover:bg-slate-800" size="sm"><Trash2 className="w-4 h-4 mr-1"/>Remove</Button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Title</label>
                   <Input value={t.title} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,title:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Minimum Price (GHS)</label>
-                  <Input type="number" value={t.price} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,price:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Duration</label>
-                  <Input value={t.duration} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,duration:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

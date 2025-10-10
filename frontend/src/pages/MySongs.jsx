@@ -28,7 +28,14 @@ export default function MySongs() {
     if (search) params.set('search', search);
     fetch(`/api/creators/${user.id}/songs?${params.toString()}`)
       .then(r => r.json())
-      .then(d => { setItems(d.items||[]); setPages(d.pages||1); setTotal(d.total||0); })
+      .then(d => {
+        // only show standalone singles (exclude songs that belong to albums)
+        const itemsRaw = d.items || [];
+        const onlySingles = Array.isArray(itemsRaw) ? itemsRaw.filter(s => !s.album_id) : [];
+        setItems(onlySingles);
+        setPages(d.pages||1);
+        setTotal(onlySingles.length || d.total || 0);
+      })
       .finally(()=>setLoading(false));
   }, [page, search]);
 

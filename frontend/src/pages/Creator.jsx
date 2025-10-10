@@ -23,8 +23,10 @@ export default function Creator() {
         const res2 = await fetch(`/api/creators/${encodeURIComponent(id)}/content`);
         const data2 = res2.ok ? await res2.json() : { albums: [], videos: [] };
         setContent(data2);
-        const singlesData = await Song.list({ user_id: id });
-        setSingles(singlesData);
+  const singlesData = await Song.list({ user_id: id });
+  // only show standalone singles (exclude songs that are part of albums)
+  const onlySingles = Array.isArray(singlesData) ? singlesData.filter(s => !s.album_id) : [];
+  setSingles(onlySingles);
       } finally { setLoading(false); }
     })();
   }, [id]);

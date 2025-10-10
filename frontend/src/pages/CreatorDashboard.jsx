@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { useNavigate } from 'react-router-dom';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
+import { Song } from '@/entities/Song';
 
 export default function CreatorDashboard() {
   const [user, setUser] = useState(null);
@@ -117,11 +118,27 @@ export default function CreatorDashboard() {
             const cRes = await fetch(`/api/creators/${idToUse}/content`);
             if (cRes.ok) {
               const cData = await cRes.json();
-              setMyContent({ albums: cData.albums || [], videos: cData.videos || [], songs: cData.songs || [] });
+              // ensure songs only counts standalone songs (not tracks that belong to albums)
+              const allSongs = cData.songs || [];
+              const standaloneSongs = Array.isArray(allSongs) ? allSongs.filter(s => !s.album_id) : [];
+              setMyContent({ albums: cData.albums || [], videos: cData.videos || [], songs: allSongs });
+              setStats(prev => ({ ...prev, songsCount: standaloneSongs.length }));
             }
           }
         } catch {}
         finally { setContentLoading(false); }
+      }
+
+      // Always ensure songsCount is accurate by querying songs endpoint and counting standalone singles
+      try {
+        const idToUse2 = authedId || user?.id;
+        if (idToUse2) {
+          const songsList = await Song.list({ user_id: idToUse2 });
+          const onlySingles = Array.isArray(songsList) ? songsList.filter(s => !s.album_id) : [];
+          setStats(prev => ({ ...prev, songsCount: onlySingles.length }));
+        }
+      } catch (e) {
+        // ignore
       }
 
       // Recent sales for this creator
