@@ -58,16 +58,28 @@ router.get('/:id', async (req, res, next) => {
       [id]
     );
     if (userRes.rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-
-    // counts
-    const countsRes = await query(
+    // counts (already part of userRes but keep for compatibility) and earnings
+    const totalsRes = await query(
       `SELECT
-         (SELECT COUNT(1) FROM albums a WHERE a.user_id = $1) as albums_count,
-         (SELECT COUNT(1) FROM videos v WHERE v.user_id = $1) as videos_count`,
+         COALESCE((SELECT COUNT(1) FROM albums a WHERE a.user_id = $1), 0) as albums_count,
+         COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = $1), 0) as videos_count,
+         COALESCE((SELECT SUM(p.amount) FROM purchases p
+                    WHERE p.payment_status = 'completed' AND (
+                      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+                      (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+                      (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+                    )), 0) as total_earnings,
+         COALESCE((SELECT COUNT(1) FROM purchases p
+                    WHERE p.payment_status = 'completed' AND (
+                      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+                      (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+                      (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+                    )), 0) as total_sales
+       `,
       [id]
     );
 
-    res.json({ ...userRes.rows[0], ...(countsRes.rows[0] || {}) });
+    res.json({ ...userRes.rows[0], ...(totalsRes.rows[0] || {}) });
   } catch (err) { next(err); }
 });
 
@@ -75,7 +87,7 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/content', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const [albumsRes, videosRes] = await Promise.all([
+    const [albumsRes, videosRes, songsRes] = await Promise.all([
       query(
         `SELECT a.*, COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as artist
          FROM albums a
@@ -92,9 +104,17 @@ router.get('/:id/content', async (req, res, next) => {
          ORDER BY v.created_at DESC`,
         [id]
       )
+        ,
+        query(
+          `SELECT s.id, s.title, s.price, s.created_at, s.cover_image, s.preview_url
+           FROM songs s
+           WHERE s.user_id = $1
+           ORDER BY s.created_at DESC`,
+          [id]
+        )
     ]);
 
-    res.json({ albums: albumsRes.rows, videos: videosRes.rows });
+      res.json({ albums: albumsRes.rows, videos: videosRes.rows, songs: songsRes.rows });
   } catch (err) { next(err); }
 });
 

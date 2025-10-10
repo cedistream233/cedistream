@@ -9,7 +9,7 @@ export default defineConfig({
     strictPort: true,
     host: true,
     proxy: {
-      '/api': 'http://localhost:5000'
+      '/api': process.env.VITE_BACKEND_URL || 'http://localhost:5000'
     }
   },
   resolve: {

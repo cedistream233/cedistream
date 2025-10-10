@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import './lib/database.js'; // Initialize database connection
+import { closePool } from './lib/database.js'; // Initialize database connection and provide close helper
 import albumsRouter from './routes/albums.js';
 import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';
@@ -15,7 +15,7 @@ import songsRouter from './routes/songs.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const BASE_PORT = Number(process.env.PORT) || 5000;
 
 app.use(cors({ origin: process.env.APP_URL || 'http://localhost:3000' }));
 app.use(express.json());
@@ -39,6 +39,38 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server listening on Port:${PORT}`);
-});
+// Start server with graceful fallback if port is in use
+function startServer(port, attemptsLeft = 10) {
+  const server = app.listen(port, () => {
+    console.log(`✅ Server listening on Port:${port}`);
+  });
+
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+      const next = port + 1;
+      console.warn(`⚠️  Port ${port} in use. Retrying on ${next}... (${attemptsLeft - 1} attempts left)`);
+      // Try the next port shortly
+      setTimeout(() => startServer(next, attemptsLeft - 1), 250);
+    } else {
+      console.error('❌ Failed to start server:', err);
+      process.exit(1);
+    }
+  });
+}
+
+startServer(BASE_PORT);
+
+// Graceful shutdown
+const shutdown = async (signal) => {
+  try {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    await closePool();
+    process.exit(0);
+  } catch (e) {
+    console.error('Error during shutdown:', e);
+    process.exit(1);
+  }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

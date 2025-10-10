@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Music2, 
+  Music,
   Video, 
   DollarSign, 
   TrendingUp, 
@@ -32,6 +33,7 @@ export default function CreatorDashboard() {
     totalEarnings: 0,
     totalSales: 0,
     albumCount: 0,
+    songsCount: 0,
     videoCount: 0,
     monthlyEarnings: 0,
     viewsThisMonth: 0
@@ -39,6 +41,8 @@ export default function CreatorDashboard() {
   const [recentSales, setRecentSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [myContent, setMyContent] = useState({ albums: [], videos: [] });
+  // include songs list
+  const [songsLoading, setSongsLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
 
   useEffect(() => {
@@ -66,11 +70,21 @@ export default function CreatorDashboard() {
         setUser(profileData);
         authedId = profileData?.id;
         
-        if (profileData.creatorProfile) {
-          setStats(prevStats => ({
-            ...prevStats,
-            totalEarnings: parseFloat(profileData.creatorProfile.total_earnings || 0),
-            totalSales: profileData.creatorProfile.total_sales || 0
+        // We'll rely on /api/creators/:id for authoritative counts & totals
+      }
+
+      // Get creator totals (earnings, sales, albums, videos)
+      if (authedId) {
+        const cMetaRes = await fetch(`/api/creators/${authedId}`);
+        if (cMetaRes.ok) {
+          const meta = await cMetaRes.json();
+          setStats(prev => ({
+            ...prev,
+            totalEarnings: parseFloat(meta.total_earnings || 0),
+            totalSales: parseInt(meta.total_sales || 0, 10),
+            albumCount: parseInt(meta.albums_count || 0, 10),
+            songsCount: parseInt(meta.songs_count || 0, 10),
+            videoCount: parseInt(meta.videos_count || 0, 10)
           }));
         }
       }
@@ -84,7 +98,7 @@ export default function CreatorDashboard() {
             const cRes = await fetch(`/api/creators/${idToUse}/content`);
             if (cRes.ok) {
               const cData = await cRes.json();
-              setMyContent({ albums: cData.albums || [], videos: cData.videos || [] });
+              setMyContent({ albums: cData.albums || [], videos: cData.videos || [], songs: cData.songs || [] });
             }
           }
         } catch {}
@@ -109,14 +123,7 @@ export default function CreatorDashboard() {
         setRecentSales([]);
       }
 
-      // You can add more API calls here for albums, videos etc.
-      setStats(prevStats => ({
-        ...prevStats,
-        albumCount: 3,
-        videoCount: 2,
-        monthlyEarnings: 450.00,
-        viewsThisMonth: 1250
-      }));
+      // No hardcoded values; keep monthly/views at 0 unless we have analytics sources
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -243,20 +250,18 @@ export default function CreatorDashboard() {
           </motion.div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - always visible, values sourced from backend */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             icon={DollarSign}
             title="Total Earnings"
             value={`GH₵ ${stats.totalEarnings.toFixed(2)}`}
-            change="+12% this month"
             color="text-green-400"
           />
           <StatCard
             icon={Users}
             title="Total Sales"
             value={stats.totalSales}
-            change="+3 this week"
             color="text-blue-400"
           />
           <StatCard
@@ -264,6 +269,12 @@ export default function CreatorDashboard() {
             title="Albums"
             value={stats.albumCount}
             color="text-purple-400"
+          />
+          <StatCard
+            icon={Music}
+            title="Songs"
+            value={stats.songsCount}
+            color="text-yellow-400"
           />
           <StatCard
             icon={Video}
@@ -389,6 +400,26 @@ export default function CreatorDashboard() {
                         </div>
                       </div>
                     )) : <div className="text-gray-400">No albums yet</div>}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
+                  <CardHeader><CardTitle className="text-white">Songs</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {myContent.songs?.length ? myContent.songs.map(s => (
+                      <div key={s.id} className="p-3 rounded-lg bg-slate-800/50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded bg-slate-700 overflow-hidden">
+                            {s.cover_image ? <img src={s.cover_image} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Music2 className="w-5 h-5"/></div>}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{s.title}</div>
+                            <div className="text-xs text-gray-400">GHS {parseFloat(s.price||0).toFixed(2)}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2"></div>
+                      </div>
+                    )) : <div className="text-gray-400">No songs yet</div>}
                   </CardContent>
                 </Card>
 

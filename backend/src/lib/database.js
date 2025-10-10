@@ -10,11 +10,18 @@ let pool = null;
 if (process.env.DATABASE_URL) {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false
-    }
+    ssl: { rejectUnauthorized: false },
+    keepAlive: true,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    max: Number(process.env.PGPOOL_MAX || 10),
+    application_name: 'cedistream-backend'
   });
-  
+
+  pool.on('error', (err) => {
+    console.error('⚠️  Postgres pool error:', err);
+  });
+
   console.log('✅ Connected to Neon PostgreSQL database');
 } else {
   console.warn('⚠️  DATABASE_URL not set. Database operations will fail until configured.');
@@ -38,4 +45,15 @@ export const query = async (text, params) => {
 
 export const getPool = () => pool;
 
-export default { query, getPool };
+export const closePool = async () => {
+  if (pool) {
+    try {
+      await pool.end();
+      console.log('🧹 Postgres pool closed');
+    } catch (e) {
+      console.error('Error closing Postgres pool:', e);
+    }
+  }
+};
+
+export default { query, getPool, closePool };
