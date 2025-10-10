@@ -80,7 +80,8 @@ export default function Creator() {
                           // quick login
                           const { User } = await import('@/entities/User');
                           await User.login();
-                          window.location.reload();
+                          // after login redirect to cart so user can checkout
+                          window.location.href = '/cart';
                           return;
                         }
                         // show simple choose amount prompt
@@ -101,9 +102,10 @@ export default function Creator() {
                         if (!exists) {
                           u2.cart = [...currentCart, cartItem];
                           localStorage.setItem('demo_user', JSON.stringify(u2));
-                          alert('Added to cart');
+                          // redirect to cart to allow immediate checkout
+                          window.location.href = '/cart';
                         } else {
-                          alert('Item already in cart');
+                          window.location.href = '/cart';
                         }
                       } catch (e) {
                         console.error(e);

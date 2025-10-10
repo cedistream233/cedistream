@@ -55,10 +55,12 @@ export default function Albums() {
     let filtered = albums;
 
     if (searchTerm) {
-      filtered = filtered.filter(album =>
-        album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        album.artist.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const q = searchTerm.toLowerCase().replace(/\s+/g, '');
+      filtered = filtered.filter(album => {
+        const t = (album.title || '').toLowerCase().replace(/\s+/g, '');
+        const a = (album.artist || '').toLowerCase().replace(/\s+/g, '');
+        return t.includes(q) || a.includes(q);
+      });
     }
 
     // genre/category filtering removed per new requirements
@@ -91,7 +93,7 @@ export default function Albums() {
     const itemExists = currentCart.some(i => i.item_id === album.id);
     if (!itemExists) {
       await User.updateMyUserData({ cart: [...currentCart, cartItem] });
-      window.location.reload();
+      window.location.href = '/cart';
     }
     onModalCancel();
   };

@@ -46,10 +46,12 @@ export default function Videos() {
     let filtered = videos;
 
     if (searchTerm) {
-      filtered = filtered.filter(video =>
-        video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        video.creator.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const q = searchTerm.toLowerCase().replace(/\s+/g, '');
+      filtered = filtered.filter(video => {
+        const t = (video.title || '').toLowerCase().replace(/\s+/g, '');
+        const c = (video.creator || '').toLowerCase().replace(/\s+/g, '');
+        return t.includes(q) || c.includes(q);
+      });
     }
 
     // category filter removed per new requirements
@@ -82,7 +84,8 @@ export default function Videos() {
     const itemExists = currentCart.some(i => i.item_id === video.id);
     if (!itemExists) {
       await User.updateMyUserData({ cart: [...currentCart, cartItem] });
-      window.location.reload();
+      // navigate to cart for checkout
+      window.location.href = '/cart';
     }
     onModalCancel();
   };
