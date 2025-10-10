@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Song } from '@/entities/Song';
 import { Card } from '@/components/ui/card';
 import AudioPlayer from '@/components/media/AudioPlayer';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
 export default function SongDetails() {
   const { id } = useParams();
@@ -38,7 +39,7 @@ export default function SongDetails() {
     })();
   }, [song?.id]);
 
-  if (loading) return <div className="max-w-2xl mx-auto py-16 text-center text-gray-400">Loading…</div>;
+  if (loading) return <LoadingOverlay text="Loading" />;
   if (!song) return <div className="max-w-2xl mx-auto py-16 text-center text-gray-400">Song not found</div>;
 
   return (

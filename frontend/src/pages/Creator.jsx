@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import ContentCard from '@/components/content/ContentCard';
 import ContentRow from '@/components/content/ContentRow';
 import { Song } from '@/entities/Song';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
 export default function Creator() {
   const { id } = useParams();
@@ -28,16 +29,7 @@ export default function Creator() {
     })();
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-12 bg-slate-800 rounded w-64" />
-          <div className="h-5 bg-slate-800 rounded w-1/2" />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingOverlay text="Loading creator" />;
 
   if (!creator) {
     return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-400">Creator not found</div>;
