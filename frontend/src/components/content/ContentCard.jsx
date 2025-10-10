@@ -159,22 +159,28 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
                     <div className="relative w-18 h-18">
                       {/* circular progress ring */}
                       <svg className="w-20 h-20" viewBox="0 0 36 36">
-                        <path className="text-slate-700" d="M18 2.0845a15.9155 15.9155 0 1 1 0 31.831" fill="none" strokeWidth="2" stroke="rgba(255,255,255,0.06)" />
-                        <path
-                          className="text-green-400"
-                          d="M18 2.0845a15.9155 15.9155 0 1 1 0 31.831"
-                          fill="none"
-                          strokeWidth="2"
-                          stroke="url(#grad1)"
-                          strokeDasharray={`${Math.min(100, duration>0 ? (currentTime/duration*100) : 0)} 100`}
-                          strokeLinecap="round"
-                        />
                         <defs>
                           <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
                             <stop offset="0%" stopColor="#7c3aed" />
                             <stop offset="100%" stopColor="#ec4899" />
                           </linearGradient>
                         </defs>
+                        {/* background ring */}
+                        <circle cx="18" cy="18" r="15.9155" fill="none" strokeWidth="2" stroke="rgba(255,255,255,0.06)" />
+                        {/* progress ring: circumference is 100 (r chosen accordingly). strokeDashoffset flips so 0 => empty, 100 => full */}
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="15.9155"
+                          fill="none"
+                          strokeWidth="2"
+                          stroke="url(#grad1)"
+                          strokeDasharray="100"
+                          strokeDashoffset={100 - (duration > 0 ? (currentTime / duration * 100) : 0)}
+                          strokeLinecap="round"
+                          transform="rotate(-90 18 18)"
+                          style={{ transition: 'stroke-dashoffset 120ms linear' }}
+                        />
                       </svg>
 
                       <button
