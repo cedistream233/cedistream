@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.jsx';
 import { ImageViewerProvider } from './contexts/ImageViewerContext.jsx';
 import Layout from './Layout.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
 import Albums from './pages/Albums.jsx';
 import Videos from './pages/Videos.jsx';
@@ -46,17 +47,17 @@ export default function App() {
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />
   <Route path="/creators/:id" element={withLayout(Creator, 'Creator')} />
-        <Route path="/cart" element={withLayout(Cart, 'Cart')} />
-        <Route path="/checkout" element={withLayout(Checkout, 'Checkout')} />
-        <Route path="/library" element={withLayout(Library, 'Library')} />
-        <Route path="/admin" element={withLayout(Admin, 'Admin')} />
-        <Route path="/dashboard" element={withLayout(CreatorDashboard, 'Dashboard')} />
-  <Route path="/my/albums" element={withLayout(MyAlbums, 'My Albums')} />
-  <Route path="/my/songs" element={withLayout(MySongs, 'My Songs')} />
-  <Route path="/my/videos" element={withLayout(MyVideos, 'My Videos')} />
-  <Route path="/profile" element={withLayout(Profile, 'Profile')} />
-    <Route path="/upload/album" element={withLayout(UploadAlbum, 'Upload Album')} />
-    <Route path="/upload/video" element={withLayout(UploadVideo, 'Upload Video')} />
+        <Route path="/cart" element={<ProtectedRoute>{withLayout(Cart, 'Cart')}</ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
+        <Route path="/library" element={<ProtectedRoute>{withLayout(Library, 'Library')}</ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute>{withLayout(Admin, 'Admin')}</ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute>{withLayout(CreatorDashboard, 'Dashboard')}</ProtectedRoute>} />
+  <Route path="/my/albums" element={<ProtectedRoute>{withLayout(MyAlbums, 'My Albums')}</ProtectedRoute>} />
+  <Route path="/my/songs" element={<ProtectedRoute>{withLayout(MySongs, 'My Songs')}</ProtectedRoute>} />
+  <Route path="/my/videos" element={<ProtectedRoute>{withLayout(MyVideos, 'My Videos')}</ProtectedRoute>} />
+  <Route path="/profile" element={<ProtectedRoute>{withLayout(Profile, 'Profile')}</ProtectedRoute>} />
+    <Route path="/upload/album" element={<ProtectedRoute>{withLayout(UploadAlbum, 'Upload Album')}</ProtectedRoute>} />
+    <Route path="/upload/video" element={<ProtectedRoute>{withLayout(UploadVideo, 'Upload Video')}</ProtectedRoute>} />
         
         {/* Auth routes without layout */}
         <Route path="/login" element={<Login />} />

@@ -28,7 +28,8 @@ export default function Layout({ children, currentPageName }) {
 	const handleLogoutConfirm = async () => {
 		logout();
 		setShowLogoutModal(false);
-		navigate('/');
+	// Replace history so back button won't go to protected pages; send user to home
+	navigate('/', { replace: true });
 	};
 
 	const navItems = [
