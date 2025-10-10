@@ -148,11 +148,12 @@ export default function Albums() {
                   artist: song.artist,
                   price: song.price,
                   cover_image: song.cover_image,
+                  audio_url: song.audio_url,
                   songs: []
                 }}
                 type="album"
                 onAddToCart={() => handleAddToCart({ id: song.id, title: song.title, price: song.price, cover_image: song.cover_image }, true)}
-                onViewDetails={() => { /* optional: navigate to a SongDetails page later */ }}
+                onViewDetails={() => navigate(`/songs/${encodeURIComponent(song.id)}`)}
               />
             ))}
           </div>

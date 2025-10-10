@@ -1,14 +1,65 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, ShoppingCart, Music2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { Pause } from "lucide-react";
 
 export default function ContentCard({ item, type, onAddToCart, onViewDetails }) {
-  const image = type === "album" ? item.cover_image : item.thumbnail;
+  // prefer cover_image, fallback to thumbnail
+  const image = item.cover_image || item.thumbnail || null;
   const title = item.title;
-  const creator = type === "album" ? item.artist : item.creator;
+  const creator = item.artist || item.creator;
   const price = item.price;
+
+  const audioRef = useRef(null);
+  const previewTimeoutRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    // initialize audio element if audio_url exists
+    if (item?.audio_url) {
+      if (!audioRef.current) audioRef.current = new Audio(item.audio_url);
+      else audioRef.current.src = item.audio_url;
+      audioRef.current.preload = 'metadata';
+
+      const onEnded = () => setPlaying(false);
+      audioRef.current.addEventListener('ended', onEnded);
+      return () => {
+        audioRef.current.removeEventListener('ended', onEnded);
+        // stop and cleanup preview timeout
+        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      };
+    }
+    // cleanup when no audio
+    return () => {};
+  }, [item?.audio_url]);
+
+  const togglePreview = () => {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+        previewTimeoutRef.current = null;
+      }
+    } else {
+      try {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+        setPlaying(true);
+        // auto-stop preview after 30s
+        previewTimeoutRef.current = setTimeout(() => {
+          if (audioRef.current) audioRef.current.pause();
+          setPlaying(false);
+        }, 30000);
+      } catch (e) {
+        // play might be blocked by browser autoplay policies
+        console.warn('Preview play failed', e);
+      }
+    }
+  };
 
   return (
     <motion.div
@@ -35,7 +86,17 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
             )}
             
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+              <div className="absolute bottom-4 left-4 right-4 flex gap-2 items-center">
+                {item?.audio_url && (
+                  <Button
+                    onClick={(e) => { e.stopPropagation(); togglePreview(); }}
+                    size="icon"
+                    className="bg-white/90 text-black hover:bg-white"
+                    aria-label={playing ? 'Pause preview' : 'Play preview'}
+                  >
+                    {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  </Button>
+                )}
                 <Button
                   onClick={onViewDetails}
                   className="flex-1 bg-white/90 text-black hover:bg-white"
