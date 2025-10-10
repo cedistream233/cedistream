@@ -25,6 +25,17 @@ export const AuthProvider = ({ children }) => {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
+    // also mirror demo_user changes (used by demo flows)
+    const onStorage = (e) => {
+      if (e.key === 'demo_user' || e.key === 'user') {
+        try {
+          const v = localStorage.getItem('user') || localStorage.getItem('demo_user');
+          setUser(v ? JSON.parse(v) : null);
+        } catch { }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const login = (userData, authToken) => {
@@ -46,6 +57,19 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
+  // convenience helper used by demo flows to update demo_user cart/state
+  const updateMyUserData = async (patch) => {
+    try {
+      const u = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+      const updated = { ...u, ...patch };
+      localStorage.setItem('demo_user', JSON.stringify(updated));
+      // also mirror to 'user' so AuthProvider and UI react
+      localStorage.setItem('user', JSON.stringify(updated));
+      setUser(updated);
+      return updated;
+    } catch (e) { console.error(e); return null; }
+  };
+
   const isAuthenticated = !!token && !!user;
   const isCreator = user?.role === 'creator';
   const isSupporter = user?.role === 'supporter';
@@ -56,6 +80,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     updateUser,
+    updateMyUserData,
     isAuthenticated,
     isCreator,
     isSupporter,

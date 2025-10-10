@@ -19,7 +19,8 @@ export default function Layout({ children, currentPageName }) {
 	const navigate = useNavigate();
 	const { user, logout, isAuthenticated, isCreator } = useAuth();
 	const [showLogoutModal, setShowLogoutModal] = useState(false);
-	const [cartCount, setCartCount] = useState(0); // TODO: Implement cart functionality
+	// derive cart count from auth context so it updates when demo_user/user changes
+	const cartCount = (user?.cart || []).length || 0;
 
 	const handleLogoutClick = () => {
 		setShowLogoutModal(true);

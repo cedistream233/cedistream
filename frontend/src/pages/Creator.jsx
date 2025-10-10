@@ -76,43 +76,44 @@ export default function Creator() {
                     }}
                     type="song"
                     onAddToCart={() => {
-                    // open ChooseAmountModal via simple flow used in Albums/Videos: emulate adding to cart by triggering login or modal
+                    // Add to cart at minimum price and redirect to cart (no prompt)
                     (async () => {
                       try {
-                        const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
+                        const { User } = await import('@/entities/User');
+                        let u = JSON.parse(localStorage.getItem('demo_user') || 'null');
                         if (!u) {
-                          // quick login
-                          const { User } = await import('@/entities/User');
                           await User.login();
-                          // after login redirect to cart so user can checkout
-                          window.location.href = '/cart';
-                          return;
+                          u = await User.me();
                         }
-                        // show simple choose amount prompt
-                        const amount = prompt(`Enter amount to pay (minimum GH₵ ${Number(song.price||0).toFixed(2)}):`, String(song.price||0));
-                        if (amount === null) return;
-                        const chosen = Math.max(Number(song.price||0), Number(amount||0));
+                        const minPrice = Number(song.price || 0);
                         const cartItem = {
                           item_type: 'song',
                           item_id: song.id,
                           title: song.title,
-                          price: chosen,
-                          min_price: Number(song.price||0),
+                          price: minPrice,
+                          min_price: minPrice,
                           image: song.cover_image
                         };
-                        const u2 = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
-                        const currentCart = u2.cart || [];
+                        const currentCart = u.cart || [];
                         const exists = currentCart.some(i => i.item_id === song.id);
                         if (!exists) {
-                          u2.cart = [...currentCart, cartItem];
-                          localStorage.setItem('demo_user', JSON.stringify(u2));
-                          // redirect to cart to allow immediate checkout
-                          window.location.href = '/cart';
-                        } else {
-                          window.location.href = '/cart';
+                          await User.updateMyUserData({ cart: [...currentCart, cartItem] });
                         }
+                        // redirect to cart to allow immediate checkout
+                        window.location.href = '/cart';
                       } catch (e) {
                         console.error(e);
+                        // best-effort fallback
+                        try {
+                          const u2 = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+                          const minPrice2 = Number(song.price || 0);
+                          const cartItem2 = { item_type: 'song', item_id: song.id, title: song.title, price: minPrice2, min_price: minPrice2, image: song.cover_image };
+                          u2.cart = u2.cart || [];
+                          if (!u2.cart.some(i => i.item_id === song.id)) u2.cart.push(cartItem2);
+                          localStorage.setItem('demo_user', JSON.stringify(u2));
+                          localStorage.setItem('user', JSON.stringify(u2));
+                        } catch {}
+                        window.location.href = '/cart';
                       }
                     })();
                     }}

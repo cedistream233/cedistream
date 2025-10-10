@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Lock } from 'lucide-react';
 
 export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails }) {
@@ -7,6 +8,7 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
   const creator = item.artist || item.creator;
   const price = item.price;
   const [owned, setOwned] = useState(false);
+  const { updateMyUserData, user } = useAuth();
 
   useEffect(() => {
     try {
@@ -46,13 +48,78 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
       </div>
       <div className="pl-3 flex items-center gap-2">
         <button
-          onClick={(e) => { e.stopPropagation(); onViewDetails && onViewDetails(); }}
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              // attempt to prefetch preview URL and store in sessionStorage for immediate use on details page
+              const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+              if (res.ok) {
+                const d = await res.json();
+                if (d?.url) {
+                  try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
+                }
+              }
+            } catch (err) {
+              // ignore
+            }
+            // navigate to details; the details page will pick up sessionStorage preview if present
+            window.location.href = `/songs/${encodeURIComponent(item.id)}`;
+          }}
           className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
         >
           Preview
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onAddToCart && onAddToCart(); }}
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              // if onAddToCart callback is provided, call it (page-level handlers may implement custom flows)
+              if (onAddToCart) return onAddToCart();
+
+              // ensure demo user exists, otherwise trigger minimal login flow
+              let demo = JSON.parse(localStorage.getItem('demo_user') || 'null');
+              if (!demo) {
+                const { User } = await import('@/entities/User');
+                await User.login();
+                demo = JSON.parse(localStorage.getItem('demo_user') || 'null');
+              }
+
+              // construct cart item in the same shape other pages use
+              const cartItem = {
+                item_type: type,
+                item_id: item.id,
+                title: title,
+                price: Number(price || 0),
+                min_price: Number(price || 0),
+                image: item.cover_image || item.thumbnail || null,
+              };
+
+              const currentCart = (demo?.cart) || [];
+              const exists = currentCart.some(i => i.item_id === item.id && i.item_type === type);
+              if (!exists) {
+                const updated = await (updateMyUserData ? updateMyUserData({ cart: [...currentCart, cartItem] }) : (async () => {
+                  demo.cart = [...currentCart, cartItem];
+                  localStorage.setItem('demo_user', JSON.stringify(demo));
+                  localStorage.setItem('user', JSON.stringify(demo));
+                  return demo;
+                })());
+              }
+
+              // navigate to cart for checkout
+              window.location.href = '/cart';
+            } catch (err) {
+              console.error(err);
+              // fallback: try a simple localStorage update and redirect
+              try {
+                const u = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+                u.cart = u.cart || [];
+                if (!u.cart.some(i => i.item_id === item.id)) u.cart.push({ item_type: type, item_id: item.id, title, price: Number(price||0) });
+                localStorage.setItem('demo_user', JSON.stringify(u));
+                localStorage.setItem('user', JSON.stringify(u));
+              } catch {}
+              window.location.href = '/cart';
+            }
+          }}
           className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700"
         >
           Buy

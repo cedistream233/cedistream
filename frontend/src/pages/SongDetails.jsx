@@ -33,6 +33,16 @@ export default function SongDetails() {
         setAudioUrl(full);
         return;
       }
+      // Prefer a prefetched preview URL if available (stored in sessionStorage by the preview button)
+      let pref = null;
+      try { pref = sessionStorage.getItem(`preview:${song.id}`); } catch {}
+      if (pref) {
+        setPurchased(false);
+        setAudioUrl(pref);
+        // clear the prefetched value to avoid stale urls later
+        try { sessionStorage.removeItem(`preview:${song.id}`); } catch {}
+        return;
+      }
       const prev = await Song.getPreviewUrl(song.id);
       setPurchased(false);
       setAudioUrl(prev || null);
