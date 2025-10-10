@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, ShoppingCart, Music2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { Pause } from "lucide-react";
+import { Pause, RotateCcw } from "lucide-react";
 
 export default function ContentCard({ item, type, onAddToCart, onViewDetails }) {
   // prefer cover_image, fallback to thumbnail
@@ -15,30 +15,43 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
   const audioRef = useRef(null);
   const previewTimeoutRef = useRef(null);
   const [playing, setPlaying] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   useEffect(() => {
-    // initialize audio element if audio_url exists
-    if (item?.audio_url) {
-      if (!audioRef.current) audioRef.current = new Audio(item.audio_url);
-      else audioRef.current.src = item.audio_url;
-      audioRef.current.preload = 'metadata';
-
-      const onEnded = () => setPlaying(false);
-      audioRef.current.addEventListener('ended', onEnded);
-      return () => {
-        audioRef.current.removeEventListener('ended', onEnded);
-        // stop and cleanup preview timeout
-        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
-      };
+    // Prefer a dedicated preview endpoint for songs. We detect songs by presence of audio_url on the card item
+    async function loadPreview() {
+      if (!item?.id || !item?.audio_url) return;
+      setLoadingPreview(true);
+      try {
+        const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+        if (res.ok) {
+          const d = await res.json();
+          setPreviewUrl(d.url || null);
+        } else {
+          setPreviewUrl(null);
+        }
+      } catch {
+        setPreviewUrl(null);
+      } finally { setLoadingPreview(false); }
     }
-    // cleanup when no audio
-    return () => {};
-  }, [item?.audio_url]);
+    loadPreview();
+    return () => { if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current); };
+  }, [item?.id, item?.audio_url]);
+
+  const ensureAudio = () => {
+    if (!previewUrl) return null;
+    if (!audioRef.current) audioRef.current = new Audio(previewUrl);
+    if (audioRef.current.src !== previewUrl) audioRef.current.src = previewUrl;
+    audioRef.current.preload = 'metadata';
+    return audioRef.current;
+  };
 
   const togglePreview = () => {
-    if (!audioRef.current) return;
+    const el = ensureAudio();
+    if (!el) return;
     if (playing) {
-      audioRef.current.pause();
+      el.pause();
       setPlaying(false);
       if (previewTimeoutRef.current) {
         clearTimeout(previewTimeoutRef.current);
@@ -46,12 +59,12 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
       }
     } else {
       try {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
+        el.currentTime = 0;
+        el.play();
         setPlaying(true);
         // auto-stop preview after 30s
         previewTimeoutRef.current = setTimeout(() => {
-          if (audioRef.current) audioRef.current.pause();
+          if (el) el.pause();
           setPlaying(false);
         }, 30000);
       } catch (e) {
@@ -59,6 +72,13 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
         console.warn('Preview play failed', e);
       }
     }
+  };
+
+  const replay = (e) => {
+    e.stopPropagation();
+    const el = ensureAudio();
+    if (!el) return;
+    el.currentTime = 0; el.play().catch(()=>{}); setPlaying(true);
   };
 
   return (
@@ -87,7 +107,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
             
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div className="absolute bottom-4 left-4 right-4 flex gap-2 items-center">
-                {item?.audio_url && (
+                {type === 'album' && previewUrl && (
                   <Button
                     onClick={(e) => { e.stopPropagation(); togglePreview(); }}
                     size="icon"
@@ -95,6 +115,11 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
                     aria-label={playing ? 'Pause preview' : 'Play preview'}
                   >
                     {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  </Button>
+                )}
+                {type === 'album' && previewUrl && (
+                  <Button onClick={(e)=>{ e.stopPropagation(); replay(e); }} size="icon" variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
+                    <RotateCcw className="w-4 h-4" />
                   </Button>
                 )}
                 <Button

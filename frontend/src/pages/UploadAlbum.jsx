@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, MoveVertical, Upload, Music, Image as ImageIcon } from 'lucide-react';
 import CropperModal from '@/components/ui/CropperModal';
+import UploadProgressModal from '@/components/ui/UploadProgressModal';
+import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
 
 export default function UploadAlbum() {
   const [title, setTitle] = useState('');
@@ -17,6 +19,10 @@ export default function UploadAlbum() {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [showProgress, setShowProgress] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [created, setCreated] = useState(null);
   const coverInputRef = useRef(null);
   const [showCoverCropper, setShowCoverCropper] = useState(false);
   const [pendingCover, setPendingCover] = useState(null);
@@ -61,19 +67,27 @@ export default function UploadAlbum() {
         if (t.preview) fd.append(`preview_${t.id}`, t.preview);
       }
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/uploads/albums', {
-        method: 'POST',
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
-        body: fd
+      setProgress(5); setShowProgress(true);
+      const res = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/uploads/albums');
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.min(99, (e.loaded / e.total) * 100)); };
+        xhr.onreadystatechange = () => { if (xhr.readyState === 4) resolve(xhr); };
+        xhr.onerror = reject;
+        xhr.send(fd);
       });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Upload failed');
-  setSuccess('Album published!');
+      const data = JSON.parse(res.responseText || '{}');
+      if (res.status < 200 || res.status >= 300) throw new Error(data.error || 'Upload failed');
+      setProgress(100);
+      setSuccess('Album published!');
+      setCreated(data?.album || null);
+      setShowSuccess(true);
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setTracks([]);
     } catch (e) {
       setError(e.message);
     } finally {
-      setPublishing(false);
+      setPublishing(false); setTimeout(()=>setShowProgress(false), 600);
     }
   };
 
@@ -202,6 +216,15 @@ export default function UploadAlbum() {
           const file = new File([blob], 'album-cover.jpg', { type: 'image/jpeg' });
           setCover(file);
         }}
+      />
+      <UploadProgressModal open={showProgress} title="Uploading Album" description="Uploading your album and tracks. Please keep this page open until complete." percent={progress} />
+      <PublishSuccessModal
+        open={showSuccess}
+        title="Album Published!"
+        message="Your album is live. Share it or view the details."
+        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/albums/${encodeURIComponent(created.id)}`; }}
+        onShare={() => { if (navigator.share && created?.id) navigator.share({ title, url: `${window.location.origin}/albums/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/albums/${created.id}`); }}
+        onClose={() => setShowSuccess(false)}
       />
     </div>
   );

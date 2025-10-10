@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Song } from '@/entities/Song';
 import { Card } from '@/components/ui/card';
+import AudioPlayer from '@/components/media/AudioPlayer';
 
 export default function SongDetails() {
   const { id } = useParams();
@@ -45,11 +46,10 @@ export default function SongDetails() {
         <img src={song.cover_image || 'https://via.placeholder.com/160?text=%F0%9F%8E%B5'} alt={song.title} className="w-40 h-40 rounded-lg object-cover mb-2" />
         <h1 className="text-2xl font-bold text-white mb-1">{song.title}</h1>
         <div className="text-gray-400 mb-2">{song.artist}</div>
-        <audio controls src={audioUrl || undefined} className="w-full mb-2">
-          Your browser does not support the audio element.
-        </audio>
-        {!audioUrl && (
-          <div className="text-xs text-gray-400">No preview available. Purchase to listen.</div>
+        {audioUrl ? (
+          <AudioPlayer src={audioUrl} title={song.title} showPreviewBadge={!purchased} />
+        ) : (
+          <div className="w-full text-center text-xs text-gray-400">No preview available. Purchase to listen.</div>
         )}
   <div className="text-yellow-400 font-bold text-lg">From GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
         {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}

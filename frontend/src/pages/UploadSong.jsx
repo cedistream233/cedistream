@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Upload, Image as ImageIcon, Music } from 'lucide-react';
 import CropperModal from '@/components/ui/CropperModal';
+import UploadProgressModal from '@/components/ui/UploadProgressModal';
+import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
 
 export default function UploadSong() {
   const [title, setTitle] = useState('');
@@ -18,6 +20,10 @@ export default function UploadSong() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [showProgress, setShowProgress] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [created, setCreated] = useState(null);
 
   const coverRef = useRef(null);
   const audioRef = useRef(null);
@@ -39,19 +45,34 @@ export default function UploadSong() {
       if (cover) fd.append('cover', cover);
       if (preview) fd.append('preview', preview);
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/uploads/songs', {
-        method: 'POST',
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
-        body: fd
+      setProgress(5); setShowProgress(true);
+      const res = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/uploads/songs');
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = (e.loaded / e.total) * 100;
+            setProgress(Math.min(99, pct));
+          }
+        };
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === 4) resolve(xhr);
+        };
+        xhr.onerror = reject;
+        xhr.send(fd);
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const data = JSON.parse(res.responseText || '{}');
+      if (res.status < 200 || res.status >= 300) throw new Error(data.error || 'Upload failed');
+      setProgress(100);
       setSuccess('Song published!');
+      setCreated(data);
+      setShowSuccess(true);
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setAudio(null); setPreview(null);
     } catch (e) {
       setError(e.message);
     } finally {
-      setBusy(false);
+      setBusy(false); setTimeout(()=>setShowProgress(false), 600);
     }
   };
 
@@ -134,6 +155,16 @@ export default function UploadSong() {
       <div className="flex gap-3">
         <Button onClick={submit} disabled={busy} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{busy? 'Publishing...' : 'Publish Song'}</Button>
       </div>
+
+      <UploadProgressModal open={showProgress} title="Uploading Song" description="We're uploading your files to storage. Please keep this page open." percent={progress} />
+      <PublishSuccessModal
+        open={showSuccess}
+        title="Song Published!"
+        message="Your song is live. Share it or view the details."
+        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/songs/${encodeURIComponent(created.id)}`; }}
+        onShare={() => { if (navigator.share && created?.id) navigator.share({ title, url: `${window.location.origin}/songs/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/songs/${created.id}`); }}
+        onClose={() => setShowSuccess(false)}
+      />
 
       <CropperModal
         isOpen={showCoverCropper}

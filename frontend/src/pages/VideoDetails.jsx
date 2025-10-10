@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
+import VideoPlayer from '@/components/media/VideoPlayer';
 
 export default function VideoDetails() {
   const navigate = useNavigate();
@@ -132,10 +133,7 @@ export default function VideoDetails() {
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           {mediaUrl ? (
-            <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black">
-              <video controls src={mediaUrl} className="w-full h-full object-cover" />
-              {!canAccess && <div className="absolute top-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Preview</div>}
-            </div>
+            <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} />
           ) : (
             video.thumbnail ? (
               <div className="relative group">

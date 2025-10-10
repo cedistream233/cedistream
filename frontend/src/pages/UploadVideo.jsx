@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Upload, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import CropperModal from '@/components/ui/CropperModal';
+import UploadProgressModal from '@/components/ui/UploadProgressModal';
+import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
 
 export default function UploadVideo() {
   const [title, setTitle] = useState('');
@@ -18,6 +20,10 @@ export default function UploadVideo() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [showProgress, setShowProgress] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [created, setCreated] = useState(null);
 
   const thumbRef = useRef(null);
   const videoRef = useRef(null);
@@ -40,19 +46,29 @@ export default function UploadVideo() {
       if (thumbnail) fd.append('thumbnail', thumbnail);
   if (preview) fd.append('preview', preview);
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/uploads/videos', {
-        method: 'POST',
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
-        body: fd
+      setProgress(5); setShowProgress(true);
+      const res = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/uploads/videos');
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.min(99, (e.loaded / e.total) * 100));
+        };
+        xhr.onreadystatechange = () => { if (xhr.readyState === 4) resolve(xhr); };
+        xhr.onerror = reject;
+        xhr.send(fd);
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const data = JSON.parse(res.responseText || '{}');
+      if (res.status < 200 || res.status >= 300) throw new Error(data.error || 'Upload failed');
+      setProgress(100);
       setSuccess('Video published!');
-  setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null); setPreview(null);
+      setCreated(data);
+      setShowSuccess(true);
+      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null); setPreview(null);
     } catch (e) {
       setError(e.message);
     } finally {
-      setBusy(false);
+      setBusy(false); setTimeout(()=>setShowProgress(false), 600);
     }
   };
 
@@ -153,6 +169,16 @@ export default function UploadVideo() {
           const file = new File([blob], 'video-thumb.jpg', { type: 'image/jpeg' });
           setThumbnail(file);
         }}
+      />
+
+      <UploadProgressModal open={showProgress} title="Uploading Video" description="Your video is uploading. This may take a while depending on size and network." percent={progress} />
+      <PublishSuccessModal
+        open={showSuccess}
+        title="Video Published!"
+        message="Your video is live. Share it or view the details."
+        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/videos?id=${encodeURIComponent(created.id)}`; }}
+        onShare={() => { if (navigator.share && created?.id) navigator.share({ title, url: `${window.location.origin}/videos?id=${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/videos?id=${created.id}`); }}
+        onClose={() => setShowSuccess(false)}
       />
     </div>
   );
