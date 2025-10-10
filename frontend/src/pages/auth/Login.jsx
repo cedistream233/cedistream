@@ -155,15 +155,6 @@ export default function Login() {
                 </Link>
               </p>
             </div>
-
-            {/* Demo credentials */}
-            <div className="mt-6 p-4 bg-slate-800/50 rounded-lg">
-              <p className="text-xs text-gray-400 mb-2">Demo Accounts:</p>
-              <div className="text-xs text-gray-300 space-y-1">
-                <div>Creator: kwame@beats.com / password123</div>
-                <div>Supporter: supporter@demo.com / password123</div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </motion.div>

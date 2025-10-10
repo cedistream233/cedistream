@@ -71,8 +71,25 @@ export default function CreatorDashboard() {
         }
       }
 
-      // You can add more API calls here for albums, videos, recent sales etc.
-      // For now, we'll use mock data
+      // Recent sales for this creator
+      const salesRes = await fetch('/api/uploads/recent-sales', {
+        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+      });
+      if (salesRes.ok) {
+        const rows = await salesRes.json();
+        setRecentSales(Array.isArray(rows) ? rows.map(r => ({
+          id: r.id,
+          item: r.item,
+          type: r.item_type,
+          amount: parseFloat(r.amount || 0),
+          date: new Date(r.date).toISOString().slice(0,10),
+          buyer: '—'
+        })) : []);
+      } else {
+        setRecentSales([]);
+      }
+
+      // You can add more API calls here for albums, videos etc.
       setStats(prevStats => ({
         ...prevStats,
         albumCount: 3,
@@ -80,12 +97,6 @@ export default function CreatorDashboard() {
         monthlyEarnings: 450.00,
         viewsThisMonth: 1250
       }));
-
-      setRecentSales([
-        { id: 1, item: 'Afro Vibes', type: 'album', amount: 25.00, date: '2024-10-08', buyer: 'John D.' },
-        { id: 2, item: 'Behind the Music', type: 'video', amount: 15.00, date: '2024-10-07', buyer: 'Sarah M.' },
-        { id: 3, item: 'Afro Vibes', type: 'album', amount: 25.00, date: '2024-10-06', buyer: 'Mike K.' }
-      ]);
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -290,11 +301,11 @@ export default function CreatorDashboard() {
                   <CardTitle className="text-white">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full justify-start bg-purple-600 hover:bg-purple-700">
+                  <Button onClick={() => navigate('/upload/album')} className="w-full justify-start bg-purple-600 hover:bg-purple-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Upload New Album
                   </Button>
-                  <Button className="w-full justify-start bg-pink-600 hover:bg-pink-700">
+                  <Button onClick={() => navigate('/upload/video')} className="w-full justify-start bg-pink-600 hover:bg-pink-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Upload New Video
                   </Button>
@@ -315,11 +326,11 @@ export default function CreatorDashboard() {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-white">My Content</h2>
               <div className="flex space-x-2">
-                <Button className="bg-purple-600 hover:bg-purple-700">
+                <Button onClick={() => navigate('/upload/album')} className="bg-purple-600 hover:bg-purple-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Album
                 </Button>
-                <Button className="bg-pink-600 hover:bg-pink-700">
+                <Button onClick={() => navigate('/upload/video')} className="bg-pink-600 hover:bg-pink-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Video
                 </Button>
@@ -332,7 +343,7 @@ export default function CreatorDashboard() {
                   <Music2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-2">No content yet</h3>
                   <p className="text-gray-400 mb-6">Start by uploading your first album or video</p>
-                  <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                  <Button onClick={() => navigate('/upload/album')} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
                     Upload Content
                   </Button>
                 </div>

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../lib/database.js';
+import { authenticateToken } from '../lib/auth.js';
 
 const router = Router();
 

@@ -20,6 +20,8 @@ import ResetPassword from './pages/auth/ResetPassword.jsx';
 import CreatorDashboard from './pages/CreatorDashboard.jsx';
 import Profile from './pages/Profile.jsx';
 import Creator from './pages/Creator.jsx';
+import UploadAlbum from './pages/UploadAlbum.jsx';
+import UploadVideo from './pages/UploadVideo.jsx';
 
 const withLayout = (Component, name) => (
   <Layout currentPageName={name}>
@@ -47,6 +49,8 @@ export default function App() {
         <Route path="/admin" element={withLayout(Admin, 'Admin')} />
         <Route path="/dashboard" element={withLayout(CreatorDashboard, 'Dashboard')} />
   <Route path="/profile" element={withLayout(Profile, 'Profile')} />
+    <Route path="/upload/album" element={withLayout(UploadAlbum, 'Upload Album')} />
+    <Route path="/upload/video" element={withLayout(UploadVideo, 'Upload Video')} />
         
         {/* Auth routes without layout */}
         <Route path="/login" element={<Login />} />

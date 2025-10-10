@@ -1,0 +1,196 @@
+import React, { useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Trash2, MoveVertical, Upload, Music, Image as ImageIcon } from 'lucide-react';
+
+export default function UploadAlbum() {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [genre, setGenre] = useState('');
+  const [releaseDate, setReleaseDate] = useState('');
+  const [cover, setCover] = useState(null);
+  const [tracks, setTracks] = useState([]);
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const coverInputRef = useRef(null);
+
+  const addTrack = () => setTracks(t => [...t, { id: crypto.randomUUID(), title: '', price: '', duration: '', audio: null, preview: null }]);
+  const removeTrack = (id) => setTracks(t => t.filter(x => x.id !== id));
+  const moveTrack = (id, dir) => setTracks(t => {
+    const idx = t.findIndex(x => x.id === id);
+    if (idx < 0) return t;
+    const next = [...t];
+    const swapIdx = dir === 'up' ? Math.max(0, idx - 1) : Math.min(t.length - 1, idx + 1);
+    const [item] = next.splice(idx, 1);
+    next.splice(swapIdx, 0, item);
+    return next;
+  });
+
+  const onPublish = async () => handleSubmit(true);
+  const onSaveDraft = async () => handleSubmit(false);
+
+  const handleSubmit = async (publish) => {
+    setError(''); setSuccess(''); setPublishing(true);
+    try {
+      if (!title || !price) throw new Error('Title and price are required');
+      const fd = new FormData();
+      fd.append('title', title);
+      if (description) fd.append('description', description);
+      fd.append('price', price);
+      if (genre) fd.append('genre', genre);
+      if (releaseDate) fd.append('release_date', releaseDate);
+      fd.append('publish', String(publish));
+      if (cover) fd.append('cover', cover);
+      const songs = tracks.map((t, i) => ({
+        title: t.title,
+        price: Number(t.price || 0),
+        duration: t.duration,
+        audio: `audio_${t.id}`,
+        preview: t.preview ? `preview_${t.id}` : undefined,
+        track_number: i + 1,
+      }));
+      fd.append('songs', JSON.stringify(songs));
+      for (const t of tracks) {
+        if (t.audio) fd.append(`audio_${t.id}`, t.audio);
+        if (t.preview) fd.append(`preview_${t.id}`, t.preview);
+      }
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/uploads/albums', {
+        method: 'POST',
+        headers: { Authorization: token ? `Bearer ${token}` : '' },
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setSuccess(publish ? 'Album published!' : 'Draft saved');
+      setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setTracks([]);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-2xl font-bold text-white mb-4">Upload New Album</h1>
+      {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
+      {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
+
+      <Card className="bg-slate-900/50 border-purple-900/20 mb-6">
+        <CardHeader>
+          <CardTitle className="text-white">Album Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Title</label>
+              <Input value={title} onChange={e=>setTitle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Price (GHS)</label>
+              <Input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Genre</label>
+              <Input value={genre} onChange={e=>setGenre(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Release Date</label>
+              <Input type="date" value={releaseDate} onChange={e=>setReleaseDate(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Description</label>
+            <Textarea rows={3} value={description} onChange={e=>setDescription(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Album Cover</label>
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-32 rounded-md overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                {cover ? (
+                  <img src={URL.createObjectURL(cover)} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="w-10 h-10 text-slate-500" />
+                )}
+              </div>
+              <div>
+                <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e)=>setCover(e.target.files?.[0]||null)} />
+                <Button onClick={()=>coverInputRef.current?.click()} className="bg-purple-600 hover:bg-purple-700"><Upload className="w-4 h-4 mr-2"/>Select Cover</Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900/50 border-purple-900/20">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center justify-between">
+            <span>Tracks</span>
+            <Button onClick={addTrack} size="sm" className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4 mr-1"/>Add Track</Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {tracks.length === 0 && (
+            <div className="text-sm text-gray-400">No tracks yet. Add your first track.</div>
+          )}
+          {tracks.map((t, idx) => (
+            <div key={t.id} className="p-4 rounded-lg border border-purple-900/20 bg-slate-900/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-gray-300 font-medium flex items-center gap-2"><MoveVertical className="w-4 h-4"/> Track {idx+1}</div>
+                <Button variant="outline" onClick={()=>removeTrack(t.id)} className="border-slate-700 text-red-300 hover:bg-slate-800" size="sm"><Trash2 className="w-4 h-4 mr-1"/>Remove</Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Title</label>
+                  <Input value={t.title} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,title:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Price (GHS)</label>
+                  <Input type="number" value={t.price} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,price:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Duration</label>
+                  <Input value={t.duration} onChange={e=>setTracks(x=>x.map(s=>s.id===t.id?{...s,duration:e.target.value}:s))} className="bg-slate-800 border-slate-700 text-white" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FilePicker label="Audio File" accept="audio/*" value={t.audio} onChange={(file)=>setTracks(x=>x.map(s=>s.id===t.id?{...s,audio:file}:s))} />
+                <FilePicker label="Preview (optional)" accept="audio/*" value={t.preview} onChange={(file)=>setTracks(x=>x.map(s=>s.id===t.id?{...s,preview:file}:s))} />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={()=>moveTrack(t.id,'up')} className="border-slate-700 text-white hover:bg-slate-800">Move Up</Button>
+                <Button size="sm" variant="outline" onClick={()=>moveTrack(t.id,'down')} className="border-slate-700 text-white hover:bg-slate-800">Move Down</Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="mt-6 flex gap-3">
+        <Button onClick={onSaveDraft} disabled={publishing} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">Save Draft</Button>
+        <Button onClick={onPublish} disabled={publishing} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{publishing? 'Publishing...' : 'Publish Album'}</Button>
+      </div>
+    </div>
+  );
+}
+
+function FilePicker({ label, accept, value, onChange }) {
+  const ref = useRef(null);
+  return (
+    <div>
+      <label className="block text-xs text-gray-400 mb-1">{label}</label>
+      <div className="flex items-center gap-3">
+        <Input readOnly value={value?.name || ''} placeholder={`Select ${label.toLowerCase()}`} className="bg-slate-800 border-slate-700 text-white" />
+        <input ref={ref} type="file" accept={accept} className="hidden" onChange={(e)=>onChange(e.target.files?.[0]||null)} />
+        <Button type="button" onClick={()=>ref.current?.click()} className="bg-purple-600 hover:bg-purple-700"><Upload className="w-4 h-4 mr-1"/>Choose</Button>
+      </div>
+    </div>
+  );
+}

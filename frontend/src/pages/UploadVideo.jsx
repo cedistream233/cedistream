@@ -1,0 +1,119 @@
+import React, { useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Upload, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+
+export default function UploadVideo() {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [category, setCategory] = useState('');
+  const [releaseDate, setReleaseDate] = useState('');
+  const [thumbnail, setThumbnail] = useState(null);
+  const [video, setVideo] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const thumbRef = useRef(null);
+  const videoRef = useRef(null);
+
+  const submit = async (publish) => {
+    setError(''); setSuccess(''); setBusy(true);
+    try {
+      if (!title || !price || !video) throw new Error('Title, price and video are required');
+      const fd = new FormData();
+      fd.append('title', title);
+      if (description) fd.append('description', description);
+      fd.append('price', price);
+      if (category) fd.append('category', category);
+      if (releaseDate) fd.append('release_date', releaseDate);
+      fd.append('publish', String(publish));
+      fd.append('video', video);
+      if (thumbnail) fd.append('thumbnail', thumbnail);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/uploads/videos', {
+        method: 'POST',
+        headers: { Authorization: token ? `Bearer ${token}` : '' },
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setSuccess(publish ? 'Video published!' : 'Draft saved');
+      setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-2xl font-bold text-white mb-4">Upload New Video</h1>
+      {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
+      {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
+
+      <Card className="bg-slate-900/50 border-purple-900/20 mb-6">
+        <CardHeader>
+          <CardTitle className="text-white">Video Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Title</label>
+              <Input value={title} onChange={e=>setTitle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Price (GHS)</label>
+              <Input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Category</label>
+              <Input value={category} onChange={e=>setCategory(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Release Date</label>
+              <Input type="date" value={releaseDate} onChange={e=>setReleaseDate(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Description</label>
+            <Textarea rows={3} value={description} onChange={e=>setDescription(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Thumbnail</label>
+              <div className="flex items-center gap-3">
+                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  {thumbnail ? <img src={URL.createObjectURL(thumbnail)} className="w-full h-full object-cover" /> : <ImageIcon className="w-8 h-8 text-slate-500" />}
+                </div>
+                <input ref={thumbRef} type="file" accept="image/*" className="hidden" onChange={(e)=>setThumbnail(e.target.files?.[0]||null)} />
+                <Button onClick={()=>thumbRef.current?.click()} className="bg-purple-600 hover:bg-purple-700"><Upload className="w-4 h-4 mr-2"/>Select Thumbnail</Button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Video</label>
+              <div className="flex items-center gap-3">
+                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  {video ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                </div>
+                <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setVideo(e.target.files?.[0]||null)} />
+                <Button onClick={()=>videoRef.current?.click()} className="bg-pink-600 hover:bg-pink-700"><Upload className="w-4 h-4 mr-2"/>Select Video</Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-3">
+        <Button onClick={()=>submit(false)} disabled={busy} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">Save Draft</Button>
+        <Button onClick={()=>submit(true)} disabled={busy} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">{busy? 'Publishing...' : 'Publish Video'}</Button>
+      </div>
+    </div>
+  );
+}
