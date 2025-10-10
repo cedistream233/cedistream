@@ -21,8 +21,6 @@ if (process.env.DATABASE_URL) {
   pool.on('error', (err) => {
     console.error('⚠️  Postgres pool error:', err);
   });
-
-  console.log('✅ Connected to Neon PostgreSQL database');
 } else {
   console.warn('⚠️  DATABASE_URL not set. Database operations will fail until configured.');
 }

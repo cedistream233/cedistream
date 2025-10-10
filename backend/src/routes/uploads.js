@@ -222,3 +222,25 @@ router.patch('/videos/:id/status', authenticateToken, requireRole(['creator']), 
     return res.json(upd.rows[0]);
   } catch (e) { console.error(e); return res.status(500).json({ error: 'Internal Server Error' }); }
 });
+
+// Toggle song publish status
+router.patch('/songs/:id/status', authenticateToken, requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    if (!['draft','published'].includes(String(status))) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    // ensure ownership
+    const own = await query('SELECT user_id FROM songs WHERE id = $1', [id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Song not found' });
+    if (own.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const publishedAt = status === 'published' ? new Date() : null;
+    const upd = await query(
+      `UPDATE songs SET status = $2, published_at = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, status, publishedAt]
+    );
+    return res.json(upd.rows[0]);
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'Internal Server Error' }); }
+});

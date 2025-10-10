@@ -354,12 +354,16 @@ export default function CreatorDashboard() {
           </TabsContent>
 
           <TabsContent value="content" className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-col sm:flex-row gap-3 sm:gap-0">
               <h2 className="text-2xl font-bold text-white">My Content</h2>
-              <div className="flex space-x-2">
+              <div className="flex space-x-2 w-full sm:w-auto justify-stretch sm:justify-end">
                 <Button onClick={() => navigate('/upload/album')} className="bg-purple-600 hover:bg-purple-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Album
+                </Button>
+                <Button onClick={() => navigate('/upload/song')} className="bg-indigo-600 hover:bg-indigo-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Song
                 </Button>
                 <Button onClick={() => navigate('/upload/video')} className="bg-pink-600 hover:bg-pink-700">
                   <Plus className="w-4 h-4 mr-2" />
@@ -372,7 +376,7 @@ export default function CreatorDashboard() {
                 <CardContent className="p-6 text-gray-400">Loading your content…</CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                 <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
                   <CardHeader><CardTitle className="text-white">Albums</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
@@ -414,10 +418,20 @@ export default function CreatorDashboard() {
                           </div>
                           <div>
                             <div className="text-white font-medium">{s.title}</div>
-                            <div className="text-xs text-gray-400">GHS {parseFloat(s.price||0).toFixed(2)}</div>
+                            <div className="text-xs text-gray-400">GHS {parseFloat(s.price||0).toFixed(2)} · {s.status || 'draft'}</div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2"></div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={async ()=>{
+                            const token = localStorage.getItem('token');
+                            const next = s.status === 'published' ? 'draft' : 'published';
+                            const res = await fetch(`/api/uploads/songs/${s.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json', Authorization: token?`Bearer ${token}`:''}, body: JSON.stringify({status: next})});
+                            if (res.ok) {
+                              const updated = await res.json();
+                              setMyContent(mc=>({ ...mc, songs: mc.songs.map(x=>x.id===s.id?updated:x) }));
+                            }
+                          }}>{s.status === 'published' ? 'Unpublish' : 'Publish'}</Button>
+                        </div>
                       </div>
                     )) : <div className="text-gray-400">No songs yet</div>}
                   </CardContent>
