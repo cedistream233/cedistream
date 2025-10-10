@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 
 export default function LogoutConfirmModal({ isOpen, onClose, onConfirm, userName }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const safeName = (typeof userName === 'string' ? userName.replace(/\s+/g, ' ').trim() : '');
 
   const handleConfirm = async () => {
     setIsLoggingOut(true);
@@ -22,7 +23,8 @@ export default function LogoutConfirmModal({ isOpen, onClose, onConfirm, userNam
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-md">
+  {/* Use white surface with dark text for readability */}
+  <DialogContent className="bg-white border-slate-200 text-slate-900 sm:max-w-md">
         <DialogHeader className="text-center">
           <motion.div
             initial={{ scale: 0 }}
@@ -32,15 +34,11 @@ export default function LogoutConfirmModal({ isOpen, onClose, onConfirm, userNam
           >
             <AlertTriangle className="h-8 w-8 text-red-400" />
           </motion.div>
-          <DialogTitle className="text-xl font-semibold">
+          <DialogTitle className="text-xl font-semibold text-slate-900">
             Confirm Logout
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
-            {userName ? (
-              <>Are you sure you want to sign out, <span className="font-medium text-white">{userName}</span>?</>
-            ) : (
-              'Are you sure you want to sign out?'
-            )}
+          <DialogDescription className="text-slate-600">
+            Are you sure you want to sign out?
             <br />
             You'll need to sign in again to access your account.
           </DialogDescription>
@@ -48,10 +46,10 @@ export default function LogoutConfirmModal({ isOpen, onClose, onConfirm, userNam
         
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0">
           <Button
-            variant="secondary"
+            variant="white"
             onClick={onClose}
             disabled={isLoggingOut}
-            className="border-slate-600 hover:bg-slate-800"
+            className="border border-slate-300"
           >
             Cancel
           </Button>

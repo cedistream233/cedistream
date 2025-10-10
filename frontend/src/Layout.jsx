@@ -41,10 +41,15 @@ export default function Layout({ children, currentPageName }) {
 
 	const getUserDisplayName = () => {
 		if (!user) return '';
-		const first = user.firstName || user.first_name;
-		const last = user.lastName || user.last_name;
+		const rawFirst = user.firstName ?? user.first_name ?? '';
+		const rawLast = user.lastName ?? user.last_name ?? '';
+		const first = String(rawFirst).trim();
+		const last = String(rawLast).trim();
 		if (first && last) return `${first} ${last}`;
-		return user.username || user.email || '';
+		const username = (user.username ?? '').toString().trim();
+		if (username) return username;
+		const email = (user.email ?? '').toString().trim();
+		return email;
 	};
 
 	const getUserInitials = () => {
