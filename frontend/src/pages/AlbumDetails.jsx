@@ -8,6 +8,7 @@ import { ArrowLeft, ShoppingCart, Music, Clock, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
+import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 
 export default function AlbumDetails() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function AlbumDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [purchased, setPurchased] = useState(false);
   const [trackAudioUrls, setTrackAudioUrls] = useState({});
+  const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
 
   useEffect(() => {
     if (albumId) {
@@ -84,27 +86,26 @@ export default function AlbumDetails() {
       return;
     }
     const minPrice = Number(album.price || 0);
-    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
-    if (amountStr == null) return;
-    let amount = parseFloat(amountStr);
-    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
+    setAmountModal({ visible: true, min: minPrice });
+  };
 
+  const onModalCancel = () => setAmountModal({ visible: false, min: 0 });
+  const onModalConfirm = async (chosenAmount) => {
     const cartItem = {
       item_type: "album",
       item_id: album.id,
       title: album.title,
-      price: amount,
-      min_price: minPrice,
+      price: chosenAmount,
+      min_price: Number(album.price || 0),
       image: album.cover_image
     };
-
     const currentCart = user.cart || [];
     const itemExists = currentCart.some(i => i.item_id === album.id);
-    
     if (!itemExists) {
       await User.updateMyUserData({ cart: [...currentCart, cartItem] });
       navigate(createPageUrl("Cart"));
     }
+    onModalCancel();
   };
 
   if (isLoading) {
@@ -121,6 +122,7 @@ export default function AlbumDetails() {
             </div>
           </div>
         </div>
+        <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
       </div>
     );
   }

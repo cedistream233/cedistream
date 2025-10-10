@@ -4,6 +4,7 @@ import { User } from "@/entities/User";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
+import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -15,6 +16,7 @@ export default function Videos() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [amountModal, setAmountModal] = useState({ visible: false, min: 0, video: null });
 
   useEffect(() => {
     loadVideos();
@@ -61,27 +63,28 @@ export default function Videos() {
       return;
     }
     const minPrice = Number(video.price || 0);
-    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
-    if (amountStr == null) return;
-    let amount = parseFloat(amountStr);
-    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
+    setAmountModal({ visible: true, min: minPrice, video });
+  };
 
+  const onModalCancel = () => setAmountModal({ visible: false, min: 0, video: null });
+  const onModalConfirm = async (chosenAmount) => {
+    const { video } = amountModal;
+    if (!video) return onModalCancel();
     const cartItem = {
       item_type: "video",
       item_id: video.id,
       title: video.title,
-      price: amount,
-      min_price: minPrice,
+      price: chosenAmount,
+      min_price: Number(video.price || 0),
       image: video.thumbnail
     };
-
     const currentCart = user.cart || [];
     const itemExists = currentCart.some(i => i.item_id === video.id);
-    
     if (!itemExists) {
       await User.updateMyUserData({ cart: [...currentCart, cartItem] });
       window.location.reload();
     }
+    onModalCancel();
   };
 
   const viewDetails = (id) => {
@@ -135,6 +138,7 @@ export default function Videos() {
           ))}
         </div>
       )}
+      <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
     </div>
   );
 }

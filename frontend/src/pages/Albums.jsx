@@ -4,6 +4,7 @@ import { User } from "@/entities/User";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
+import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import { useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Song } from "@/entities/Song";
@@ -20,6 +21,7 @@ export default function Albums() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [singles, setSingles] = useState([]);
+  const [amountModal, setAmountModal] = useState({ visible: false, min: 0, album: null });
 
   useEffect(() => {
     loadAlbums();
@@ -70,27 +72,28 @@ export default function Albums() {
       return;
     }
     const minPrice = Number(album.price || 0);
-    let amountStr = window.prompt(`Enter amount to pay (minimum GH₵ ${minPrice.toFixed(2)})`, String(minPrice));
-    if (amountStr == null) return; // cancelled
-    let amount = parseFloat(amountStr);
-    if (!Number.isFinite(amount) || amount < minPrice) amount = minPrice;
+    setAmountModal({ visible: true, min: minPrice, album: { ...album, asSong } });
+  };
 
+  const onModalCancel = () => setAmountModal({ visible: false, min: 0, album: null });
+  const onModalConfirm = async (chosenAmount) => {
+    const { album } = amountModal;
+    if (!album) return onModalCancel();
     const cartItem = {
-      item_type: asSong ? "song" : "album",
+      item_type: album.asSong ? "song" : "album",
       item_id: album.id,
       title: album.title,
-      price: amount,
-      min_price: minPrice,
+      price: chosenAmount,
+      min_price: Number(album.price || 0),
       image: album.cover_image
     };
-
     const currentCart = user.cart || [];
     const itemExists = currentCart.some(i => i.item_id === album.id);
-    
     if (!itemExists) {
       await User.updateMyUserData({ cart: [...currentCart, cartItem] });
       window.location.reload();
     }
+    onModalCancel();
   };
 
   const viewDetails = (id) => {
@@ -129,7 +132,7 @@ export default function Albums() {
         </div>
       </div>
 
-      {isLoading ? (
+  {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="animate-pulse">
@@ -181,6 +184,7 @@ export default function Albums() {
           ))}
         </div>
       )}
+      <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
     </div>
   );
 }
