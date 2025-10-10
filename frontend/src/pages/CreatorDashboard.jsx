@@ -21,6 +21,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { useNavigate } from 'react-router-dom';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
 export default function CreatorDashboard() {
   const [user, setUser] = useState(null);
@@ -193,13 +194,7 @@ export default function CreatorDashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading dashboard...</div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingOverlay text="Loading dashboard" />;
 
   const StatCard = ({ icon: Icon, title, value, change, color = "text-purple-400" }) => (
     <motion.div

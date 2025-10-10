@@ -19,6 +19,15 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
     } catch { setOwned(false); }
   }, [item?.id]);
 
+  const getPublishedDate = () => {
+    const raw = item?.release_date || item?.published_at || item?.published_date || item?.released_at || item?.created_at || item?.created_date;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+  const publishedDate = getPublishedDate();
+
   return (
     <div
       onClick={onViewDetails}
@@ -43,6 +52,7 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
             )}
           </div>
           <div className="text-xs text-gray-400 truncate">{creator}</div>
+          {publishedDate && <div className="text-[11px] text-gray-400 mt-0.5">Published {publishedDate}</div>}
           <div className="text-[11px] text-gray-400 mt-0.5">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</div>
         </div>
       </div>

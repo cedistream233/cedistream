@@ -10,6 +10,14 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
   const title = item.title;
   const creator = item.artist || item.creator;
   const price = item.price;
+  const getPublishedDate = () => {
+    const raw = item?.release_date || item?.published_at || item?.published_date || item?.released_at || item?.created_at || item?.created_date;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+  const publishedDate = getPublishedDate();
 
   const audioRef = useRef(null);
   const previewTimeoutRef = useRef(null);
@@ -216,7 +224,10 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
 
           <div className="p-4">
             <h3 className="font-semibold text-white truncate mb-1">{title}</h3>
-            <p className="text-sm text-gray-400 truncate mb-3">{creator}</p>
+            <p className="text-sm text-gray-400 truncate mb-1">{creator}</p>
+            {publishedDate && (
+              <div className="text-[11px] text-gray-400 mb-2">Published {publishedDate}</div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-300">
                 Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}

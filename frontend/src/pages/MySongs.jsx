@@ -13,6 +13,13 @@ export default function MySongs() {
   // advanced filters removed
   const navigate = useNavigate();
 
+  const formatDate = (raw) => {
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!user?.id) return;
@@ -50,6 +57,9 @@ export default function MySongs() {
                    'bg-slate-600/20 text-slate-300 border border-slate-700/30'
                  }`}>{(s.status||'published')}</span>
                </div>
+                {(() => { const rel = formatDate(s.release_date || s.created_at || s.created_date); return rel ? (
+                  <div className="text-[11px] text-gray-400 mt-0.5">Released {rel}</div>
+                ) : null; })()}
                <div className="text-xs text-gray-400">Min GHS {parseFloat(s.price||0).toFixed(2)}</div>
                <div className="flex gap-2 mt-2">
                  <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={()=>navigate(`/songs/${s.id}`)}>Open</Button>
