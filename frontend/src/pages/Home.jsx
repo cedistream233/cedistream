@@ -74,33 +74,20 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {results.map((c) => (
-                  <div key={c.user_id} className="block group">
-                    <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50 border border-purple-900/20 hover:border-purple-500/40 transition">
+                  <Link key={c.user_id} to={`/creators/${encodeURIComponent(c.user_id)}`} className="block group">
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50 border border-purple-900/20 hover:border-purple-500/40 transition cursor-pointer">
                       <img
                         src={c.profile_image || 'https://via.placeholder.com/80?text=%F0%9F%8E%B5'}
                         alt={c.display_name}
                         className="w-16 h-16 rounded-full object-cover cursor-zoom-in"
-                        onClick={(e) => { e.stopPropagation(); openViewer(c.profile_image); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (c.profile_image) openViewer(c.profile_image); }}
                       />
-                        <div className="min-w-0">
-                          <Link to={`/creators/${encodeURIComponent(c.user_id)}`} className="block">
-                            <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>
-                            <div className="text-xs text-gray-400">{c.albums_count} albums • {c.videos_count} videos • {c.songs_count} songs</div>
-                          </Link>
-
-                          {c.recent_songs && c.recent_songs.length > 0 && (
-                            <div className="mt-2 grid grid-cols-1 gap-1">
-                              {c.recent_songs.map((s) => (
-                                <div key={s.id} className="text-sm text-gray-300 flex justify-between items-center">
-                                  <span className="truncate">{s.title}</span>
-                                  <span className="text-xs text-yellow-400">GH₵ {parseFloat(s.price)?.toFixed(2) || '0.00'}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                      <div className="min-w-0">
+                        <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>
+                        <div className="text-xs text-gray-400">{c.albums_count} albums • {c.videos_count} videos • {c.songs_count} songs</div>
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

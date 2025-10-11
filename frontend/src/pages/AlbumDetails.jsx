@@ -239,6 +239,13 @@ export default function AlbumDetails() {
     );
   }
 
+  // helpers
+  const albumHasAnyPreview = useMemo(() => {
+    if (!album?.songs?.length) return false;
+    // if we have computed preview URLs map, check it; fallback to false
+    return album.songs.some(s => !!trackPreviewUrls[s.id]);
+  }, [album?.songs, trackPreviewUrls]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back button intentionally removed per UX preference */}
@@ -345,11 +352,12 @@ export default function AlbumDetails() {
             </div>
           )}
           <div className="mb-4 md:mb-6">
-            {/** Decide which source to use based on ownership/purchase/toggle */}
+            {/** Decide which source to use based on ownership/purchase/toggle; if no preview at all and not purchased, show locked */}
             {(() => {
               const currentSong = album.songs[currentIndex];
               const sid = currentSong?.id;
               let src = null;
+              let canPlay = true;
               if (isOwner) {
                 src = ownerPlayMode === 'full'
                   ? (trackFullUrls[sid] || trackPreviewUrls[sid] || null)
@@ -357,8 +365,25 @@ export default function AlbumDetails() {
               } else if (purchased) {
                 src = trackFullUrls[sid] || trackPreviewUrls[sid] || null;
               } else {
-                src = trackPreviewUrls[sid] || null;
+                // supporter and not purchased: only allow preview if exists
+                if (albumHasAnyPreview) {
+                  src = trackPreviewUrls[sid] || null;
+                } else {
+                  canPlay = false;
+                }
               }
+
+              if (!canPlay || !src) {
+                return (
+                  <div className="w-full rounded-xl bg-slate-900/60 border border-slate-800 p-5 text-center text-gray-300">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-sm">Locked</span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">Purchase the album to play tracks.</div>
+                  </div>
+                );
+              }
+
               return (
                 <AudioPlayer
                   src={src}
@@ -404,7 +429,7 @@ export default function AlbumDetails() {
                             : 'No audio')
                         : (purchased
                             ? (trackFullUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Loading...')
-                            : (trackPreviewUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No preview'))}
+                            : (trackPreviewUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Locked'))}
                     </div>
                   </div>
                 </button>

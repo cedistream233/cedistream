@@ -147,7 +147,12 @@ export default function Creator() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {content.videos.map((video) => (
-                <ContentCard key={video.id} item={video} type="video" />
+                <ContentCard
+                  key={video.id}
+                  item={video}
+                  type="video"
+                  onViewDetails={() => { window.location.href = `/videos?id=${encodeURIComponent(video.id)}`; }}
+                />
               ))}
             </div>
           )}

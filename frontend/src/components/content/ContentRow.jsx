@@ -8,6 +8,7 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
   const creator = item.artist || item.creator;
   const price = item.price;
   const [owned, setOwned] = useState(false);
+  const [hasPreview, setHasPreview] = useState(null); // null = unknown, true/false after check
   const { updateMyUserData, user } = useAuth();
 
   useEffect(() => {
@@ -18,6 +19,28 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
       } else setOwned(false);
     } catch { setOwned(false); }
   }, [item?.id]);
+
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      // Only check previews for songs for now
+      if (type !== 'song' || !item?.id) { setHasPreview(false); return; }
+      try {
+        const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+        if (!aborted) {
+          if (res.ok) {
+            const d = await res.json();
+            setHasPreview(!!d?.url);
+          } else {
+            setHasPreview(false);
+          }
+        }
+      } catch {
+        if (!aborted) setHasPreview(false);
+      }
+    })();
+    return () => { aborted = true; };
+  }, [item?.id, type]);
 
   const getPublishedDate = () => {
     const raw = item?.release_date || item?.published_at || item?.published_date || item?.released_at || item?.created_at || item?.created_date;
@@ -57,28 +80,36 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
         </div>
       </div>
       <div className="pl-3 flex items-center gap-2">
-        <button
-          onClick={async (e) => {
-            e.stopPropagation();
-            try {
-              // attempt to prefetch preview URL and store in sessionStorage for immediate use on details page
-              const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-              if (res.ok) {
-                const d = await res.json();
-                if (d?.url) {
-                  try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
+        {hasPreview ? (
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                // attempt to prefetch preview URL and store in sessionStorage for immediate use on details page
+                const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+                if (res.ok) {
+                  const d = await res.json();
+                  if (d?.url) {
+                    try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
+                  }
                 }
+              } catch (err) {
+                // ignore
               }
-            } catch (err) {
-              // ignore
-            }
-            // navigate to details; the details page will pick up sessionStorage preview if present
-            window.location.href = `/songs/${encodeURIComponent(item.id)}`;
-          }}
-          className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
-        >
-          Preview
-        </button>
+              // navigate to details; the details page will pick up sessionStorage preview if present
+              window.location.href = `/songs/${encodeURIComponent(item.id)}`;
+            }}
+            className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
+          >
+            Preview
+          </button>
+        ) : (
+          !owned && (
+            <div className="px-3 py-2 rounded-md bg-slate-800/60 text-gray-400 text-sm flex items-center gap-1 select-none">
+              <Lock className="w-3 h-3" /> Locked
+            </div>
+          )
+        )}
         <button
           onClick={async (e) => {
             e.stopPropagation();

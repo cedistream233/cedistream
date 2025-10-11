@@ -142,6 +142,9 @@ export default function VideoDetails() {
                   alt={video.title}
                   className="w-full rounded-2xl shadow-2xl"
                 />
+                {!canAccess && (
+                  <div className="absolute top-3 left-3 text-[11px] uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded">Locked</div>
+                )}
                 <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
                     <Play className="w-10 h-10 text-purple-900 ml-1" />
