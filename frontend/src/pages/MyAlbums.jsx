@@ -38,7 +38,14 @@ export default function MyAlbums() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
         {loading ? Array.from({length:8}).map((_,i)=>(<div key={i} className="h-40 bg-slate-800/40 rounded animate-pulse"/>)) :
          items.map(a => (
-           <Card key={a.id} className="bg-slate-900/50 border-purple-900/20">
+           <Card
+             key={a.id}
+             role="button"
+             tabIndex={0}
+             onClick={() => navigate(`/albums/${a.id}`)}
+             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/albums/${a.id}`); } }}
+             className="bg-slate-900/50 border-purple-900/20 cursor-pointer"
+           >
              <CardContent className="p-3">
                <div className="w-full h-28 rounded bg-slate-800 overflow-hidden mb-2">
                  {a.cover_image ? <img className="w-full h-full object-cover" src={a.cover_image}/> : null}
@@ -46,7 +53,7 @@ export default function MyAlbums() {
                <div className="text-white font-medium truncate">{a.title}</div>
                <div className="text-xs text-gray-400">Min GHS {parseFloat(a.price||0).toFixed(2)}</div>
                <div className="flex gap-2 mt-2">
-                 <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={()=>navigate(`/albums/${a.id}`)}>Open</Button>
+                 <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={(e)=>{ e.stopPropagation(); navigate(`/albums/${a.id}`); }}>Open</Button>
                  {/* publish toggle removed: content is published immediately */}
                </div>
              </CardContent>

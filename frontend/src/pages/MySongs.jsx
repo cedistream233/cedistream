@@ -51,7 +51,14 @@ export default function MySongs() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
         {loading ? Array.from({length:8}).map((_,i)=>(<div key={i} className="h-40 bg-slate-800/40 rounded animate-pulse"/>)) :
          items.map(s => (
-           <Card key={s.id} className="bg-slate-900/50 border-purple-900/20">
+           <Card
+             key={s.id}
+             role="button"
+             tabIndex={0}
+             onClick={() => navigate(`/songs/${s.id}`)}
+             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/songs/${s.id}`); } }}
+             className="bg-slate-900/50 border-purple-900/20 cursor-pointer"
+           >
              <CardContent className="p-3">
                <div className="w-full h-28 rounded bg-slate-800 overflow-hidden mb-2">
                  {s.cover_image ? <img className="w-full h-full object-cover" src={s.cover_image}/> : null}
@@ -69,7 +76,7 @@ export default function MySongs() {
                 ) : null; })()}
                <div className="text-xs text-gray-400">Min GHS {parseFloat(s.price||0).toFixed(2)}</div>
                <div className="flex gap-2 mt-2">
-                 <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={()=>navigate(`/songs/${s.id}`)}>Open</Button>
+                 <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={(e)=>{ e.stopPropagation(); navigate(`/songs/${s.id}`); }}>Open</Button>
                  {/* publish toggle removed */}
                </div>
              </CardContent>

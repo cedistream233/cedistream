@@ -130,7 +130,13 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
       whileHover={{ y: -8 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="group relative overflow-hidden bg-slate-900/50 border-purple-900/20 hover:border-purple-500/50 backdrop-blur-sm transition-all duration-300">
+      <Card
+        role={onViewDetails ? 'button' : undefined}
+        tabIndex={onViewDetails ? 0 : undefined}
+        onClick={onViewDetails ? (() => (onViewDetails || (() => {}))()) : undefined}
+        onKeyDown={onViewDetails ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (onViewDetails||(()=>{}))(); } }) : undefined}
+        className={`group relative overflow-hidden bg-slate-900/50 border-purple-900/20 hover:border-purple-500/50 backdrop-blur-sm transition-all duration-300 ${onViewDetails ? 'cursor-pointer' : ''}`}
+      >
         <CardContent className="p-0">
           <div className="relative aspect-square overflow-hidden">
             {image ? (

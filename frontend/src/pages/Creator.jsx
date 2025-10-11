@@ -134,7 +134,7 @@ export default function Creator() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {content.albums.map((album) => (
-                <ContentCard key={album.id} item={album} type="album" />
+                <ContentCard key={album.id} item={album} type="album" onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`} />
               ))}
             </div>
           )}
