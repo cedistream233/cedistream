@@ -41,6 +41,9 @@ export default function CreatorDashboard() {
     viewsThisMonth: 0
   });
   const [recentSales, setRecentSales] = useState([]);
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPageSize, setSalesPageSize] = useState(10);
+  const [salesHasMore, setSalesHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [myContent, setMyContent] = useState({ albums: [], videos: [] });
   // include songs list
@@ -59,8 +62,9 @@ export default function CreatorDashboard() {
   useEffect(() => {
     if (!token) return; // wait until token is ready so creator-protected routes succeed
     fetchDashboardData();
+    // re-fetch when pagination changes so recent sales update
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, salesPage, salesPageSize]);
 
   // Refresh when tab gains focus or page becomes visible
   useEffect(() => {
@@ -142,22 +146,30 @@ export default function CreatorDashboard() {
         // ignore
       }
 
-      // Recent sales for this creator
-      const salesRes = await fetch('/api/uploads/recent-sales', {
-        headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
-      });
-      if (salesRes.ok) {
-        const rows = await salesRes.json();
-        setRecentSales(Array.isArray(rows) ? rows.map(r => ({
-          id: r.id,
-          item: r.item,
-          type: r.item_type,
-          amount: parseFloat(r.amount || 0),
-          date: new Date(r.date).toISOString().slice(0,10),
-          buyer: '—'
-        })) : []);
-      } else {
+      // Recent sales for this creator (paginated)
+      try {
+        const offset = (salesPage - 1) * salesPageSize;
+        const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
+          headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
+        });
+        if (salesRes.ok) {
+          const rows = await salesRes.json();
+          setRecentSales(Array.isArray(rows) ? rows.map(r => ({
+            id: r.id,
+            item: r.item,
+            type: r.item_type,
+            amount: parseFloat(r.amount || 0),
+            date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
+            buyer: r.buyer_name || '—'
+          })) : []);
+          setSalesHasMore(Array.isArray(rows) ? rows.length === salesPageSize : false);
+        } else {
+          setRecentSales([]);
+          setSalesHasMore(false);
+        }
+      } catch (e) {
         setRecentSales([]);
+        setSalesHasMore(false);
       }
 
       // No hardcoded values; keep monthly/views at 0 unless we have analytics sources
@@ -189,27 +201,27 @@ export default function CreatorDashboard() {
 
   // Export recent sales as CSV (client-side)
   const downloadSalesCsv = () => {
-    try {
-      const headers = ['Date','Type','Item','Amount'];
-      const rows = recentSales.map(s => [s.date, s.type, s.item, s.amount.toFixed(2)]);
-      const csv = [headers, ...rows]
-        .map(r => r.map(v => {
-          const val = String(v ?? '');
-          return /[",\n]/.test(val) ? '"' + val.replace(/"/g,'""') + '"' : val;
-        }).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const date = new Date().toISOString().slice(0,10);
-      a.download = `cedistream-sales-${date}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('CSV export failed', e);
-    }
+    (async () => {
+      try {
+        // Fetch full sales list (limit=0 for all)
+        const tokenLocal = token || localStorage.getItem('token');
+        // Request server to stream CSV back
+        const res = await fetch('/api/uploads/sales-export?limit=0', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+        if (!res.ok) throw new Error('Failed to download CSV');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const date = new Date().toISOString().slice(0,10);
+        a.download = `cedistream-sales-${date}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('CSV export failed', e);
+      }
+    })();
   };
 
   if (loading) return <LoadingOverlay text="Loading dashboard" />;
@@ -386,6 +398,21 @@ export default function CreatorDashboard() {
                           <div className="text-green-400 font-bold mt-2 sm:mt-0">+GH₵ {sale.amount.toFixed(2)}</div>
                         </div>
                       ))}
+                        <div className="flex items-center justify-between mt-4">
+                          <div className="flex items-center gap-2">
+                            <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={() => setSalesPage(p => Math.max(1, p-1))} disabled={salesPage === 1}>Prev</button>
+                            <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={() => { if (salesHasMore) setSalesPage(p => p+1); }} disabled={!salesHasMore}>Next</button>
+                            <span className="text-sm text-gray-400">Page {salesPage}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm text-gray-400">Per page</label>
+                            <select value={salesPageSize} onChange={e => { setSalesPageSize(parseInt(e.target.value,10)); setSalesPage(1); }} className="bg-slate-800 text-white px-2 py-1 rounded">
+                              <option value={5}>5</option>
+                              <option value={10}>10</option>
+                              <option value={25}>25</option>
+                            </select>
+                          </div>
+                        </div>
                     </div>
                   )}
                 </CardContent>

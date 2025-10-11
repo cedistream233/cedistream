@@ -4,6 +4,8 @@ import { authenticateToken, requireRole } from '../lib/auth.js';
 import { supabase } from '../lib/supabase.js';
 import { query } from '../lib/database.js';
 
+import QueryStream from 'pg-query-stream';
+import { getPool } from '../lib/database.js';
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -14,7 +16,7 @@ async function uploadToStorage(bucket, path, buffer, contentType) {
     cacheControl: '3600', upsert: true, contentType
   });
   if (error) throw error;
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  const { data } = await supabase.storage.from(bucket).getPublicUrl(path);
   return data?.publicUrl;
 }
 
@@ -211,13 +213,17 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
   }
 });
 
-// Recent sales for creator: aggregates last 10 completed purchases on creator's items
-router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (req, res) => {
+// Recent sales for creator: aggregates purchases on creator's items
+ router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (req, res) => {
   try {
     const userId = req.user.id;
+    const limit = Math.max(0, Number(req.query.limit || 10));
     // purchases joined with albums/videos by item_id; includes songs if table exists
-    const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.created_at as date
+    // include buyer name (from users if present) and payment_status
+    const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.created_at as date, p.payment_status,
+                       COALESCE(u.full_name, u.display_name, u.username, p.user_email, '—') as buyer_name
                  FROM purchases p
+                 LEFT JOIN users u ON u.id = p.user_id
                  WHERE p.payment_status = 'completed'
                    AND (
                      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
@@ -225,7 +231,7 @@ router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (
                      (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
                    )
                  ORDER BY p.created_at DESC
-                 LIMIT 10`;
+                 ${limit > 0 ? 'LIMIT ' + limit : ''}`;
     const result = await query(sql, [userId]);
     return res.json(result.rows);
   } catch (err) {
@@ -235,6 +241,80 @@ router.get('/recent-sales', authenticateToken, requireRole(['creator']), async (
     }
     console.error('recent-sales error:', err);
     return res.status(500).json({ error: 'Failed to load recent sales' });
+  }
+});
+
+// Stream CSV export for all sales for a creator. Uses server-side streaming to avoid loading all rows into memory.
+router.get('/sales-export', authenticateToken, requireRole(['creator']), async (req, res) => {
+  let client;
+  try {
+    const userId = req.user.id;
+    const limit = Number.isFinite(Number(req.query.limit)) ? parseInt(req.query.limit, 10) : 0;
+    const offset = Number.isFinite(Number(req.query.offset)) ? parseInt(req.query.offset, 10) : 0;
+
+    const pool = getPool();
+    client = await pool.connect();
+
+    let sql = `
+      SELECT p.created_at as date, p.item_type, p.item_title as item, p.amount, p.payment_status,
+             COALESCE(u.full_name, u.display_name, u.username, p.user_email, '') as buyer_name
+      FROM purchases p
+      LEFT JOIN users u ON u.id = p.user_id
+      WHERE p.payment_status = 'completed'
+        AND (
+          (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+          (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+          (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+        )
+      ORDER BY p.created_at DESC
+    `;
+    const params = [userId];
+    if (limit > 0) {
+      sql += ' LIMIT $2 OFFSET $3';
+      params.push(limit, offset);
+    }
+
+    const qs = new QueryStream(sql, params);
+    const stream = client.query(qs);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="sales-${userId}.csv"`);
+    // header
+    res.write('Date,Type,Item,Amount,Buyer Name,Payment Status\n');
+
+    const esc = v => {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    };
+
+    stream.on('data', row => {
+      const line = [row.date, row.item_type, row.item, row.amount, row.buyer_name, row.payment_status]
+        .map(esc).join(',') + '\n';
+      const ok = res.write(line);
+      if (!ok) {
+        stream.pause();
+        res.once('drain', () => stream.resume());
+      }
+    });
+
+    stream.on('end', () => {
+      res.end();
+      client.release();
+    });
+    stream.on('error', err => {
+      console.error('sales-export stream error', err);
+      try { res.status(500).end(); } catch (e) {}
+      client.release();
+    });
+
+  } catch (err) {
+    console.error('sales-export error', err);
+    if (client) client.release();
+    return res.status(500).json({ error: 'Failed to stream sales' });
   }
 });
 
