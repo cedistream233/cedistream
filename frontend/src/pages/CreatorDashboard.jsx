@@ -391,13 +391,7 @@ export default function CreatorDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Export Report - same look as Earnings section */}
-              <div className="flex">
-                <Button onClick={downloadSalesCsv} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Report
-                </Button>
-              </div>
+              {/* Export Report button removed per request */}
             </div>
           </TabsContent>
 
@@ -471,22 +465,14 @@ export default function CreatorDashboard() {
                 </CardContent>
               </Card>
               
-              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
+              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm md:col-span-2">
                 <CardContent className="p-6">
-                  <div className="text-center">
-                    <p className="text-gray-400 text-sm">This Month</p>
-                    <p className="text-3xl font-bold text-white mt-2">GH₵ {stats.monthlyEarnings.toFixed(2)}</p>
-                    <p className="text-green-400 text-sm mt-2">+12% vs last month</p>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <p className="text-gray-400 text-sm">Pending Payouts</p>
-                    <p className="text-3xl font-bold text-yellow-400 mt-2">GH₵ 0.00</p>
-                    <p className="text-gray-400 text-sm mt-2">No pending payouts</p>
+                  <div>
+                    <p className="text-gray-300 text-sm font-medium">Withdrawal History</p>
+                    <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/40 p-4">
+                      <p className="text-slate-400 text-sm">No withdrawals yet.</p>
+                      <p className="text-slate-500 text-xs mt-1">Your approved withdrawals will appear here.</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
