@@ -37,7 +37,7 @@ export const PriceEditModal = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit3 className="w-5 h-5 text-purple-400" />
-            Edit {itemType} price
+            Update {itemType} price
           </DialogTitle>
           <DialogDescription className="text-gray-400">
             Set the minimum price for your {itemType}. Supporters can choose to pay more.
@@ -117,7 +117,7 @@ export const PriceDisplay = ({
           className="flex items-center gap-1 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
         >
           <Edit3 className="w-4 h-4" />
-          Edit
+          Update
         </button>
       )}
     </div>

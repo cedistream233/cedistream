@@ -43,6 +43,7 @@ export default function AudioPlayer({
     };
   }, []);
 
+  // react to src, loopMode and autoPlay changes
   useEffect(() => {
     if (!audioRef.current) return;
     const wasPlaying = playing;
@@ -57,8 +58,10 @@ export default function AudioPlayer({
     }
     // Apply loop for single-track loop mode
     audioRef.current.loop = loopMode === 'one';
+    // If the audio was already playing, continue playing the new src.
+    // Otherwise, if parent requests autoPlay, attempt to start playback.
     if (wasPlaying && src) {
-      audioRef.current.play().catch(()=>{});
+      audioRef.current.play().then(() => setPlaying(true)).catch(()=>{});
     } else if (src && autoPlay) {
       // attempt to start playback when the new src is loaded
       audioRef.current.play().then(() => setPlaying(true)).catch(()=>{});
@@ -66,7 +69,7 @@ export default function AudioPlayer({
       setPlaying(false);
       setCurrent(0);
     }
-  }, [src, loopMode]);
+  }, [src, loopMode, autoPlay]);
 
   const toggle = async () => {
     const el = audioRef.current; if (!el || !src || audioLoading || loading) return;
@@ -136,34 +139,39 @@ export default function AudioPlayer({
           </div>
         </div>
 
-          <div className="flex items-center justify-center gap-4 mt-1">
-          <button onClick={onPrev} disabled={!hasPrev} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-700 disabled:opacity-40" title="Previous">
-            <SkipBack className="w-4 h-4"/>
-          </button>
-          <div className="relative">
-            <button onClick={toggle} disabled={(audioLoading || loading) || !src} className={`w-12 h-12 rounded-full ${(audioLoading || loading) ? 'bg-slate-600/60 text-white/60' : 'bg-white text-slate-900'} flex items-center justify-center shadow-md`} aria-label={(audioLoading || loading) ? 'Loading audio' : 'Play/Pause'}>
-              {playing ? <Pause className="w-6 h-6"/> : <Play className="w-6 h-6 ml-0.5"/>}
-            </button>
-            {(audioLoading || loading) && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </div>
-          <button onClick={onNext} disabled={!hasNext} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-700 disabled:opacity-40" title="Next">
-            <SkipForward className="w-4 h-4"/>
-          </button>
-          {onLoopModeChange && (
-            <button onClick={cycleLoop} className={`w-10 h-10 rounded-full flex items-center justify-center border border-slate-700 ${
-              loopMode==='off' ? 'bg-slate-800 text-white' : loopMode==='one' ? 'bg-purple-600 text-white' : 'bg-pink-600 text-white'
-            }`} title={loopMode==='off'?'Loop off': loopMode==='one'?'Loop current':'Loop all'}>
+          <div className="flex items-center justify-between mt-1 w-full">
+            <div className="flex items-center justify-center gap-4">
+              <button onClick={onPrev} disabled={!hasPrev} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-700 disabled:opacity-40" title="Previous">
+                <SkipBack className="w-4 h-4"/>
+              </button>
               <div className="relative">
-                <Repeat className="w-4 h-4"/>
-                {loopMode==='one' && <span className="absolute -top-1 -right-1 text-[10px] font-bold">1</span>}
+                <button onClick={toggle} disabled={(audioLoading || loading) || !src} className={`w-12 h-12 rounded-full ${(audioLoading || loading) ? 'bg-slate-600/60 text-white/60' : 'bg-white text-slate-900'} flex items-center justify-center shadow-md`} aria-label={(audioLoading || loading) ? 'Loading audio' : 'Play/Pause'}>
+                  {playing ? <Pause className="w-6 h-6"/> : <Play className="w-6 h-6 ml-0.5"/>}
+                </button>
+                {(audioLoading || loading) && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </div>
-            </button>
-          )}
-        </div>
+              <button onClick={onNext} disabled={!hasNext} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-700 disabled:opacity-40" title="Next">
+                <SkipForward className="w-4 h-4"/>
+              </button>
+            </div>
+
+            <div className="flex items-center">
+              {onLoopModeChange && (
+                <button onClick={cycleLoop} className={`w-10 h-10 rounded-full flex items-center justify-center border border-slate-700 ${
+                  loopMode==='off' ? 'bg-slate-800 text-white' : loopMode==='one' ? 'bg-purple-600 text-white' : 'bg-pink-600 text-white'
+                }`} title={loopMode==='off'?'Loop off': loopMode==='one'?'Loop current':'Loop all'}>
+                  <div className="relative">
+                    <Repeat className="w-4 h-4"/>
+                    {loopMode==='one' && <span className="absolute -top-1 -right-1 text-[10px] font-bold">1</span>}
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
       </div>
       <style>{`
         @keyframes eqGrow { from { transform: scaleY(0.4); } to { transform: scaleY(1.6); } }

@@ -102,10 +102,10 @@ export default function SongDetails() {
 
   return (
     <div className="max-w-2xl mx-auto py-12 px-4">
-      <Card className="p-6 flex flex-col items-center gap-6">
+      <Card className="p-5 md:p-6 flex flex-col items-center gap-5 md:gap-6">
         <img src={song.cover_image || 'https://via.placeholder.com/160?text=%F0%9F%8E%B5'} alt={song.title} className="w-40 h-40 rounded-lg object-cover mb-2" />
-        <h1 className="text-2xl font-bold text-white mb-1">{song.title}</h1>
-        <div className="text-gray-400 mb-2">{song.artist}</div>
+        <h1 className="text-2xl font-bold text-white mb-0.5">{song.title}</h1>
+        <div className="text-gray-400 mb-1">{song.artist}</div>
         {/* Render the player immediately; pass loading while the audio URL is being resolved */}
         {isOwner && (
           <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export default function SongDetails() {
           onLoopModeChange={setLoopMode}
           embedded
         />
-  <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
+        <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
         <div className="mt-2">
           <div className="flex items-center gap-3 justify-center">
             <div className="text-sm text-gray-400">Min price: GH₵ {parseFloat((optimisticPrice ?? song?.price)||0).toFixed(2)}</div>

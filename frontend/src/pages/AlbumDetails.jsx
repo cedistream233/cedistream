@@ -62,6 +62,13 @@ export default function AlbumDetails() {
     } catch (error) {}
   };
 
+  // clear the one-time autoPlay trigger after a short delay so it's only applied once
+  useEffect(() => {
+    if (!autoPlayTrigger) return;
+    const t = setTimeout(() => setAutoPlayTrigger(false), 250);
+    return () => clearTimeout(t);
+  }, [autoPlayTrigger]);
+
   const loadAlbum = async () => {
     if (!albumId) return;
     setIsLoading(true);
@@ -117,13 +124,25 @@ export default function AlbumDetails() {
 
   const onPrev = () => {
     if (!album?.songs?.length) return;
-    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-    else if (loopMode === 'all') setCurrentIndex(album.songs.length - 1);
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      setAutoPlayTrigger(true);
+    }
+    else if (loopMode === 'all') {
+      setCurrentIndex(album.songs.length - 1);
+      setAutoPlayTrigger(true);
+    }
   };
   const onNext = () => {
     if (!album?.songs?.length) return;
-    if (currentIndex < album.songs.length - 1) setCurrentIndex(currentIndex + 1);
-    else if (loopMode === 'all') setCurrentIndex(0);
+    if (currentIndex < album.songs.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setAutoPlayTrigger(true);
+    }
+    else if (loopMode === 'all') {
+      setCurrentIndex(0);
+      setAutoPlayTrigger(true);
+    }
   };
 
   const handleAddToCart = async () => {
@@ -224,7 +243,7 @@ export default function AlbumDetails() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back button intentionally removed per UX preference */}
 
-      <div className="grid md:grid-cols-2 gap-8 mb-12">
+      <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-12">
         <div>
           {album.cover_image ? (
             <img
@@ -240,15 +259,15 @@ export default function AlbumDetails() {
         </div>
 
         <div className="flex flex-col justify-center">
-          <div className="mb-6">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">{album.title}</h1>
-            <p className="text-2xl text-purple-400 mb-6">{album.artist}</p>
+          <div className="mb-2 md:mb-6">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-1 md:mb-4 ">{album.title}</h1>
+            <p className="text-2xl text-purple-400 mb-2">{album.artist}</p>
             {album.description && (
               <p className="text-gray-400 text-lg">{album.description}</p>
             )}
           </div>
 
-          <div className="flex items-center gap-3 mb-4 text-gray-400">
+          <div className="flex items-center gap-2 mb-3 md:mb-4 text-gray-400">
             {album.genre && (
               <div className="flex items-center gap-2">
                 <Music className="w-5 h-5" />
@@ -271,8 +290,8 @@ export default function AlbumDetails() {
 
           {/* Play/Shuffle removed per request */}
 
-          <div className="mb-6">
-            <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
+          <div className="mb-4 md:mb-6">
+            <div className="bg-slate-900/50 rounded-xl p-4 md:p-6 mb-4 md:mb-6">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Minimum price:</span>
                 <PriceDisplay 
@@ -303,7 +322,7 @@ export default function AlbumDetails() {
 
       {album.songs?.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold text-white mb-6">Now Playing</h2>
+          <h2 className="text-2xl font-bold text-white mb-3 md:mb-6">Now Playing</h2>
           {isOwner && (
             <div className="flex items-center gap-2 mb-3 text-sm">
               <span className="text-gray-400">Source:</span>
@@ -325,7 +344,7 @@ export default function AlbumDetails() {
               </div>
             </div>
           )}
-          <div className="mb-6">
+          <div className="mb-4 md:mb-6">
             {/** Decide which source to use based on ownership/purchase/toggle */}
             {(() => {
               const currentSong = album.songs[currentIndex];
@@ -347,7 +366,7 @@ export default function AlbumDetails() {
                   title={currentSong?.title || 'Track'}
                   artwork={album.cover_image}
                   showPreviewBadge={!purchased && !isOwner}
-                  onEnded={() => { if (loopMode !== 'one') onNext(); }}
+                  onEnded={() => { if (loopMode === 'all') onNext(); }}
                   onPrev={onPrev}
                   onNext={onNext}
                   hasPrev={album.songs.length > 1}
@@ -365,7 +384,7 @@ export default function AlbumDetails() {
               {album.songs.map((song, index) => (
                 <button
                   key={song.id || index}
-                  onClick={() => setCurrentIndex(index)}
+                  onClick={() => { setCurrentIndex(index); setAutoPlayTrigger(true); }}
                   className={`w-full text-left p-4 hover:bg-purple-900/10 transition-colors ${index===currentIndex?'bg-purple-900/10':''}`}
                 >
                   <div className="flex items-center justify-between">

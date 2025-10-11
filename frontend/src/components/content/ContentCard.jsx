@@ -229,8 +229,8 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
           </div>
 
           <div className="p-4">
-            <h3 className="font-semibold text-white truncate mb-1">{title}</h3>
-            <p className="text-sm text-gray-400 truncate mb-1">{creator}</p>
+            <h3 className="font-semibold text-white truncate mb-0">{title}</h3>
+            <p className="text-sm text-gray-400 truncate mb-0">{creator}</p>
             {publishedDate && (
               <div className="text-[11px] text-gray-400 mb-2">Published {publishedDate}</div>
             )}
