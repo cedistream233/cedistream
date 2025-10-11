@@ -12,6 +12,7 @@ export default function Insights({ creatorId, token }) {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
   const [range, setRange] = useState('14'); // '7' | '14'
   const [total, setTotal] = useState(0);
+  const [totalSales, setTotalSales] = useState(0);
 
   useEffect(() => {
     if (!creatorId) return;
@@ -26,6 +27,7 @@ export default function Insights({ creatorId, token }) {
         if (!mounted) return;
   setOverview({ viewsThisMonth: data.viewsThisMonth || 0, monthlyRevenue: data.monthlyRevenue || 0 });
   setTotal(data.totalRevenue || data.monthlyRevenue || 0);
+  setTotalSales(data.totalSales || 0);
   setViewsSeries([]); // no views series now; use sales instead
   setRevenueSeries((data.series || []).map(s => ({ date: s.date, revenue: s.revenue || 0, sales: s.sales || 0 })));
       } catch (e) {
@@ -63,7 +65,44 @@ export default function Insights({ creatorId, token }) {
   }, [combined, isMobile]);
 
   const chartHeight = isMobile ? 360 : 340;
-  const scrollWidth = Math.max(640, (combined?.length || 0) * (isMobile ? 24 : 20));
+  const mobilePointWidth = 48; // width allocated per day on mobile for readability
+  const scrollWidth = isMobile
+    ? Math.max(720, (combined?.length || 0) * mobilePointWidth)
+    : Math.max(640, (combined?.length || 0) * 20);
+
+  const formatDateLabel = (d) => {
+    if (!d) return '';
+    try {
+      const [y, m, day] = d.split('-');
+      const dt = new Date(Number(y), Number(m) - 1, Number(day));
+      return dt.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' });
+    } catch {
+      return d;
+    }
+  };
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    const salesPoint = payload.find(p => p && p.dataKey === 'sales');
+    const revenuePoint = payload.find(p => p && p.dataKey === 'revenue');
+    const salesVal = salesPoint?.value ?? 0;
+    const revenueVal = revenuePoint?.value ?? 0;
+    return (
+      <div style={{ background: '#0b1224', border: '1px solid #334155', color: '#e2e8f0', padding: '8px 10px', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,0.35)' }}>
+        <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: 6 }}>{formatDateLabel(label)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <span style={{ width: 8, height: 8, background: '#60a5fa', borderRadius: 999 }} />
+          <span style={{ color: '#cbd5e1' }}>sales:</span>
+          <strong style={{ color: '#bae6fd' }}>{Number(salesVal).toLocaleString()}</strong>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, background: '#34d399', borderRadius: 999 }} />
+          <span style={{ color: '#cbd5e1' }}>revenue:</span>
+          <strong style={{ color: '#bbf7d0' }}>GH₵ {Number(revenueVal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -82,37 +121,69 @@ export default function Insights({ creatorId, token }) {
         </CardHeader>
         <CardContent className={isMobile ? 'p-3 space-y-3' : 'p-6 space-y-4'}>
           {/* Big total like Paystack */}
-          <div className="text-center">
-            <div className="text-slate-300 text-sm">Revenue GHS</div>
-            <div className="text-3xl md:text-4xl font-semibold text-white">{Number(total).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+          <div className="flex items-end justify-center gap-6 flex-wrap">
+            <div className="text-center">
+              <div className="text-slate-300 text-sm">Revenue GHS</div>
+              <div className="text-3xl md:text-4xl font-semibold text-white">{Number(total).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            </div>
+            <div className="text-center md:text-left">
+              <div className="text-slate-300 text-sm">Total Sales</div>
+              <div className="text-xl md:text-2xl font-medium text-blue-300">{Number(totalSales).toLocaleString()}</div>
+            </div>
           </div>
 
           {/* No metric toggle; show both Revenue and Sales together on all devices */}
 
-          {/* Single chart style (dotted dual-line) for both mobile/desktop */}
-          <div style={{ width: '100%', height: chartHeight }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={combined} margin={{ top: 8, right: 24, left: 8, bottom: isMobile ? 28 : 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2b2b2b" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: '#cbd5e1', fontSize: isMobile ? 10 : 11 }}
-                  interval={xAxisInterval}
-                  tickFormatter={(d) => (d ? d.slice(5) : '')}
-                  tickLine={false}
-                  height={isMobile ? 24 : 20}
-                  angle={isMobile ? -30 : 0}
-                  textAnchor={isMobile ? 'end' : 'middle'}
-                />
-                <YAxis yAxisId="left" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
-                <Tooltip wrapperStyle={{ background: '#071023', border: '1px solid #334155', color: '#e2e8f0', fontSize: isMobile ? 12 : 13 }} />
-                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />
-                <Line yAxisId="left" type="monotone" dataKey="sales" stroke="#60a5fa" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
-                <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#34d399" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {/* Single chart style (dotted dual-line). On mobile, allow horizontal scroll for readability */}
+          {isMobile ? (
+            <div style={{ width: '100%', overflowX: 'auto' }} className="no-scrollbar">
+              <div style={{ width: `${scrollWidth}px`, height: `${chartHeight}px` }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={combined} margin={{ top: 8, right: 24, left: 8, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2b2b2b" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
+                      interval={0}
+                      tickFormatter={(d) => (d ? d.slice(5) : '')}
+                      tickLine={false}
+                      height={36}
+                      angle={-45}
+                      textAnchor="end"
+                    />
+                    <YAxis yAxisId="left" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />
+                    <Line yAxisId="left" type="monotone" dataKey="sales" stroke="#60a5fa" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+                    <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#34d399" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ) : (
+            <div style={{ width: '100%', height: chartHeight }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={combined} margin={{ top: 8, right: 24, left: 8, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2b2b2b" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
+                    interval={xAxisInterval}
+                    tickFormatter={(d) => (d ? d.slice(5) : '')}
+                    tickLine={false}
+                    height={20}
+                  />
+                  <YAxis yAxisId="left" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />
+                  <Line yAxisId="left" type="monotone" dataKey="sales" stroke="#60a5fa" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+                  <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#34d399" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
