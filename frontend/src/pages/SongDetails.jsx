@@ -142,34 +142,22 @@ export default function SongDetails() {
             </div>
           </div>
         )}
-        {(() => {
-          const effectiveSrc = isOwner
+        {/* Always render the player immediately so the UI is consistent;
+            player will show loading state while URLs are fetched and remain
+            disabled until a src is available. */}
+        <AudioPlayer
+          src={isOwner
             ? (ownerPlayMode === 'full' ? (fullUrl || previewUrl) : (previewUrl || fullUrl))
-            : audioUrl;
-          if (!effectiveSrc) {
-            return (
-              <div className="w-full rounded-xl bg-slate-900/60 border border-slate-800 p-5 text-center text-gray-300">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-sm">Locked</span>
-                </div>
-                <div className="text-xs text-gray-400 mt-1">No preview available. Purchase to unlock full track.</div>
-              </div>
-            );
-          }
-          return (
-            <AudioPlayer
-              src={effectiveSrc}
-              loading={audioFetching}
-              title={song.title}
-              showPreviewBadge={!purchased}
-              hasPrev={false}
-              hasNext={false}
-              loopMode={loopMode}
-              onLoopModeChange={setLoopMode}
-              embedded
-            />
-          );
-        })()}
+            : audioUrl}
+          loading={audioFetching}
+          title={song.title}
+          showPreviewBadge={!purchased}
+          hasPrev={false}
+          hasNext={false}
+          loopMode={loopMode}
+          onLoopModeChange={setLoopMode}
+          embedded
+        />
         <div className="text-sm md:text-base text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
         <div className="mt-2">
           <div className="flex items-center gap-3 justify-center">

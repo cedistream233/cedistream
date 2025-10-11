@@ -8,6 +8,7 @@ import { ShoppingCart, Music, Clock, Calendar } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import AudioPlayer from '@/components/media/AudioPlayer';
 import { PriceEditModal, PriceDisplay } from '@/components/ui/PriceEditModal';
@@ -24,6 +25,7 @@ export default function AlbumDetails() {
   // Keep separate maps for preview and full audio URLs
   const [trackPreviewUrls, setTrackPreviewUrls] = useState({});
   const [trackFullUrls, setTrackFullUrls] = useState({});
+  const [audioFetching, setAudioFetching] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
@@ -107,6 +109,7 @@ export default function AlbumDetails() {
   useEffect(() => {
     (async () => {
       if (!album?.songs?.length) return;
+      setAudioFetching(true);
       const previews = {};
       const fulls = {};
       for (const s of album.songs) {
@@ -126,6 +129,7 @@ export default function AlbumDetails() {
       }
       setTrackPreviewUrls(previews);
       setTrackFullUrls(fulls);
+      setAudioFetching(false);
     })();
   }, [album?.songs, purchased, isOwner, token]);
 
@@ -211,31 +215,7 @@ export default function AlbumDetails() {
   };
 
   if (isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-slate-800 rounded w-32 mb-8"></div>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="aspect-square bg-slate-800 rounded-lg"></div>
-            <div className="space-y-4">
-              <div className="h-12 bg-slate-800 rounded"></div>
-              <div className="h-6 bg-slate-800 rounded w-3/4"></div>
-              <div className="h-32 bg-slate-800 rounded"></div>
-            </div>
-          </div>
-        </div>
-        <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
-        <PriceEditModal
-          isOpen={priceEditModal}
-          onClose={() => setPriceEditModal(false)}
-          currentPrice={album?.price}
-          onSave={handlePriceSave}
-          loading={priceLoading}
-          itemType="album"
-        />
-        <ToastContainer toasts={toasts} onRemove={removeToast} />
-      </div>
-    );
+    return <LoadingOverlay text="Loading album" />;
   }
 
   if (!album) {
@@ -352,55 +332,32 @@ export default function AlbumDetails() {
             </div>
           )}
           <div className="mb-4 md:mb-6">
-            {/** Decide which source to use based on ownership/purchase/toggle; if no preview at all and not purchased, show locked */}
-            {(() => {
-              const currentSong = album.songs[currentIndex];
-              const sid = currentSong?.id;
-              let src = null;
-              let canPlay = true;
-              if (isOwner) {
-                src = ownerPlayMode === 'full'
-                  ? (trackFullUrls[sid] || trackPreviewUrls[sid] || null)
-                  : (trackPreviewUrls[sid] || trackFullUrls[sid] || null);
-              } else if (purchased) {
-                src = trackFullUrls[sid] || trackPreviewUrls[sid] || null;
-              } else {
-                // supporter and not purchased: only allow preview if exists
-                if (albumHasAnyPreview) {
-                  src = trackPreviewUrls[sid] || null;
-                } else {
-                  canPlay = false;
+            {/* Always render the player immediately (shows loading while URLs fetch). */}
+            <AudioPlayer
+              src={( () => {
+                const currentSong = album.songs[currentIndex];
+                const sid = currentSong?.id;
+                if (isOwner) {
+                  return ownerPlayMode === 'full'
+                    ? (trackFullUrls[sid] || trackPreviewUrls[sid] || null)
+                    : (trackPreviewUrls[sid] || trackFullUrls[sid] || null);
                 }
-              }
-
-              if (!canPlay || !src) {
-                return (
-                  <div className="w-full rounded-xl bg-slate-900/60 border border-slate-800 p-5 text-center text-gray-300">
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-sm">Locked</span>
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">Purchase the album to play tracks.</div>
-                  </div>
-                );
-              }
-
-              return (
-                <AudioPlayer
-                  src={src}
-                  autoPlay={autoPlayTrigger}
-                  title={currentSong?.title || 'Track'}
-                  artwork={album.cover_image}
-                  showPreviewBadge={!purchased && !isOwner}
-                  onEnded={() => { if (loopMode === 'all') onNext(); }}
-                  onPrev={onPrev}
-                  onNext={onNext}
-                  hasPrev={album.songs.length > 1}
-                  hasNext={album.songs.length > 1}
-                  loopMode={loopMode}
-                  onLoopModeChange={setLoopMode}
-                />
-              );
-            })()}
+                if (purchased) return trackFullUrls[sid] || trackPreviewUrls[sid] || null;
+                return albumHasAnyPreview ? (trackPreviewUrls[sid] || null) : null;
+              })() }
+              autoPlay={autoPlayTrigger}
+              loading={audioFetching}
+              title={album.songs[currentIndex]?.title || 'Track'}
+              artwork={album.cover_image}
+              showPreviewBadge={!purchased && !isOwner}
+              onEnded={() => { if (loopMode === 'all') onNext(); }}
+              onPrev={onPrev}
+              onNext={onNext}
+              hasPrev={album.songs.length > 1}
+              hasNext={album.songs.length > 1}
+              loopMode={loopMode}
+              onLoopModeChange={setLoopMode}
+            />
           </div>
 
           <h3 className="text-xl font-semibold text-white mb-3">Tracklist</h3>
@@ -423,13 +380,18 @@ export default function AlbumDetails() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-400">
-                      {isOwner
-                        ? (trackFullUrls[song.id] || trackPreviewUrls[song.id]
-                            ? (index===currentIndex ? 'Playing' : 'Tap to play')
-                            : 'No audio')
-                        : (purchased
-                            ? (trackFullUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Loading...')
-                            : (trackPreviewUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Locked'))}
+                      {(() => {
+                        const hasFull = !!trackFullUrls[song.id];
+                        const hasPreview = !!trackPreviewUrls[song.id];
+                        if (audioFetching && !hasFull && !hasPreview) return 'Loading...';
+                        if (isOwner) {
+                          return (hasFull || hasPreview) ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No audio';
+                        }
+                        if (purchased) {
+                          return hasFull ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Loading...';
+                        }
+                        return hasPreview ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Locked';
+                      })()}
                     </div>
                   </div>
                 </button>
