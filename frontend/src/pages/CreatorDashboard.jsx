@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Edit2, X } from 'lucide-react';
+import Insights from '@/components/insights/Insights';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
@@ -445,33 +446,7 @@ export default function CreatorDashboard() {
 
           <TabsContent value="analytics" className="space-y-6">
             <h2 className="text-2xl font-bold text-white">Analytics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Eye className="w-5 h-5 mr-2" />
-                    Views This Month
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white">{stats.viewsThisMonth.toLocaleString()}</div>
-                  <p className="text-green-400 text-sm mt-1">+15% from last month</p>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2" />
-                    Monthly Revenue
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white">GH₵ {stats.monthlyEarnings.toFixed(2)}</div>
-                  <p className="text-green-400 text-sm mt-1">+8% from last month</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Insights creatorId={user?.id} token={token} />
           </TabsContent>
 
           <TabsContent value="earnings" className="space-y-6">

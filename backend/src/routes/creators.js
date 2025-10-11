@@ -134,6 +134,63 @@ router.get('/:id/content', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/creators/:id/analytics
+router.get('/:id/analytics', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    // support only ?range=7|14 days per product requirement
+    let days = parseInt(req.query.range || '14', 10);
+    if (![7, 14].includes(days)) days = 14;
+    // Build last 30 days dates
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0,10);
+      dates.push(iso);
+    }
+
+    // Revenue per day from purchases where item belongs to this creator
+    const revenueRes = await query(
+      `SELECT to_char(p.created_at::date, 'YYYY-MM-DD') as day, COALESCE(SUM(p.amount),0) as total
+       FROM purchases p
+       WHERE p.payment_status = 'completed' AND (
+         (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+         (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+         (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+       ) AND p.created_at >= (NOW() - ($2 || ' days')::interval)
+       GROUP BY day`,
+      [id, String(days)]
+    );
+
+    const revMap = new Map((revenueRes.rows || []).map(r => [r.day, parseFloat(r.total)]));
+
+    // Sales count per day
+    const salesRes = await query(
+      `SELECT to_char(p.created_at::date, 'YYYY-MM-DD') as day, COUNT(1)::int as count
+       FROM purchases p
+       WHERE p.payment_status = 'completed' AND (
+         (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+         (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+         (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+       ) AND p.created_at >= (NOW() - ($2 || ' days')::interval)
+       GROUP BY day`,
+      [id, String(days)]
+    );
+    const salesMap = new Map((salesRes.rows || []).map(r => [r.day, parseInt(r.count, 10) || 0]));
+
+    // Create series combining revenue and placeholder views (0)
+  const series = dates.map(d => ({ date: d, revenue: revMap.get(d) || 0, sales: salesMap.get(d) || 0 }));
+
+    // totals
+    const totalRevenue = series.reduce((s, v) => s + (v.revenue || 0), 0);
+    const totalSales = series.reduce((s, v) => s + (v.sales || 0), 0);
+    const viewsThisMonth = 0; // placeholder - not tracked currently
+
+    res.json({ series, totalRevenue, totalSales, monthlyRevenue: totalRevenue, viewsThisMonth });
+  } catch (err) { next(err); }
+});
+
 export default router;
 
 // Helpers: pagination parsing
