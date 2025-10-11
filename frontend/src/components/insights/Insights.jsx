@@ -10,7 +10,7 @@ export default function Insights({ creatorId, token }) {
   const [viewsSeries, setViewsSeries] = useState([]);
   const [revenueSeries, setRevenueSeries] = useState([]);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
-  const [range, setRange] = useState('14'); // '7' | '14'
+  const [range, setRange] = useState('7'); // '7' | '14'
   const [total, setTotal] = useState(0);
   const [totalSales, setTotalSales] = useState(0);
 
