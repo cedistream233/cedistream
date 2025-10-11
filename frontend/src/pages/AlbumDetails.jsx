@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Album } from "@/entities/Album";
 import { User } from "@/entities/User";
 import { Song } from "@/entities/Song";
@@ -21,7 +21,9 @@ export default function AlbumDetails() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [purchased, setPurchased] = useState(false);
-  const [trackAudioUrls, setTrackAudioUrls] = useState({});
+  // Keep separate maps for preview and full audio URLs
+  const [trackPreviewUrls, setTrackPreviewUrls] = useState({});
+  const [trackFullUrls, setTrackFullUrls] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
@@ -30,6 +32,21 @@ export default function AlbumDetails() {
   const [optimisticPrice, setOptimisticPrice] = useState(null);
   const [priceLoading, setPriceLoading] = useState(false);
   const { toasts, toast, removeToast } = useToast();
+  const token = useMemo(() => localStorage.getItem('token') || null, []);
+
+  // Determine ownership robustly from multiple sources
+  const localUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null');
+    } catch { return null; }
+  }, []);
+  const isOwner = useMemo(() => {
+    const uid = user?.id || localUser?.id;
+    return uid && album?.user_id && String(uid) === String(album.user_id);
+  }, [user?.id, localUser?.id, album?.user_id]);
+
+  // For creators: allow choosing between preview and full when preview exists
+  const [ownerPlayMode, setOwnerPlayMode] = useState('full'); // 'full' | 'preview'
 
   useEffect(() => {
     if (albumId) {
@@ -76,20 +93,27 @@ export default function AlbumDetails() {
   useEffect(() => {
     (async () => {
       if (!album?.songs?.length) return;
-      const map = {};
+      const previews = {};
+      const fulls = {};
       for (const s of album.songs) {
-        let url = null;
-        if (purchased) {
-          url = await Song.getSignedUrl(s.id, localStorage.getItem('token'));
+        // Fetch preview for all (if exists)
+        try {
+          const p = await Song.getPreviewUrl(s.id);
+          if (p) previews[s.id] = p;
+        } catch {}
+
+        // Fetch full for owner or if purchased
+        if (isOwner || purchased) {
+          try {
+            const f = await Song.getSignedUrl(s.id, token);
+            if (f) fulls[s.id] = f;
+          } catch {}
         }
-        if (!url) {
-          url = await Song.getPreviewUrl(s.id);
-        }
-        if (url) map[s.id] = url;
       }
-      setTrackAudioUrls(map);
+      setTrackPreviewUrls(previews);
+      setTrackFullUrls(fulls);
     })();
-  }, [album?.songs, purchased]);
+  }, [album?.songs, purchased, isOwner, token]);
 
   const onPrev = () => {
     if (!album?.songs?.length) return;
@@ -131,6 +155,10 @@ export default function AlbumDetails() {
   };
 
   const handlePriceEdit = () => {
+    if (!token) {
+      toast.error('Please log in as the creator to change the price.');
+      return;
+    }
     setPriceEditModal(true);
   };
 
@@ -148,7 +176,7 @@ export default function AlbumDetails() {
         throw new Error('Failed to update price');
       }
     } catch (error) {
-      toast.error('Failed to update price. Please try again.');
+      toast.error('Failed to update price. Make sure you are logged in and own this album.');
       console.error('Price update error:', error);
     } finally {
       setPriceLoading(false);
@@ -220,7 +248,7 @@ export default function AlbumDetails() {
             )}
           </div>
 
-          <div className="flex items-center gap-3 mb-4 text-gray-400">`
+          <div className="flex items-center gap-3 mb-4 text-gray-400">
             {album.genre && (
               <div className="flex items-center gap-2">
                 <Music className="w-5 h-5" />
@@ -247,55 +275,88 @@ export default function AlbumDetails() {
             <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Minimum price:</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl font-bold text-yellow-400">From GH₵ {parseFloat((optimisticPrice ?? album?.price) ?? 0).toFixed(2)}</span>
-                  {user?.id === album?.user_id && (
-                    <PriceDisplay 
-                      price={optimisticPrice ?? album?.price} 
-                      showEdit={true}
-                      onEdit={handlePriceEdit}
-                      loading={priceLoading}
-                      size="sm"
-                    />
-                  )}
-                </div>
+                <PriceDisplay 
+                  price={optimisticPrice ?? album?.price}
+                  optimisticPrice={optimisticPrice}
+                  canEdit={!!isOwner}
+                  onEdit={handlePriceEdit}
+                  loading={priceLoading}
+                />
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
-            {/* kept for compatibility; price editor above will update album state */}
-          </div>
+          {/* price editor above will update album state (removed empty decorative bar) */}
 
-          <Button
-            onClick={handleAddToCart}
-            size="lg"
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg py-6"
-          >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            Add to Cart
-          </Button>
+          {!isOwner && (
+            <Button
+              onClick={handleAddToCart}
+              size="lg"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg py-6"
+            >
+              <ShoppingCart className="w-5 h-5 mr-2" />
+              Add to Cart
+            </Button>
+          )}
         </div>
       </div>
 
       {album.songs?.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold text-white mb-6">Now Playing</h2>
+          {isOwner && (
+            <div className="flex items-center gap-2 mb-3 text-sm">
+              <span className="text-gray-400">Source:</span>
+              <div className="inline-flex rounded-md overflow-hidden border border-slate-700">
+                <button
+                  className={`px-3 py-1 ${ownerPlayMode === 'preview' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-gray-300'} disabled:opacity-50`}
+                  onClick={() => setOwnerPlayMode('preview')}
+                  disabled={!trackPreviewUrls[album.songs[currentIndex]?.id]}
+                >
+                  Preview
+                </button>
+                <button
+                  className={`px-3 py-1 ${ownerPlayMode === 'full' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-gray-300'} disabled:opacity-50`}
+                  onClick={() => setOwnerPlayMode('full')}
+                  disabled={!trackFullUrls[album.songs[currentIndex]?.id]}
+                >
+                  Full
+                </button>
+              </div>
+            </div>
+          )}
           <div className="mb-6">
-            <AudioPlayer
-              src={trackAudioUrls[album.songs[currentIndex]?.id]}
-              autoPlay={autoPlayTrigger}
-              title={album.songs[currentIndex]?.title || 'Track'}
-              artwork={album.cover_image}
-              showPreviewBadge={!purchased}
-              onEnded={() => { if (loopMode !== 'one') onNext(); }}
-              onPrev={onPrev}
-              onNext={onNext}
-              hasPrev={album.songs.length > 1}
-              hasNext={album.songs.length > 1}
-              loopMode={loopMode}
-              onLoopModeChange={setLoopMode}
-            />
+            {/** Decide which source to use based on ownership/purchase/toggle */}
+            {(() => {
+              const currentSong = album.songs[currentIndex];
+              const sid = currentSong?.id;
+              let src = null;
+              if (isOwner) {
+                src = ownerPlayMode === 'full'
+                  ? (trackFullUrls[sid] || trackPreviewUrls[sid] || null)
+                  : (trackPreviewUrls[sid] || trackFullUrls[sid] || null);
+              } else if (purchased) {
+                src = trackFullUrls[sid] || trackPreviewUrls[sid] || null;
+              } else {
+                src = trackPreviewUrls[sid] || null;
+              }
+              return (
+                <AudioPlayer
+                  src={src}
+                  autoPlay={autoPlayTrigger}
+                  title={currentSong?.title || 'Track'}
+                  artwork={album.cover_image}
+                  showPreviewBadge={!purchased && !isOwner}
+                  onEnded={() => { if (loopMode !== 'one') onNext(); }}
+                  onPrev={onPrev}
+                  onNext={onNext}
+                  hasPrev={album.songs.length > 1}
+                  hasNext={album.songs.length > 1}
+                  loopMode={loopMode}
+                  onLoopModeChange={setLoopMode}
+                />
+              );
+            })()}
           </div>
 
           <h3 className="text-xl font-semibold text-white mb-3">Tracklist</h3>
@@ -318,7 +379,13 @@ export default function AlbumDetails() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-400">
-                      {trackAudioUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No preview'}
+                      {isOwner
+                        ? (trackFullUrls[song.id] || trackPreviewUrls[song.id]
+                            ? (index===currentIndex ? 'Playing' : 'Tap to play')
+                            : 'No audio')
+                        : (purchased
+                            ? (trackFullUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Loading...')
+                            : (trackPreviewUrls[song.id] ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No preview'))}
                     </div>
                   </div>
                 </button>
@@ -327,6 +394,16 @@ export default function AlbumDetails() {
           </Card>
         </div>
       )}
+      {/* Global modals/toasts */}
+      <PriceEditModal
+      isOpen={priceEditModal}
+      onClose={() => setPriceEditModal(false)}
+      currentPrice={album?.price}
+      onSave={handlePriceSave}
+      loading={priceLoading}
+      itemType="album"
+      />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }
