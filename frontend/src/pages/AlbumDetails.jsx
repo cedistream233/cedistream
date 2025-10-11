@@ -48,6 +48,13 @@ export default function AlbumDetails() {
   // For creators: allow choosing between preview and full when preview exists
   const [ownerPlayMode, setOwnerPlayMode] = useState('full'); // 'full' | 'preview'
 
+  // helpers (must be declared before any early returns to keep hook order stable)
+  const albumHasAnyPreview = useMemo(() => {
+    if (!album?.songs?.length) return false;
+    // if we have computed preview URLs map, check it; fallback to false
+    return album.songs.some(s => !!trackPreviewUrls[s.id]);
+  }, [album?.songs, trackPreviewUrls]);
+
   useEffect(() => {
     if (albumId) {
       loadAlbum();
@@ -238,13 +245,6 @@ export default function AlbumDetails() {
       </div>
     );
   }
-
-  // helpers
-  const albumHasAnyPreview = useMemo(() => {
-    if (!album?.songs?.length) return false;
-    // if we have computed preview URLs map, check it; fallback to false
-    return album.songs.some(s => !!trackPreviewUrls[s.id]);
-  }, [album?.songs, trackPreviewUrls]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
