@@ -170,10 +170,9 @@ export default function SongDetails() {
             />
           );
         })()}
-        <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
+        <div className="text-sm md:text-base text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
         <div className="mt-2">
           <div className="flex items-center gap-3 justify-center">
-            <div className="text-sm text-gray-400">Min price: GH₵ {parseFloat((optimisticPrice ?? song?.price)||0).toFixed(2)}</div>
             {isOwner && (
               <PriceDisplay 
                 price={optimisticPrice ?? song?.price}

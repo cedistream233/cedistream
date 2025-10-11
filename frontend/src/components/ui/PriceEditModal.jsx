@@ -104,8 +104,8 @@ export const PriceDisplay = ({
   const displayPrice = optimisticPrice !== null ? optimisticPrice : price;
   
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-2xl font-semibold text-yellow-400">
+    <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
+      <span className="text-lg md:text-2xl font-semibold text-yellow-400">
         GH₵ {parseFloat(displayPrice ?? 0).toFixed(2)}
       </span>
       {loading && (
@@ -117,7 +117,7 @@ export const PriceDisplay = ({
           className="flex items-center gap-1 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
         >
           <Edit3 className="w-4 h-4" />
-          Update
+          <span className="hidden md:inline">Update</span>
         </button>
       )}
     </div>
