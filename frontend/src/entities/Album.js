@@ -57,6 +57,16 @@ export const Album = {
     if (!res.ok) return null;
     return res.json();
   },
+  async update(id, patch = {}) {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`/api/albums/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+      body: JSON.stringify(patch)
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
 };
 
 export default AlbumSchema;

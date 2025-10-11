@@ -4,17 +4,18 @@ import { User } from "@/entities/User";
 import { Song } from "@/entities/Song";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ShoppingCart, Music, Clock, Calendar } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ShoppingCart, Music, Clock, Calendar } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import AudioPlayer from '@/components/media/AudioPlayer';
+import { PriceEditModal, PriceDisplay } from '@/components/ui/PriceEditModal';
+import { useToast, ToastContainer } from '@/components/ui/Toast';
 
 export default function AlbumDetails() {
   const navigate = useNavigate();
-  const urlParams = new URLSearchParams(window.location.search);
-  const albumId = urlParams.get("id");
+  const { id: albumId } = useParams();
   
   const [album, setAlbum] = useState(null);
   const [user, setUser] = useState(null);
@@ -24,6 +25,11 @@ export default function AlbumDetails() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
+  const [autoPlayTrigger, setAutoPlayTrigger] = useState(false);
+  const [priceEditModal, setPriceEditModal] = useState(false);
+  const [optimisticPrice, setOptimisticPrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const { toasts, toast, removeToast } = useToast();
 
   useEffect(() => {
     if (albumId) {
@@ -40,11 +46,14 @@ export default function AlbumDetails() {
   };
 
   const loadAlbum = async () => {
+    if (!albumId) return;
     setIsLoading(true);
-    const albums = await Album.list();
-    const foundAlbum = albums.find(a => a.id === albumId);
-    setAlbum(foundAlbum);
-    setIsLoading(false);
+    try {
+      const foundAlbum = await Album.get(albumId);
+      setAlbum(foundAlbum);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -121,6 +130,32 @@ export default function AlbumDetails() {
     onModalCancel();
   };
 
+  const handlePriceEdit = () => {
+    setPriceEditModal(true);
+  };
+
+  const handlePriceSave = async (newPrice) => {
+    setPriceLoading(true);
+    setOptimisticPrice(newPrice); // Show new price immediately
+    
+    try {
+      const updated = await Album.update(album.id, { price: newPrice });
+      if (updated) {
+        setAlbum(updated);
+        toast.success('Price updated successfully!');
+        setPriceEditModal(false);
+      } else {
+        throw new Error('Failed to update price');
+      }
+    } catch (error) {
+      toast.error('Failed to update price. Please try again.');
+      console.error('Price update error:', error);
+    } finally {
+      setPriceLoading(false);
+      setOptimisticPrice(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -136,6 +171,15 @@ export default function AlbumDetails() {
           </div>
         </div>
         <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
+        <PriceEditModal
+          isOpen={priceEditModal}
+          onClose={() => setPriceEditModal(false)}
+          currentPrice={album?.price}
+          onSave={handlePriceSave}
+          loading={priceLoading}
+          itemType="album"
+        />
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>
     );
   }
@@ -150,14 +194,7 @@ export default function AlbumDetails() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Button
-        variant="ghost"
-        onClick={() => navigate(createPageUrl("Albums"))}
-        className="mb-8 text-purple-400 hover:text-purple-300"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Albums
-      </Button>
+      {/* Back button intentionally removed per UX preference */}
 
       <div className="grid md:grid-cols-2 gap-8 mb-12">
         <div>
@@ -183,7 +220,7 @@ export default function AlbumDetails() {
             )}
           </div>
 
-          <div className="flex items-center gap-6 mb-8 text-gray-400">
+          <div className="flex items-center gap-3 mb-4 text-gray-400">`
             {album.genre && (
               <div className="flex items-center gap-2">
                 <Music className="w-5 h-5" />
@@ -204,11 +241,30 @@ export default function AlbumDetails() {
             )}
           </div>
 
-          <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Minimum price:</span>
-              <span className="text-3xl font-bold text-yellow-400">From GH₵ {album.price?.toFixed(2)}</span>
+          {/* Play/Shuffle removed per request */}
+
+          <div className="mb-6">
+            <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Minimum price:</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl font-bold text-yellow-400">From GH₵ {parseFloat((optimisticPrice ?? album?.price) ?? 0).toFixed(2)}</span>
+                  {user?.id === album?.user_id && (
+                    <PriceDisplay 
+                      price={optimisticPrice ?? album?.price} 
+                      showEdit={true}
+                      onEdit={handlePriceEdit}
+                      loading={priceLoading}
+                      size="sm"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
+            {/* kept for compatibility; price editor above will update album state */}
           </div>
 
           <Button
@@ -228,6 +284,7 @@ export default function AlbumDetails() {
           <div className="mb-6">
             <AudioPlayer
               src={trackAudioUrls[album.songs[currentIndex]?.id]}
+              autoPlay={autoPlayTrigger}
               title={album.songs[currentIndex]?.title || 'Track'}
               artwork={album.cover_image}
               showPreviewBadge={!purchased}

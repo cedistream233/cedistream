@@ -4,6 +4,8 @@ import { Song } from '@/entities/Song';
 import { Card } from '@/components/ui/card';
 import AudioPlayer from '@/components/media/AudioPlayer';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
+import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
+import { useToast, ToastContainer } from '@/components/ui/Toast';
 
 export default function SongDetails() {
   const { id } = useParams();
@@ -13,6 +15,10 @@ export default function SongDetails() {
   const [purchased, setPurchased] = useState(false);
   const [audioFetching, setAudioFetching] = useState(true);
   const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
+  const [priceEditModal, setPriceEditModal] = useState(false);
+  const [optimisticPrice, setOptimisticPrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const { toast, toasts, removeToast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -53,6 +59,32 @@ export default function SongDetails() {
     })();
   }, [song?.id]);
 
+  const handlePriceEdit = () => {
+    setPriceEditModal(true);
+  };
+
+  const handlePriceSave = async (newPrice) => {
+    setPriceLoading(true);
+    setOptimisticPrice(newPrice); // Show new price immediately
+    
+    try {
+      const updated = await Song.update(song.id, { price: newPrice });
+      if (updated) {
+        setSong(updated);
+        toast.success('Price updated successfully!');
+        setPriceEditModal(false);
+      } else {
+        throw new Error('Failed to update price');
+      }
+    } catch (error) {
+      toast.error('Failed to update price. Please try again.');
+      console.error('Price update error:', error);
+    } finally {
+      setPriceLoading(false);
+      setOptimisticPrice(null);
+    }
+  };
+
   if (loading) return <LoadingOverlay text="Loading" />;
   if (!song) return <div className="max-w-2xl mx-auto py-16 text-center text-gray-400">Song not found</div>;
 
@@ -74,7 +106,21 @@ export default function SongDetails() {
           onLoopModeChange={setLoopMode}
           embedded
         />
-  <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
+  <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
+        <div className="mt-2">
+          <div className="flex items-center gap-3 justify-center">
+            <div className="text-sm text-gray-400">Min price: GH₵ {parseFloat((optimisticPrice ?? song?.price)||0).toFixed(2)}</div>
+            {JSON.parse(localStorage.getItem('user')||'null')?.id === song.user_id && (
+              <PriceDisplay 
+                price={optimisticPrice ?? song?.price} 
+                showEdit={true}
+                onEdit={handlePriceEdit}
+                loading={priceLoading}
+                size="sm"
+              />
+            )}
+          </div>
+        </div>
     <div className="w-full text-center text-sm text-gray-400 mt-2">You can choose to pay more to support the creator. Minimum applies.</div>
         <div className="w-full flex gap-3 mt-4">
           <button onClick={async () => {
@@ -93,6 +139,15 @@ export default function SongDetails() {
         </div>
         {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}
       </Card>
+      <PriceEditModal
+        isOpen={priceEditModal}
+        onClose={() => setPriceEditModal(false)}
+        currentPrice={song?.price}
+        onSave={handlePriceSave}
+        loading={priceLoading}
+        itemType="song"
+      />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

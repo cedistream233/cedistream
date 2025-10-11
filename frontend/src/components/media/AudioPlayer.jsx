@@ -6,6 +6,7 @@ export default function AudioPlayer({
   src,
   title = 'Audio',
   showPreviewBadge = false,
+  autoPlay = false,
   onEnded,
   onPrev,
   onNext,
@@ -58,6 +59,9 @@ export default function AudioPlayer({
     audioRef.current.loop = loopMode === 'one';
     if (wasPlaying && src) {
       audioRef.current.play().catch(()=>{});
+    } else if (src && autoPlay) {
+      // attempt to start playback when the new src is loaded
+      audioRef.current.play().then(() => setPlaying(true)).catch(()=>{});
     } else {
       setPlaying(false);
       setCurrent(0);
