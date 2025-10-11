@@ -47,25 +47,43 @@ export default function SongDetails() {
       try {
         const token = localStorage.getItem('token');
         let full = null;
-        if (token) full = await Song.getSignedUrl(song.id, token);
-        if (full) {
-          setPurchased(true);
-          setAudioUrl(full);
-          return;
+        // attempt to get signed/full URL if token exists
+        if (token) {
+          try { full = await Song.getSignedUrl(song.id, token); } catch (e) { full = null; }
         }
-        // Prefer a prefetched preview URL if available (stored in sessionStorage by the preview button)
+
+        // attempt to use any prefetched preview stored in sessionStorage
         let pref = null;
         try { pref = sessionStorage.getItem(`preview:${song.id}`); } catch {}
         if (pref) {
+          // prefetched previews indicate the user previously requested a preview; treat as preview
           setPurchased(false);
+          setPreviewUrl(pref);
           setAudioUrl(pref);
-          // clear the prefetched value to avoid stale urls later
           try { sessionStorage.removeItem(`preview:${song.id}`); } catch {}
+          // still try to populate full in background
+          if (!full && token) {
+            try { const f = await Song.getSignedUrl(song.id, token); if (f) setFullUrl(f); } catch {}
+          }
           return;
         }
-        const prev = await Song.getPreviewUrl(song.id);
-        setPurchased(false);
-        setAudioUrl(prev || null);
+
+        // no prefetched preview; fetch preview and full (full may be null if not owner/purchased)
+        let prev = null;
+        try { prev = await Song.getPreviewUrl(song.id); } catch (e) { prev = null; }
+
+        setPreviewUrl(prev || null);
+        setFullUrl(full || null);
+
+        if (full) {
+          setPurchased(true);
+          setAudioUrl(full);
+        } else if (prev) {
+          setPurchased(false);
+          setAudioUrl(prev);
+        } else {
+          setAudioUrl(null);
+        }
       } finally { setAudioFetching(false); }
     })();
   }, [song?.id]);
