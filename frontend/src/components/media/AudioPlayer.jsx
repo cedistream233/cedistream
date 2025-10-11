@@ -15,9 +15,11 @@ export default function AudioPlayer({
   onLoopModeChange,
   embedded = false,
   className = ''
+  , loading = false
 }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [seeking, setSeeking] = useState(false);
@@ -26,7 +28,7 @@ export default function AudioPlayer({
     const el = new Audio();
     audioRef.current = el;
     el.preload = 'metadata';
-    const onLoaded = () => setDuration(el.duration || 0);
+  const onLoaded = () => { setDuration(el.duration || 0); setAudioLoading(false); };
     const onTime = () => { if (!seeking) setCurrent(el.currentTime || 0); };
     const onEnd = () => { setPlaying(false); setCurrent(0); onEnded && onEnded(); };
     el.addEventListener('loadedmetadata', onLoaded);
@@ -44,6 +46,14 @@ export default function AudioPlayer({
     if (!audioRef.current) return;
     const wasPlaying = playing;
     audioRef.current.src = src || '';
+    // when src changes, start loading metadata
+    if (src) {
+      try { setAudioLoading(true); } catch (e) {}
+      try { audioRef.current.load(); } catch (e) {}
+    } else {
+      // if there is no src, preserve external loading prop
+      if (!loading) setAudioLoading(false);
+    }
     // Apply loop for single-track loop mode
     audioRef.current.loop = loopMode === 'one';
     if (wasPlaying && src) {
@@ -55,7 +65,7 @@ export default function AudioPlayer({
   }, [src, loopMode]);
 
   const toggle = async () => {
-    const el = audioRef.current; if (!el || !src) return;
+    const el = audioRef.current; if (!el || !src || audioLoading || loading) return;
     if (playing) { el.pause(); setPlaying(false); }
     else { try { await el.play(); setPlaying(true); } catch {} }
   };
@@ -94,7 +104,7 @@ export default function AudioPlayer({
       <div className="flex flex-col items-center gap-3">
         <div className="w-full">
           <div className="flex items-center justify-center mb-2">
-            <div className={`flex items-end gap-[3px] ${playing? 'opacity-100':'opacity-50'}`} aria-hidden>
+        <div className={`flex items-end gap-[3px] ${playing? 'opacity-100':'opacity-50'}`} aria-hidden>
               {([6,9,13,8,14,7,12,10,15,9,13,8]).map((h,i)=> (
                 <span
                   key={i}
@@ -122,13 +132,20 @@ export default function AudioPlayer({
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-4 mt-1">
+          <div className="flex items-center justify-center gap-4 mt-1">
           <button onClick={onPrev} disabled={!hasPrev} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-700 disabled:opacity-40" title="Previous">
             <SkipBack className="w-4 h-4"/>
           </button>
-          <button onClick={toggle} className="w-12 h-12 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md">
-            {playing ? <Pause className="w-6 h-6"/> : <Play className="w-6 h-6 ml-0.5"/>}
-          </button>
+          <div className="relative">
+            <button onClick={toggle} disabled={(audioLoading || loading) || !src} className={`w-12 h-12 rounded-full ${(audioLoading || loading) ? 'bg-slate-600/60 text-white/60' : 'bg-white text-slate-900'} flex items-center justify-center shadow-md`} aria-label={(audioLoading || loading) ? 'Loading audio' : 'Play/Pause'}>
+              {playing ? <Pause className="w-6 h-6"/> : <Play className="w-6 h-6 ml-0.5"/>}
+            </button>
+            {(audioLoading || loading) && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
           <button onClick={onNext} disabled={!hasNext} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-700 disabled:opacity-40" title="Next">
             <SkipForward className="w-4 h-4"/>
           </button>

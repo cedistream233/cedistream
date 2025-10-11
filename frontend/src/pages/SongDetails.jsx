@@ -11,6 +11,7 @@ export default function SongDetails() {
   const [loading, setLoading] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
   const [purchased, setPurchased] = useState(false);
+  const [audioFetching, setAudioFetching] = useState(true);
   const [loopMode, setLoopMode] = useState('off'); // 'off' | 'one' | 'all'
 
   useEffect(() => {
@@ -25,27 +26,30 @@ export default function SongDetails() {
   useEffect(() => {
     (async () => {
       if (!song?.id) return;
-      const token = localStorage.getItem('token');
-      let full = null;
-      if (token) full = await Song.getSignedUrl(song.id, token);
-      if (full) {
-        setPurchased(true);
-        setAudioUrl(full);
-        return;
-      }
-      // Prefer a prefetched preview URL if available (stored in sessionStorage by the preview button)
-      let pref = null;
-      try { pref = sessionStorage.getItem(`preview:${song.id}`); } catch {}
-      if (pref) {
+      setAudioFetching(true);
+      try {
+        const token = localStorage.getItem('token');
+        let full = null;
+        if (token) full = await Song.getSignedUrl(song.id, token);
+        if (full) {
+          setPurchased(true);
+          setAudioUrl(full);
+          return;
+        }
+        // Prefer a prefetched preview URL if available (stored in sessionStorage by the preview button)
+        let pref = null;
+        try { pref = sessionStorage.getItem(`preview:${song.id}`); } catch {}
+        if (pref) {
+          setPurchased(false);
+          setAudioUrl(pref);
+          // clear the prefetched value to avoid stale urls later
+          try { sessionStorage.removeItem(`preview:${song.id}`); } catch {}
+          return;
+        }
+        const prev = await Song.getPreviewUrl(song.id);
         setPurchased(false);
-        setAudioUrl(pref);
-        // clear the prefetched value to avoid stale urls later
-        try { sessionStorage.removeItem(`preview:${song.id}`); } catch {}
-        return;
-      }
-      const prev = await Song.getPreviewUrl(song.id);
-      setPurchased(false);
-      setAudioUrl(prev || null);
+        setAudioUrl(prev || null);
+      } finally { setAudioFetching(false); }
     })();
   }, [song?.id]);
 
@@ -58,20 +62,18 @@ export default function SongDetails() {
         <img src={song.cover_image || 'https://via.placeholder.com/160?text=%F0%9F%8E%B5'} alt={song.title} className="w-40 h-40 rounded-lg object-cover mb-2" />
         <h1 className="text-2xl font-bold text-white mb-1">{song.title}</h1>
         <div className="text-gray-400 mb-2">{song.artist}</div>
-        {audioUrl ? (
-          <AudioPlayer
-            src={audioUrl}
-            title={song.title}
-            showPreviewBadge={!purchased}
-            hasPrev={false}
-            hasNext={false}
-            loopMode={loopMode}
-            onLoopModeChange={setLoopMode}
-            embedded
-          />
-        ) : (
-          <div className="w-full text-center text-xs text-gray-400">No preview available. Purchase to listen.</div>
-        )}
+        {/* Render the player immediately; pass loading while the audio URL is being resolved */}
+        <AudioPlayer
+          src={audioUrl}
+          loading={audioFetching}
+          title={song.title}
+          showPreviewBadge={!purchased}
+          hasPrev={false}
+          hasNext={false}
+          loopMode={loopMode}
+          onLoopModeChange={setLoopMode}
+          embedded
+        />
   <div className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(song.price)?.toFixed(2) || '0.00'}</div>
     <div className="w-full text-center text-sm text-gray-400 mt-2">You can choose to pay more to support the creator. Minimum applies.</div>
         <div className="w-full flex gap-3 mt-4">
