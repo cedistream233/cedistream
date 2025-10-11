@@ -221,9 +221,10 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     // purchases joined with albums/videos by item_id; includes songs if table exists
     // include buyer name (from users if present) and payment_status
     const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.created_at as date, p.payment_status,
-                       COALESCE(u.full_name, u.display_name, u.username, p.user_email, '—') as buyer_name
-                 FROM purchases p
-                 LEFT JOIN users u ON u.id = p.user_id
+           COALESCE(cp.stage_name, CONCAT(u.first_name, ' ', u.last_name), u.email, '—') as buyer_name
+         FROM purchases p
+         LEFT JOIN users u ON u.id = p.user_id
+         LEFT JOIN creator_profiles cp ON cp.user_id = u.id
                  WHERE p.payment_status = 'completed'
                    AND (
                      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
@@ -257,9 +258,10 @@ router.get('/sales-export', authenticateToken, requireRole(['creator']), async (
 
     let sql = `
       SELECT p.created_at as date, p.item_type, p.item_title as item, p.amount, p.payment_status,
-             COALESCE(u.full_name, u.display_name, u.username, p.user_email, '') as buyer_name
+        COALESCE(cp.stage_name, CONCAT(u.first_name, ' ', u.last_name), u.email, '') as buyer_name
       FROM purchases p
       LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN creator_profiles cp ON cp.user_id = u.id
       WHERE p.payment_status = 'completed'
         AND (
           (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR

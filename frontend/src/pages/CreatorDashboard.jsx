@@ -209,11 +209,37 @@ export default function CreatorDashboard() {
         const res = await fetch('/api/uploads/sales-export?limit=0', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
         if (!res.ok) throw new Error('Failed to download CSV');
         const blob = await res.blob();
+
+        const date = new Date().toISOString().slice(0,10);
+        const defaultName = `cedistream-sales-${date}.csv`;
+
+        // Prefer Save File Picker (Chromium browsers) to let user choose location
+        const w = window;
+        if (w && 'showSaveFilePicker' in w) {
+          try {
+            const handle = await w.showSaveFilePicker({
+              suggestedName: defaultName,
+              types: [
+                {
+                  description: 'CSV Files',
+                  accept: { 'text/csv': ['.csv'] }
+                }
+              ]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return; // done
+          } catch (pickerErr) {
+            // If user cancels or API not allowed, fall back to anchor method
+          }
+        }
+
+        // Fallback: create object URL and trigger a download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const date = new Date().toISOString().slice(0,10);
-        a.download = `cedistream-sales-${date}.csv`;
+        a.download = defaultName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -473,7 +499,7 @@ export default function CreatorDashboard() {
           <TabsContent value="earnings" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-white">Earnings</h2>
-              <Button variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
+              <Button variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={downloadSalesCsv}>
                 <Download className="w-4 h-4 mr-2" />
                 Export Report
               </Button>
