@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase.js';
 
 const router = express.Router();
 const MAX_PIN_ATTEMPTS = 5; // configurable
-const LOCKOUT_MINUTES = 15; // configurable
+const LOCKOUT_MINUTES = 60; // configurable per product: ~1 hour lockout
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
 
 // Register new user
@@ -320,6 +320,77 @@ router.delete('/profile/image', authenticateToken, async (req, res) => {
     return res.json({ ok: true, user: updated.rows[0] });
   } catch (error) {
     console.error('Profile image remove error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Change password (requires current password)
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword, confirmNewPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ error: 'currentPassword, newPassword and confirmNewPassword are required' });
+    }
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ error: 'New passwords do not match' });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const result = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const ok = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    const saltRounds = 10;
+    const newHash = await bcrypt.hash(String(newPassword), saltRounds);
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, userId]);
+
+    return res.json({ ok: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Change email (requires current password)
+router.post('/change-email', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newEmail } = req.body || {};
+
+    if (!currentPassword || !newEmail) {
+      return res.status(400).json({ error: 'currentPassword and newEmail are required' });
+    }
+    // basic email format check
+    if (!/.+@.+\..+/.test(String(newEmail))) {
+      return res.status(400).json({ error: 'Please provide a valid email address' });
+    }
+
+    const userRes = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const ok = await bcrypt.compare(currentPassword, userRes.rows[0].password_hash);
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    // ensure email not taken by someone else
+    const exists = await query('SELECT 1 FROM users WHERE email = $1 AND id <> $2', [newEmail, userId]);
+    if (exists.rows.length > 0) {
+      return res.status(409).json({ error: 'Email is already in use' });
+    }
+
+    const updated = await query(
+      'UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2 RETURNING id, email, username, first_name, last_name, role',
+      [newEmail, userId]
+    );
+
+    return res.json({ ok: true, message: 'Email changed successfully', user: updated.rows[0] });
+  } catch (error) {
+    console.error('Change email error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

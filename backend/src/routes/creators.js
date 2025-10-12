@@ -11,9 +11,14 @@ router.get('/', async (req, res, next) => {
     let where = "WHERE u.role = 'creator'";
 
     if (q && String(q).trim() !== '') {
-      params.push(`%${q.toLowerCase()}%`);
-      params.push(`%${q.toLowerCase()}%`);
-      where += ` AND (LOWER(COALESCE(cp.stage_name, '')) LIKE $${params.length - 1} OR LOWER(u.first_name || ' ' || u.last_name) LIKE $${params.length})`;
+      const norm = String(q).toLowerCase().replace(/\s+/g, '');
+      // Match ignoring case and whitespace: compare against stage_name and full name with spaces removed
+      params.push(`%${norm}%`);
+      params.push(`%${norm}%`);
+      where += ` AND (
+        REPLACE(LOWER(COALESCE(cp.stage_name, '')), ' ', '') LIKE $${params.length - 1}
+        OR REPLACE(LOWER(u.first_name || ' ' || u.last_name), ' ', '') LIKE $${params.length}
+      )`;
     }
 
     const result = await query(

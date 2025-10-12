@@ -138,6 +138,85 @@ export default function ProfilePage() {
     }
   };
 
+  // Local state for credential change forms
+  const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+  const [pwdMsg, setPwdMsg] = useState(null);
+  const [pwdLoading, setPwdLoading] = useState(false);
+
+  const [emailForm, setEmailForm] = useState({ currentPassword: '', newEmail: '' });
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwdMsg(null);
+    if (!pwdForm.currentPassword || !pwdForm.newPassword || !pwdForm.confirmNewPassword) {
+      setPwdMsg({ type: 'error', text: 'Please fill all fields' });
+      return;
+    }
+    if (pwdForm.newPassword !== pwdForm.confirmNewPassword) {
+      setPwdMsg({ type: 'error', text: 'New passwords do not match' });
+      return;
+    }
+    if (pwdForm.newPassword.length < 6) {
+      setPwdMsg({ type: 'error', text: 'Password must be at least 6 characters' });
+      return;
+    }
+    setPwdLoading(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify(pwdForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPwdMsg({ type: 'success', text: data.message || 'Password changed successfully' });
+        setPwdForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+      } else {
+        setPwdMsg({ type: 'error', text: data.error || 'Failed to change password' });
+      }
+    } catch {
+      setPwdMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
+  const handleChangeEmail = async (e) => {
+    e.preventDefault();
+    setEmailMsg(null);
+    if (!emailForm.currentPassword || !emailForm.newEmail) {
+      setEmailMsg({ type: 'error', text: 'Please fill all fields' });
+      return;
+    }
+    if (!/.+@.+\..+/.test(String(emailForm.newEmail))) {
+      setEmailMsg({ type: 'error', text: 'Enter a valid email address' });
+      return;
+    }
+    setEmailLoading(true);
+    try {
+      const res = await fetch('/api/auth/change-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify(emailForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailMsg({ type: 'success', text: data.message || 'Email changed successfully' });
+        // refresh profile to reflect new email
+        await refreshProfile();
+        setEmailForm({ currentPassword: '', newEmail: '' });
+      } else {
+        setEmailMsg({ type: 'error', text: data.error || 'Failed to change email' });
+      }
+    } catch {
+      setEmailMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h2 className="text-2xl font-semibold text-white mb-4">Profile Settings</h2>
@@ -206,6 +285,59 @@ export default function ProfilePage() {
                 <Button type="submit" disabled={saving} className="bg-purple-600 hover:bg-purple-700">{saving ? 'Saving...' : 'Save Changes'}</Button>
               </div>
               <p className="text-xs text-gray-500">Email and username are not editable here.</p>
+            </form>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-900/50 p-6 rounded-lg border border-purple-900/20">
+            <h3 className="text-lg text-white mb-3">Change Password</h3>
+            {pwdMsg && (
+              <div className={`p-2 mb-3 rounded ${pwdMsg.type === 'error' ? 'bg-red-700/20 border border-red-600 text-red-200' : 'bg-green-700/10 border border-green-600 text-green-200'}`}>
+                {pwdMsg.text}
+              </div>
+            )}
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Current Password</label>
+                <Input type="password" value={pwdForm.currentPassword} onChange={e=>setPwdForm(f=>({...f, currentPassword: e.target.value}))} className="bg-slate-800 border-slate-700 text-white" required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">New Password</label>
+                <Input type="password" value={pwdForm.newPassword} onChange={e=>setPwdForm(f=>({...f, newPassword: e.target.value}))} className="bg-slate-800 border-slate-700 text-white" required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Confirm New Password</label>
+                <Input type="password" value={pwdForm.confirmNewPassword} onChange={e=>setPwdForm(f=>({...f, confirmNewPassword: e.target.value}))} className={`bg-slate-800 border-slate-700 text-white ${pwdForm.confirmNewPassword && pwdForm.confirmNewPassword !== pwdForm.newPassword ? 'border-red-500' : ''}`} required />
+                {pwdForm.confirmNewPassword && pwdForm.confirmNewPassword !== pwdForm.newPassword && (
+                  <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={pwdLoading} className="bg-purple-600 hover:bg-purple-700">{pwdLoading ? 'Updating...' : 'Update Password'}</Button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-slate-900/50 p-6 rounded-lg border border-purple-900/20">
+            <h3 className="text-lg text-white mb-3">Change Email</h3>
+            {emailMsg && (
+              <div className={`p-2 mb-3 rounded ${emailMsg.type === 'error' ? 'bg-red-700/20 border border-red-600 text-red-200' : 'bg-green-700/10 border border-green-600 text-green-200'}`}>
+                {emailMsg.text}
+              </div>
+            )}
+            <form onSubmit={handleChangeEmail} className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Current Password</label>
+                <Input type="password" value={emailForm.currentPassword} onChange={e=>setEmailForm(f=>({...f, currentPassword: e.target.value}))} className="bg-slate-800 border-slate-700 text-white" required />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">New Email</label>
+                <Input type="email" value={emailForm.newEmail} onChange={e=>setEmailForm(f=>({...f, newEmail: e.target.value}))} className="bg-slate-800 border-slate-700 text-white" required />
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={emailLoading} className="bg-purple-600 hover:bg-purple-700">{emailLoading ? 'Updating...' : 'Update Email'}</Button>
+              </div>
             </form>
           </div>
         </div>

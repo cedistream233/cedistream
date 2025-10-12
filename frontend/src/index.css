@@ -30,8 +30,4 @@ body { background-color: #0b0b12; }
   .container-edge { @apply container mx-auto px-4 sm:px-6 lg:px-8; }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-track { background: #0f0f17; }
-::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#7c3aed,#ec4899); border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#8b5cf6,#f472b6); }
+/* Use default OS scrollbar styling (no custom colors) */
