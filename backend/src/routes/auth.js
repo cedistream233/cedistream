@@ -423,9 +423,11 @@ router.post('/reset/start', async (req, res) => {
 
     const user = result.rows[0];
 
-    // Check lockout
+    // Check lockout and report remaining time if locked
     if (user.pin_lock_until && new Date(user.pin_lock_until) > new Date()) {
-      return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+      const msLeft = new Date(user.pin_lock_until) - new Date();
+      const minsLeft = Math.ceil(msLeft / 60000);
+      return res.status(429).json({ error: `Too many attempts. Please try again in ${minsLeft} minute(s).` });
     }
 
     // Verify PIN
@@ -440,6 +442,10 @@ router.post('/reset/start', async (req, res) => {
         `UPDATE users SET pin_attempts = $1${lockUntilClause || ''} WHERE id = $2`,
         [attempts, user.id]
       );
+      if (attempts >= MAX_PIN_ATTEMPTS) {
+        // Locked now - inform user of lock duration
+        return res.status(429).json({ error: `Too many attempts. Account locked for ${LOCKOUT_MINUTES} minute(s). Please try again later.` });
+      }
       return res.status(401).json({ error: 'Invalid PIN' });
     }
 
@@ -521,9 +527,11 @@ router.patch('/pin', authenticateToken, async (req, res) => {
 
     const { password_hash, pin_attempts, pin_lock_until } = result.rows[0];
 
-    // Check lockout (reuse pin_lock_until)
+    // Check lockout (reuse pin_lock_until) and report remaining time
     if (pin_lock_until && new Date(pin_lock_until) > new Date()) {
-      return res.status(429).json({ error: 'Too many incorrect attempts. Try again later.' });
+      const msLeft = new Date(pin_lock_until) - new Date();
+      const minsLeft = Math.ceil(msLeft / 60000);
+      return res.status(429).json({ error: `Too many incorrect attempts. Account locked for ${minsLeft} minute(s).` });
     }
 
     const passwordMatch = await bcrypt.compare(currentPassword, password_hash);
@@ -534,6 +542,9 @@ router.patch('/pin', authenticateToken, async (req, res) => {
         lockUntilClause = `, pin_lock_until = NOW() + INTERVAL '${LOCKOUT_MINUTES} minutes'`;
       }
       await query(`UPDATE users SET pin_attempts = $1${lockUntilClause || ''} WHERE id = $2`, [attempts, userId]);
+      if (attempts >= MAX_PIN_ATTEMPTS) {
+        return res.status(429).json({ error: `Too many incorrect attempts. Account locked for ${LOCKOUT_MINUTES} minute(s).` });
+      }
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
