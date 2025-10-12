@@ -5,7 +5,7 @@ import { closePool } from './lib/database.js'; // Initialize database connection
 import albumsRouter from './routes/albums.js';
 import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';
-import paystackRouter from './routes/paystack.js';
+import paystackRouter, { paystackWebhookHandler } from './routes/paystack.js';
 import uploadsRouter from './routes/uploads.js';
 import mediaRouter from './routes/media.js';
 import authRouter from './routes/auth.js';
@@ -18,6 +18,9 @@ const app = express();
 const BASE_PORT = Number(process.env.PORT) || 5000;
 
 app.use(cors({ origin: process.env.APP_URL || 'http://localhost:3000' }));
+// Use JSON by default; Paystack webhook uses raw body at the route level
+// Raw body required for Paystack signature verification on webhook
+app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {

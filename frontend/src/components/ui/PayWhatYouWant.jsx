@@ -9,6 +9,9 @@ export default function PayWhatYouWant({ minPrice = 1, onAdd, className = '' }) 
           <div className="text-sm text-gray-300">Pay What You Want</div>
           <div className="text-lg sm:text-xl font-semibold text-white">Minimum GH₵ {min.toFixed(2)}</div>
           <div className="text-sm text-gray-400 mt-1">Contribute any amount above the minimum.Your support helps creators make great content</div>
+          <div className="mt-2 inline-flex items-center gap-2 text-emerald-300 bg-emerald-900/20 border border-emerald-700/40 rounded-full px-3 py-1 text-xs font-semibold">
+            <span>Creator earns 80% per sale</span>
+          </div>
           <div className="text-xs text-gray-500 mt-2">Top supporters appear on the content’s leaderboard.</div>
         </div>
 

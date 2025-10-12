@@ -4,7 +4,7 @@ import { Purchase } from "@/entities/Purchase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CreditCard, Smartphone, AlertCircle, Sparkles, Trophy } from "lucide-react";
+import { CreditCard, Smartphone, AlertCircle, Sparkles, Trophy, Percent } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -78,10 +78,29 @@ export default function Checkout() {
     }
 
     setIsProcessing(true);
-
-    alert("⚠️ PAYSTACK INTEGRATION NEEDED\n\nTo complete payments, enable backend functions in Dashboard → Settings.\n\nYou'll need to:\n1. Add Paystack API keys\n2. Create payment initialization endpoint\n3. Handle payment verification\n4. Update purchase status\n\nFor now, this is a placeholder.");
-
-    setIsProcessing(false);
+    try {
+      const email = user?.email || user?.username || 'supporter@example.com';
+      const metadata = { source: 'checkout', return: window.location.href };
+      const payload = {
+        email,
+        user_id: user?.id || null,
+        items: purchases.map(p => ({ item_type: p.item_type, item_id: p.item_id, item_title: p.item_title, amount: Number(p.amount) })),
+        currency: 'GHS',
+        metadata,
+      };
+      const init = await Purchase.initializePayment(payload);
+      const authUrl = init?.data?.authorization_url;
+      if (authUrl) {
+        window.location.href = authUrl;
+        return; // stop here, browser will navigate
+      }
+      throw new Error('Authorization URL not returned');
+    } catch (e) {
+      console.error(e);
+      setCheckoutAlert({ type: 'error', items: [{ title: 'Payment Error', min: 0, got: 0 }], message: e.message || 'Failed to start payment' });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -95,10 +114,10 @@ export default function Checkout() {
             You’re in control: pay the minimum or add a little extra to support your favorite creators. Thank you for being awesome.
           </AlertDescription>
         </Alert>
-        <Alert className="bg-yellow-900/20 border-yellow-500/50">
-          <AlertCircle className="h-4 w-4 text-yellow-500" />
-          <AlertDescription className="text-yellow-200 text-sm">
-            Paystack integration placeholder. Enable in Dashboard → Settings to accept real payments.
+        <Alert className="bg-emerald-900/20 border-emerald-600/50">
+          <Percent className="h-4 w-4 text-emerald-400" />
+          <AlertDescription className="text-emerald-100 text-sm font-medium">
+            Creator earns 80% from every sale. Platform takes 20% and covers Paystack’s 2% fee.
           </AlertDescription>
         </Alert>
       </div>

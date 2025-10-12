@@ -30,7 +30,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { user_email, item_type, item_id, item_title, amount, payment_status = 'pending', payment_reference, payment_method } = req.body;
+  const { user_id, user_email, item_type, item_id, item_title, amount, currency = 'GHS', payment_status = 'pending', payment_reference, payment_method } = req.body;
     // Pay-what-you-want support: enforce minimum price from item table
     let minPrice = 0;
     if (item_type === 'album') {
@@ -49,9 +49,17 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: `Amount must be at least minimum price GH₵ ${minPrice.toFixed(2)}` });
     }
     
+    const platformFee = +(Number(amount) * 0.20).toFixed(2);
+    const paystackFee = +(Number(amount) * 0.02).toFixed(2);
+    const platformNet = +(platformFee - paystackFee).toFixed(2);
+    const creatorAmount = +(Number(amount) * 0.80).toFixed(2);
+
     const result = await query(
-      'INSERT INTO purchases (user_email, item_type, item_id, item_title, amount, payment_status, payment_reference, payment_method) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [user_email, item_type, item_id, item_title, amount, payment_status, payment_reference, payment_method]
+      `INSERT INTO purchases (user_id, item_type, item_id, item_title, amount, currency, payment_status, payment_reference, payment_method, gateway, platform_fee, paystack_fee, platform_net, creator_amount)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'paystack',$10,$11,$12,$13)
+       ON CONFLICT ON CONSTRAINT uniq_purchase_by_ref_user_item DO NOTHING
+       RETURNING *`,
+      [user_id || null, item_type, item_id, item_title, amount, currency, payment_status, payment_reference || null, payment_method || null, platformFee, paystackFee, platformNet, creatorAmount]
     );
     
     res.status(201).json(result.rows[0]);

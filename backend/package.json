@@ -15,7 +15,8 @@
     "migrate-add-songs": "node ./scripts/migrate-add-songs.js",
   "migrate-add-content-status": "node ./scripts/migrate-add-content-status.js",
   "migrate-add-songs-status": "node ./scripts/migrate-add-songs-status.js",
-  "migrate-add-analytics-indexes": "node ./scripts/migrate-add-analytics-indexes.js"
+  "migrate-add-analytics-indexes": "node ./scripts/migrate-add-analytics-indexes.js",
+  "migrate-add-fee-split": "node ./scripts/migrate-add-fee-split.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

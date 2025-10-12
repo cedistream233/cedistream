@@ -47,11 +47,11 @@ export const Purchase = {
     if (!res.ok) throw new Error('Verification failed');
     return res.json();
   },
-  async initializePayment({ email, amount, reference, metadata }) {
+  async initializePayment(payload) {
     const res = await fetch('/api/paystack/initialize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, amount, reference, metadata }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Payment initialization failed');
     return res.json();
