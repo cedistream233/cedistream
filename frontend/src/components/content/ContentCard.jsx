@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { setPostAuthIntent } from '@/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function ContentCard({ item, type, onAddToCart, onViewDetails }) {
+export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true }) {
   const { updateMyUserData } = useAuth();
   // prefer cover_image, fallback to thumbnail
   const image = item.cover_image || item.thumbnail || null;
@@ -296,12 +296,14 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
             <h3 className="font-semibold text-white truncate mb-0">{title}</h3>
             <p className="text-sm text-gray-400 truncate mb-0">{creator}</p>
             {publishedDate && (
-              <div className="text-[11px] text-gray-400 mb-2">Published {publishedDate}</div>
+              <div className="text-sm text-gray-400 mb-2">Published {publishedDate}</div>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-300">
-                Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}
-              </span>
+              {showPwyw ? (
+                <span className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
+              ) : (
+                <span className="text-sm text-gray-300">{publishedDate ? `Published ${publishedDate}` : `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}`}</span>
+              )}
               {type === "album" && item.songs?.length > 0 && (
                 <span className="text-xs text-gray-500">
                   {item.songs.length} tracks

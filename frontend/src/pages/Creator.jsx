@@ -76,6 +76,7 @@ export default function Creator() {
                       artist: song.artist,
                       price: song.price,
                       cover_image: song.cover_image,
+                      release_date: song.release_date || song.published_at || song.created_at || null,
                     }}
                     type="song"
                     onAddToCart={() => {
@@ -106,6 +107,7 @@ export default function Creator() {
                       })();
                     }}
                     onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
+                    showPwyw={false}
                   />
                 ))}
               </div>
@@ -119,8 +121,8 @@ export default function Creator() {
             <div className="text-gray-400">No albums yet</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {content.albums.map((album) => (
-                <ContentCard key={album.id} item={album} type="album" onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`} />
+                {content.albums.map((album) => (
+                <ContentCard key={album.id} item={{ ...album, release_date: album.release_date || album.published_at || album.created_at || null }} type="album" onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`} showPwyw={false} />
               ))}
             </div>
           )}
@@ -135,9 +137,10 @@ export default function Creator() {
               {content.videos.map((video) => (
                 <ContentCard
                   key={video.id}
-                  item={video}
+                  item={{ ...video, release_date: video.release_date || video.published_at || video.created_at || null }}
                   type="video"
                   onViewDetails={() => { window.location.href = `/videos?id=${encodeURIComponent(video.id)}`; }}
+                  showPwyw={false}
                 />
               ))}
             </div>

@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Lock } from 'lucide-react';
 import { setPostAuthIntent } from '@/utils';
 
-export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails }) {
+export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails, showPwyw = true }) {
   const image = item.cover_image || item.thumbnail || null;
   const title = item.title;
   const creator = item.artist || item.creator;
@@ -94,8 +94,10 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
         <div className="min-w-0">
           <div className="text-white font-medium truncate">{title}</div>
           <div className="text-xs text-gray-400 truncate">{creator}</div>
-          {publishedDate && <div className="text-[11px] text-gray-400 mt-0.5">Published {publishedDate}</div>}
-          <div className="text-[11px] text-gray-400 mt-0.5">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</div>
+          {publishedDate && <div className="text-xs text-gray-400 mt-0.5">Published {publishedDate}</div>}
+          {showPwyw && (
+            <div className="text-[11px] text-gray-400 mt-0.5">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</div>
+          )}
         </div>
       </div>
       <div className="pl-3 flex items-center gap-2">
