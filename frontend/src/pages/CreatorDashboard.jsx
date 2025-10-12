@@ -13,7 +13,9 @@ import {
   Download,
   Calendar,
   PieChart,
-  ChevronRight
+  ChevronRight,
+  Share2,
+  Copy
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Edit2, X } from 'lucide-react';
@@ -181,6 +183,39 @@ export default function CreatorDashboard() {
     }
   };
 
+  // Share/copy helpers
+  const creatorPublicUrl = (() => {
+    const id = user?.id || '';
+    const base = window?.location?.origin || '';
+    return id ? `${base}/creators/${encodeURIComponent(id)}` : '';
+  })();
+
+  const handleShareProfile = async () => {
+    try {
+      if (navigator.share && creatorPublicUrl) {
+        await navigator.share({ title: user?.creatorProfile?.stage_name || 'My Creator Profile', url: creatorPublicUrl, text: 'Check out my profile on CediStream' });
+        return;
+      }
+    } catch {}
+    // fallback: copy
+    await handleCopyProfile();
+  };
+
+  const handleCopyProfile = async () => {
+    try {
+      if (!creatorPublicUrl) return;
+      await navigator.clipboard.writeText(creatorPublicUrl);
+      // quick UI feedback
+      const el = document.getElementById('share-link-feedback');
+      if (el) {
+        el.textContent = 'Link copied!';
+        setTimeout(() => { el.textContent = ''; }, 1600);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const handleRemoveImage = async () => {
     try {
       const res = await fetch('/api/auth/profile/image', {
@@ -341,6 +376,24 @@ export default function CreatorDashboard() {
               })()}
             </h1>
             <p className="text-gray-400">Here's what's happening with your content</p>
+
+            {/* Shareable Profile Link */}
+            {creatorPublicUrl && (
+              <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex-1 bg-slate-900/60 border border-purple-900/30 rounded-lg px-3 py-2 text-sm text-gray-300 overflow-hidden">
+                  <span className="truncate block">{creatorPublicUrl}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleShareProfile} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 shadow">
+                    <Share2 className="w-4 h-4" /> Share
+                  </button>
+                  <button onClick={handleCopyProfile} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 text-white border border-slate-700 hover:bg-slate-700">
+                    <Copy className="w-4 h-4" /> Copy
+                  </button>
+                </div>
+                <div id="share-link-feedback" className="text-xs text-green-300 min-w-[80px]"></div>
+              </div>
+            )}
           </motion.div>
         </div>
 

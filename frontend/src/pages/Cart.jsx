@@ -6,13 +6,14 @@ import { Card } from "@/components/ui/card";
 import { Trash2, ShoppingBag, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Cart() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [cart, setCart] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  // UI-only map that keeps inputs empty initially even if a minimum exists
+  const [amountInputs, setAmountInputs] = useState({});
 
   useEffect(() => {
     loadCart();
@@ -22,7 +23,12 @@ export default function Cart() {
     try {
       const userData = await User.me();
       setUser(userData);
-      setCart(userData.cart || []);
+      const items = userData.cart || [];
+      setCart(items);
+      // initialize inputs to empty so users see a blank field but min is enforced
+      const init = {};
+      for (const it of items) init[it.item_id] = '';
+      setAmountInputs(init);
     } catch (error) {
       navigate(createPageUrl("Home"));
     }
@@ -105,14 +111,32 @@ export default function Cart() {
                   <input
                     type="number"
                     min={Number(item.min_price||item.price)||0}
-                    value={Number(item.price||0)}
+                    placeholder={`Min ${(Number(item.min_price||item.price)||0).toFixed(2)}`}
+                    value={amountInputs[item.item_id] ?? ''}
                     onChange={async (e) => {
-                      const val = Math.max(Number(item.min_price||0), Number(e.target.value||0));
-                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: val } : ci);
+                      const raw = e.target.value;
+                      // allow temporarily empty; clamp any number entered to the minimum
+                      setAmountInputs(prev => ({ ...prev, [item.item_id]: raw }));
+                      if (raw === '' || raw === undefined) return; // don't change stored price yet
+                      const min = Number(item.min_price || item.price) || 0;
+                      const num = Number(raw);
+                      const clamped = isNaN(num) ? min : Math.max(min, num);
+                      // reflect clamped value in the UI if user typed below min
+                      if (!isNaN(num) && num < min) {
+                        setAmountInputs(prev => ({ ...prev, [item.item_id]: String(clamped) }));
+                      }
+                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: clamped } : ci);
                       setCart(nextCart);
                       await User.updateMyUserData({ cart: nextCart });
                     }}
-                    className="w-28 bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-right"
+                    onBlur={async () => {
+                      // ensure cart keeps at least the minimum
+                      const min = Number(item.min_price || item.price) || 0;
+                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: Math.max(min, Number(ci.price||0)) } : ci);
+                      setCart(nextCart);
+                      await User.updateMyUserData({ cart: nextCart });
+                    }}
+                    className="w-32 bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-right placeholder:text-slate-500"
                   />
                 </div>
                 <Button
@@ -131,6 +155,9 @@ export default function Cart() {
 
       <Card className="bg-slate-900/50 border-purple-900/20 p-6">
         <div className="space-y-4">
+          <div className="text-sm text-gray-400">
+            You can increase the amount above the minimum to show extra support. Every cedi goes directly to the creator.
+          </div>
           <div className="flex items-center justify-between text-lg">
             <span className="text-gray-400">Items:</span>
             <span className="text-white">{cart.length}</span>

@@ -187,11 +187,14 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6">
-      <h2 className="text-2xl font-semibold text-white mb-4">Profile Settings</h2>
+    <div className="max-w-5xl mx-auto p-4 sm:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-white">Profile Settings</h2>
+        <p className="text-sm text-gray-400 mt-1 hidden md:block">Update your personal details, security and preferences.</p>
+      </div>
         {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
         {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
-        <div className="bg-slate-900/50 p-4 rounded-lg border border-purple-900/20 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start">
+  <div className="bg-slate-900/50 p-4 sm:p-6 rounded-lg border border-purple-900/20 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start">
           {/* Profile image */}
           <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-slate-800 border border-slate-700 cursor-pointer mx-auto sm:mx-0" onClick={() => {
