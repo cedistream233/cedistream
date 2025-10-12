@@ -8,6 +8,7 @@ import { setPostAuthIntent } from '@/utils';
 import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
 import PayWhatYouWant from '@/components/ui/PayWhatYouWant';
 import { useToast, ToastContainer } from '@/components/ui/Toast';
+import TopSupporters from '@/components/content/TopSupporters';
 
 export default function SongDetails() {
   const { id } = useParams();
@@ -130,6 +131,11 @@ export default function SongDetails() {
 
   return (
     <div className="max-w-2xl mx-auto py-12 px-4">
+      {/* Top Supporters Leaderboard */}
+      <div className="mb-6">
+        <TopSupporters itemType="song" itemId={song.id} />
+      </div>
+
       <Card className="p-5 md:p-6 flex flex-col items-center gap-5 md:gap-6">
         <img src={song.cover_image || 'https://via.placeholder.com/160?text=%F0%9F%8E%B5'} alt={song.title} className="w-40 h-40 rounded-lg object-cover mb-2" />
         <h1 className="text-2xl font-bold text-white mb-0.5">{song.title}</h1>
@@ -209,6 +215,7 @@ export default function SongDetails() {
         )}
         {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}
       </Card>
+
       <PriceEditModal
         isOpen={priceEditModal}
         onClose={() => setPriceEditModal(false)}

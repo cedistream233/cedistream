@@ -302,7 +302,9 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
               {showPwyw ? (
                 <span className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
               ) : (
-                <span className="text-sm text-gray-300">{publishedDate ? `Published ${publishedDate}` : `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}`}</span>
+                // For albums we prefer the full-page AlbumDetails to show the published date at the top,
+                // avoid duplication in the card footer by showing price when available.
+                <span className="text-sm text-gray-300">{type === 'album' ? `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}` : (publishedDate ? `Published ${publishedDate}` : `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}`)}</span>
               )}
               {type === "album" && item.songs?.length > 0 && (
                 <span className="text-xs text-gray-500">

@@ -8,6 +8,7 @@ import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import VideoPlayer from '@/components/media/VideoPlayer';
+import TopSupporters from '@/components/content/TopSupporters';
 
 export default function VideoDetails() {
   const navigate = useNavigate();
@@ -173,6 +174,11 @@ export default function VideoDetails() {
         Back to Videos
       </Button>
 
+      {/* Top Supporters Leaderboard */}
+      <div className="mb-8">
+        <TopSupporters itemType="video" itemId={video.id} />
+      </div>
+
       <div className="grid md:grid-cols-2 gap-8">
         <div>
           {(!isOwner && noPreviewAvailable) ? (
@@ -260,6 +266,7 @@ export default function VideoDetails() {
           </Button>
         </div>
       </div>
+
       <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
     </div>
   );
