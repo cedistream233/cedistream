@@ -220,8 +220,8 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     const limit = Math.max(0, Number(req.query.limit || 10));
     // purchases joined with albums/videos by item_id; includes songs if table exists
     // include buyer name (from users if present) and payment_status
-    const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.created_at as date, p.payment_status,
-           COALESCE(cp.stage_name, CONCAT(u.first_name, ' ', u.last_name), u.email, '—') as buyer_name
+    const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.creator_amount, p.created_at as date, p.payment_status,
+      COALESCE(cp.stage_name, CONCAT(u.first_name, ' ', u.last_name), u.email, '—') as buyer_name
          FROM purchases p
          LEFT JOIN users u ON u.id = p.user_id
          LEFT JOIN creator_profiles cp ON cp.user_id = u.id
@@ -279,10 +279,10 @@ router.get('/sales-export', authenticateToken, requireRole(['creator']), async (
     const qs = new QueryStream(sql, params);
     const stream = client.query(qs);
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="sales-${userId}.csv"`);
-    // header
-    res.write('Date,Type,Item,Amount,Buyer Name,Payment Status\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="sales-${userId}.csv"`);
+  // header (creator_amount only)
+  res.write('Date,Type,Item,Amount,Buyer Name,Payment Status\n');
 
     const esc = v => {
       if (v === null || v === undefined) return '';
@@ -294,7 +294,8 @@ router.get('/sales-export', authenticateToken, requireRole(['creator']), async (
     };
 
     stream.on('data', row => {
-      const line = [row.date, row.item_type, row.item, row.amount, row.buyer_name, row.payment_status]
+      // export creator_amount (net) as Amount for creator-focused CSV
+      const line = [row.date, row.item_type, row.item, row.creator_amount, row.buyer_name, row.payment_status]
         .map(esc).join(',') + '\n';
       const ok = res.write(line);
       if (!ok) {

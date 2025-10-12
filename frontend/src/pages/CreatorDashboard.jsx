@@ -26,6 +26,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { useNavigate } from 'react-router-dom';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Song } from '@/entities/Song';
 
 export default function CreatorDashboard() {
@@ -167,7 +175,8 @@ export default function CreatorDashboard() {
             id: r.id,
             item: r.item,
             type: r.item_type,
-            amount: parseFloat(r.amount || 0),
+            amount: parseFloat(r.amount || 0), // gross
+            creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
             date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
             buyer: r.buyer_name || '—'
           })) : []);
@@ -415,12 +424,7 @@ export default function CreatorDashboard() {
                 <div id="share-link-feedback" className="text-xs text-green-300 min-w-[80px]"></div>
               </div>
             )}
-            {/* Withdraw button */}
-            <div className="mt-4">
-              <button onClick={() => setWithdrawOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow">
-                <DollarSign className="w-4 h-4" /> Withdraw Funds
-              </button>
-            </div>
+            {/* Withdraw button removed from header — moved to Earnings card for creators */}
           </motion.div>
         </div>
 
@@ -501,7 +505,9 @@ export default function CreatorDashboard() {
                               <p className="text-gray-400 text-sm">{sale.buyer} • {sale.date}</p>
                             </div>
                           </div>
-                          <div className="text-green-400 font-bold mt-2 sm:mt-0">+GH₵ {sale.amount.toFixed(2)}</div>
+                          <div className="mt-2 sm:mt-0 text-right">
+                            <div className="text-green-400 font-bold">GH₵ {(sale.creatorAmount !== null ? sale.creatorAmount : (sale.amount * 0.8)).toFixed(2)}</div>
+                          </div>
                         </div>
                       ))}
                         <div className="flex items-center justify-between mt-4">
@@ -591,8 +597,8 @@ export default function CreatorDashboard() {
                   <div className="text-center">
                     <p className="text-gray-400 text-sm">Available Balance</p>
                     <p className="text-3xl font-bold text-green-400 mt-2">GH₵ {stats.totalEarnings.toFixed(2)}</p>
-                    <Button className="mt-4 bg-green-600 hover:bg-green-700 w-full">
-                      Request Payout
+                    <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700 w-full" onClick={() => setWithdrawOpen(true)}>
+                      Withdraw Funds
                     </Button>
                   </div>
                 </CardContent>
@@ -623,41 +629,70 @@ export default function CreatorDashboard() {
         cancelText="Cancel"
       />
         {/* Withdraw modal mount */}
-        <WithdrawModal
-          open={withdrawOpen}
-          onClose={() => { setWithdrawOpen(false); setWithdrawAmount(''); setMomo(''); setMomo2(''); }}
-          summary={withdrawSummary}
-          submitting={withdrawing}
-          amount={withdrawAmount}
-          setAmount={setWithdrawAmount}
-          momo={momo}
-          setMomo={setMomo}
-          momo2={momo2}
-          setMomo2={setMomo2}
-          onSubmit={async () => {
-            try {
-              setWithdrawing(true);
-              const tokenLocal = token || localStorage.getItem('token');
-              const res = await fetch('/api/withdrawals', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' },
-                body: JSON.stringify({ amount: Number(withdrawAmount), momoNumber: momo, momoConfirm: momo2 })
-              });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || 'Failed to submit withdrawal');
-              // Refresh summary
-              const sumRes = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
-              if (sumRes.ok) setWithdrawSummary(await sumRes.json());
-              setWithdrawOpen(false);
-              setWithdrawAmount(''); setMomo(''); setMomo2('');
-              alert('Withdrawal request submitted. You will receive funds within 24 hours.');
-            } catch (e) {
-              alert(e.message || 'Withdrawal failed');
-            } finally {
-              setWithdrawing(false);
-            }
-          }}
-        />
+        <Dialog open={withdrawOpen} onOpenChange={() => { setWithdrawOpen(false); setWithdrawAmount(''); setMomo(''); setMomo2(''); }}>
+          <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-md">
+            <DialogHeader className="text-center">
+              <DialogTitle className="text-xl font-semibold">Withdraw Funds</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3 mt-2">
+              <div>
+                <label className="text-sm text-gray-300">Amount ({withdrawSummary?.currency || 'GHS'})</label>
+                <input type="number" min={Number(withdrawSummary?.minWithdrawal || 10)} value={withdrawAmount} onChange={e=>setWithdrawAmount(e.target.value)} placeholder={`Minimum ${withdrawSummary?.currency || 'GHS'} ${Number(withdrawSummary?.minWithdrawal || 10).toFixed(2)}`} className="w-full border rounded px-3 py-2 bg-slate-800 text-white" />
+                {withdrawAmount !== '' && Number(withdrawAmount) < Number(withdrawSummary?.minWithdrawal || 10) && (
+                  <p className="text-xs text-red-400 mt-1">Amount must be at least {withdrawSummary?.currency || 'GHS'} {Number(withdrawSummary?.minWithdrawal || 10).toFixed(2)}</p>
+                )}
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Mobile Money Number</label>
+                <input type="tel" value={momo} onChange={e=>setMomo(String(e.target.value).replace(/\D/g,'').slice(0,10))} placeholder="e.g. 0241234567" maxLength={10} className="w-full border rounded px-3 py-2 bg-slate-800 text-white" />
+                <p className="text-xs text-gray-500 mt-1">Must be a 10-digit Ghana number starting with 020, 024, 054, etc.</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Confirm Mobile Money Number</label>
+                <input type="tel" value={momo2} onChange={e=>setMomo2(String(e.target.value).replace(/\D/g,'').slice(0,10))} placeholder="Re-enter number" maxLength={10} className="w-full border rounded px-3 py-2 bg-slate-800 text-white" />
+                {momo2 !== '' && momo !== momo2 && (
+                  <p className="text-xs text-red-400 mt-1">Mobile money numbers do not match.</p>
+                )}
+              </div>
+
+              <div className="bg-slate-800 rounded p-3 text-sm text-gray-300">
+                <div className="flex justify-between"><span>Estimated transfer fee</span><span>{withdrawSummary?.currency || 'GHS'} {Number(withdrawSummary?.transferFee || 1).toFixed(2)}</span></div>
+                <div className="flex justify-between mt-1"><span>Estimated amount to be received</span><span>{withdrawSummary?.currency || 'GHS'} {Math.max(0, +(Math.max(Number(withdrawSummary?.minWithdrawal || 10), Number(withdrawAmount || 0)) - Number(withdrawSummary?.transferFee || 1)).toFixed(2))}</span></div>
+                <p className="text-xs text-gray-500 mt-2">Withdrawals can take up to 24 hours to process after you request them.</p>
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0 mt-4">
+              <Button variant="secondary" onClick={() => { setWithdrawOpen(false); setWithdrawAmount(''); setMomo(''); setMomo2(''); }} className="border-slate-600 hover:bg-slate-800">Cancel</Button>
+              <Button onClick={async () => {
+                try {
+                  setWithdrawing(true);
+                  const tokenLocal = token || localStorage.getItem('token');
+                  const res = await fetch('/api/withdrawals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' },
+                    body: JSON.stringify({ amount: Number(withdrawAmount), momoNumber: momo, momoConfirm: momo2 })
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || 'Failed to submit withdrawal');
+                  // Refresh summary
+                  const sumRes = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+                  if (sumRes.ok) setWithdrawSummary(await sumRes.json());
+                  setWithdrawOpen(false);
+                  setWithdrawAmount(''); setMomo(''); setMomo2('');
+                  alert('Withdrawal request submitted. You will receive funds within 24 hours.');
+                } catch (e) {
+                  alert(e.message || 'Withdrawal failed');
+                } finally {
+                  setWithdrawing(false);
+                }
+              }} className={`bg-emerald-600 hover:bg-emerald-700 text-white ${withdrawing ? 'opacity-60 cursor-not-allowed' : ''}`} disabled={withdrawing || Number(withdrawAmount || 0) < Number(withdrawSummary?.minWithdrawal || 10) || !momo || momo !== momo2 || String(momo).replace(/\D/g,'').length !== 10}>
+                {withdrawing ? 'Submitting...' : 'Request Withdraw'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }
@@ -683,12 +718,15 @@ function WithdrawModal({ open, onClose, summary, submitting, onSubmit, amount, s
           </div>
           <div>
             <label className="text-sm text-gray-700">Mobile Money Number</label>
-            <input type="tel" value={momo} onChange={e=>setMomo(e.target.value)} placeholder="e.g. 0241234567" className="w-full border rounded px-3 py-2" />
+            <input type="tel" value={momo} onChange={e=>setMomo(String(e.target.value).replace(/\D/g,'').slice(0,10))} placeholder="e.g. 0241234567" maxLength={10} className="w-full border rounded px-3 py-2" />
             <p className="text-xs text-gray-500 mt-1">Must be a 10-digit Ghana number starting with 020, 024, 054, etc.</p>
           </div>
           <div>
             <label className="text-sm text-gray-700">Confirm Mobile Money Number</label>
-            <input type="tel" value={momo2} onChange={e=>setMomo2(e.target.value)} placeholder="Re-enter number" className="w-full border rounded px-3 py-2" />
+            <input type="tel" value={momo2} onChange={e=>setMomo2(String(e.target.value).replace(/\D/g,'').slice(0,10))} placeholder="Re-enter number" maxLength={10} className="w-full border rounded px-3 py-2" />
+            {momo2 !== '' && momo !== momo2 && (
+              <p className="text-xs text-red-400 mt-1">Mobile money numbers do not match.</p>
+            )}
           </div>
           <div className="bg-slate-100 rounded p-3 text-sm">
             <div className="flex justify-between"><span>Estimated transfer fee</span><span>{summary?.currency || 'GHS'} {fee.toFixed(2)}</span></div>
