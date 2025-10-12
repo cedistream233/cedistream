@@ -8,6 +8,7 @@ import { Trash2, ShoppingBag, CreditCard } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -18,6 +19,9 @@ export default function Cart() {
   // UI-only map that keeps inputs empty initially even if a minimum exists
   const [amountInputs, setAmountInputs] = useState({});
   const [checkoutErrors, setCheckoutErrors] = useState([]);
+  // confirm modal state for removals
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState(null); // { id, type, title }
   // derived invalid items (amount < min)
   const invalidItems = cart.map(item => {
     const raw = (amountInputs[item.item_id] ?? '').toString().trim();
@@ -46,8 +50,9 @@ export default function Cart() {
     }
   };
 
-  const removeFromCart = async (itemId) => {
-    const updatedCart = cart.filter(item => item.item_id !== itemId);
+  const removeFromCart = async (itemId, itemType) => {
+    // Guard: remove by both id and type to avoid accidental multi-removal when IDs overlap
+    const updatedCart = cart.filter(item => !(item.item_id === itemId && item.item_type === itemType));
     // update demo_user mirror and AuthProvider via updateMyUserData so header re-renders immediately
     await updateMyUserData({ cart: updatedCart });
     setCart(updatedCart);
@@ -180,7 +185,7 @@ export default function Cart() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => removeFromCart(item.item_id)}
+                  onClick={() => { setPendingRemoval({ id: item.item_id, type: item.item_type, title: item.title }); setConfirmOpen(true); }}
                   className="text-red-400 hover:text-red-300 w-full sm:w-auto"
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
@@ -222,6 +227,22 @@ export default function Cart() {
           </Button>
         </div>
       </Card>
+      {/* Confirm removal modal */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={async () => {
+          if (pendingRemoval) {
+            await removeFromCart(pendingRemoval.id, pendingRemoval.type);
+          }
+          setConfirmOpen(false);
+          setPendingRemoval(null);
+        }}
+        title="Remove item from cart?"
+        description={pendingRemoval ? `Are you sure you want to remove "${pendingRemoval.title}" from your cart?` : ''}
+        confirmText="Remove"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

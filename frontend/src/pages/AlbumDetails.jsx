@@ -169,8 +169,9 @@ export default function AlbumDetails() {
   };
 
   const handleAddToCart = async () => {
-    if (!user) {
-      const min = Number(album.price || 0);
+    const token = localStorage.getItem('token');
+    const min = Number(album.price || 0);
+    if (!token) {
       setPostAuthIntent({
         action: 'add-to-cart',
         item: {
@@ -186,8 +187,19 @@ export default function AlbumDetails() {
       window.location.href = '/signup';
       return;
     }
-    const minPrice = Number(album.price || 0);
-    setAmountModal({ visible: true, min: minPrice });
+
+    // Add to local storage cart (mirrors Song behavior) and redirect to cart
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+      const cart = Array.isArray(u.cart) ? u.cart : [];
+      const exists = cart.some(i => i.item_id === album.id && i.item_type === 'album');
+      if (!exists) {
+        const next = { ...u, cart: [...cart, { item_type: 'album', item_id: album.id, title: album.title, price: min, min_price: min, image: album.cover_image }] };
+        try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
+        try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+      }
+    } catch {}
+    window.location.href = '/cart';
   };
 
   const onModalCancel = () => setAmountModal({ visible: false, min: 0 });

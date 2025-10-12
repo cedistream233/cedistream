@@ -76,8 +76,9 @@ export default function VideoDetails() {
   }, [video?.id]);
 
   const handleAddToCart = async () => {
-    if (!user) {
-      const min = Number(video.price || 0);
+    const token = localStorage.getItem('token');
+    const min = Number(video.price || 0);
+    if (!token) {
       setPostAuthIntent({
         action: 'add-to-cart',
         item: {
@@ -93,8 +94,19 @@ export default function VideoDetails() {
       window.location.href = '/signup';
       return;
     }
-    const minPrice = Number(video.price || 0);
-    setAmountModal({ visible: true, min: minPrice });
+
+    // Add to local storage cart and redirect (mirrors Song behavior)
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+      const cart = Array.isArray(u.cart) ? u.cart : [];
+      const exists = cart.some(i => i.item_id === video.id && i.item_type === 'video');
+      if (!exists) {
+        const next = { ...u, cart: [...cart, { item_type: 'video', item_id: video.id, title: video.title, price: min, min_price: min, image: video.thumbnail }] };
+        try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
+        try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+      }
+    } catch {}
+    window.location.href = '/cart';
   };
 
   const onModalCancel = () => setAmountModal({ visible: false, min: 0 });
