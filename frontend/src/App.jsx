@@ -12,6 +12,7 @@ import AlbumDetails from './pages/AlbumDetails.jsx';
 import VideoDetails from './pages/VideoDetails.jsx';
 import Cart from './pages/Cart.jsx';
 import Checkout from './pages/Checkout.jsx';
+import PurchaseSuccess from './pages/PurchaseSuccess.jsx';
 import Library from './pages/Library.jsx';
 import Admin from './pages/Admin.jsx';
 import Login from './pages/auth/Login.jsx';
@@ -49,6 +50,7 @@ export default function App() {
   <Route path="/creators/:id" element={withLayout(Creator, 'Creator')} />
         <Route path="/cart" element={<ProtectedRoute>{withLayout(Cart, 'Cart')}</ProtectedRoute>} />
         <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
+  <Route path="/purchase/success" element={<ProtectedRoute>{withLayout(PurchaseSuccess, 'Purchase Success')}</ProtectedRoute>} />
         <Route path="/library" element={<ProtectedRoute>{withLayout(Library, 'Library')}</ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute>{withLayout(Admin, 'Admin')}</ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute>{withLayout(CreatorDashboard, 'Dashboard')}</ProtectedRoute>} />

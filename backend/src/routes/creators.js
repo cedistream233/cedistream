@@ -196,6 +196,47 @@ router.get('/:id/analytics', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/creators/:id/payouts?from=2025-01-01&to=2025-01-31
+router.get('/:id/payouts', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { from, to } = req.query;
+    const whereClauses = [`p.payment_status = 'completed'`];
+    const params = [id];
+    let idx = 2;
+
+    // restrict to items belonging to creator
+    whereClauses.push(`(
+      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+      (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+      (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+    )`);
+
+    if (from) {
+      whereClauses.push(`p.created_at >= $${idx}`); params.push(from); idx++;
+    }
+    if (to) {
+      whereClauses.push(`p.created_at <= $${idx}`); params.push(to); idx++;
+    }
+
+    const where = `WHERE ${whereClauses.join(' AND ')}`;
+
+    const totalsQ = `SELECT COALESCE(SUM(p.creator_amount),0)::numeric::float8 as total_creator_amount, COALESCE(SUM(p.amount),0)::numeric::float8 as total_gross_amount, COUNT(1)::int as total_sales
+      FROM purchases p
+      ${where}`;
+
+    const byItemQ = `SELECT p.item_type, p.item_id, p.item_title, COUNT(1)::int as sales, COALESCE(SUM(p.creator_amount),0)::numeric::float8 as creator_amount_total, COALESCE(SUM(p.amount),0)::numeric::float8 as gross_total
+      FROM purchases p
+      ${where}
+      GROUP BY p.item_type, p.item_id, p.item_title
+      ORDER BY creator_amount_total DESC
+      LIMIT 200`;
+
+    const [totRes, itemsRes] = await Promise.all([query(totalsQ, params), query(byItemQ, params)]);
+    res.json({ totals: totRes.rows[0] || { total_creator_amount: 0, total_gross_amount: 0, total_sales: 0 }, items: itemsRes.rows });
+  } catch (err) { next(err); }
+});
+
 export default router;
 
 // Helpers: pagination parsing
