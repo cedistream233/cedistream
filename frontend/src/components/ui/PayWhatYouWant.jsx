@@ -15,9 +15,9 @@ export default function PayWhatYouWant({ minPrice = 1, onAdd, className = '' }) 
         <div className="w-full sm:w-auto">
           <button
             onClick={onAdd}
-            className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 px-4 rounded-lg font-medium"
+            className="w-full md:w-auto px-5 md:px-7 py-3 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-medium flex items-center justify-center"
           >
-            Add to Cart
+            <span>Add to Cart</span>
           </button>
         </div>
       </div>
