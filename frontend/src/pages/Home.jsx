@@ -57,7 +57,6 @@ export default function Home() {
                   className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-              <p className="text-gray-400 mt-3 text-sm">Start typing to find creators. Click a creator to view all their content.</p>
             </div>
         </div>
       </section>
