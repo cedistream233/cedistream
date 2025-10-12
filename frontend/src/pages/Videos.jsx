@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, setPostAuthIntent } from "@/utils";
 
 export default function Videos() {
   const navigate = useNavigate();
@@ -61,7 +61,20 @@ export default function Videos() {
 
   const handleAddToCart = async (video) => {
     if (!user) {
-      await User.login();
+      const min = Number(video.price || 0);
+      setPostAuthIntent({
+        action: 'add-to-cart',
+        item: {
+          item_type: 'video',
+          item_id: video.id,
+          title: video.title,
+          price: min,
+          min_price: min,
+          image: video.thumbnail
+        },
+        redirect: '/cart'
+      });
+      window.location.href = '/signup';
       return;
     }
     const minPrice = Number(video.price || 0);

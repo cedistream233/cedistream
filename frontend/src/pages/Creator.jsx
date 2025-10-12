@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ContentCard from '@/components/content/ContentCard';
 import ContentRow from '@/components/content/ContentRow';
+import { setPostAuthIntent } from '@/utils';
 import { Song } from '@/entities/Song';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
@@ -78,46 +79,31 @@ export default function Creator() {
                     }}
                     type="song"
                     onAddToCart={() => {
-                    // Add to cart at minimum price and redirect to cart (no prompt)
-                    (async () => {
-                      try {
-                        const { User } = await import('@/entities/User');
-                        let u = JSON.parse(localStorage.getItem('demo_user') || 'null');
-                        if (!u) {
-                          await User.login();
-                          u = await User.me();
+                      (async () => {
+                        const token = localStorage.getItem('token');
+                        const min = Number(song.price || 0);
+                        if (!token) {
+                          setPostAuthIntent({
+                            action: 'add-to-cart',
+                            item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
+                            redirect: '/cart'
+                          });
+                          window.location.href = '/signup';
+                          return;
                         }
-                        const minPrice = Number(song.price || 0);
-                        const cartItem = {
-                          item_type: 'song',
-                          item_id: song.id,
-                          title: song.title,
-                          price: minPrice,
-                          min_price: minPrice,
-                          image: song.cover_image
-                        };
-                        const currentCart = u.cart || [];
-                        const exists = currentCart.some(i => i.item_id === song.id);
-                        if (!exists) {
-                          await User.updateMyUserData({ cart: [...currentCart, cartItem] });
-                        }
-                        // redirect to cart to allow immediate checkout
-                        window.location.href = '/cart';
-                      } catch (e) {
-                        console.error(e);
-                        // best-effort fallback
                         try {
-                          const u2 = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
-                          const minPrice2 = Number(song.price || 0);
-                          const cartItem2 = { item_type: 'song', item_id: song.id, title: song.title, price: minPrice2, min_price: minPrice2, image: song.cover_image };
-                          u2.cart = u2.cart || [];
-                          if (!u2.cart.some(i => i.item_id === song.id)) u2.cart.push(cartItem2);
-                          localStorage.setItem('demo_user', JSON.stringify(u2));
-                          localStorage.setItem('user', JSON.stringify(u2));
+                          const uRaw = localStorage.getItem('user');
+                          const u = uRaw ? JSON.parse(uRaw) : {};
+                          const cart = Array.isArray(u.cart) ? u.cart : [];
+                          const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
+                          if (!exists) {
+                            const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
+                            localStorage.setItem('user', JSON.stringify(next));
+                            try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+                          }
                         } catch {}
                         window.location.href = '/cart';
-                      }
-                    })();
+                      })();
                     }}
                     onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
                   />

@@ -4,6 +4,7 @@ import { Song } from '@/entities/Song';
 import { Card } from '@/components/ui/card';
 import AudioPlayer from '@/components/media/AudioPlayer';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
+import { setPostAuthIntent } from '@/utils';
 import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
 import { useToast, ToastContainer } from '@/components/ui/Toast';
 
@@ -176,16 +177,29 @@ export default function SongDetails() {
         {!isOwner && (
           <div className="w-full flex gap-3 mt-4">
             <button onClick={async () => {
-              const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
-              if (!u) { const { User } = await import('@/entities/User'); await User.login(); window.location.href = '/cart'; return; }
-              // add to cart simple flow with minimum price and redirect to cart
-              const cartItem = { item_type: 'song', item_id: song.id, title: song.title, price: Number(song.price||0), min_price: Number(song.price||0), image: song.cover_image };
-              const u2 = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
-              u2.cart = u2.cart || [];
-              if (!u2.cart.some(i => i.item_id === song.id)) {
-                u2.cart.push(cartItem);
-                localStorage.setItem('demo_user', JSON.stringify(u2));
+              const token = localStorage.getItem('token');
+              const min = Number(song.price || 0);
+              if (!token) {
+                setPostAuthIntent({
+                  action: 'add-to-cart',
+                  item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
+                  redirect: '/cart'
+                });
+                window.location.href = '/signup';
+                return;
               }
+              // If authenticated, we can rely on cart pages/other flows; just go to cart page
+              try {
+                const u = JSON.parse(localStorage.getItem('user') || 'null') || {};
+                const cart = Array.isArray(u.cart) ? u.cart : [];
+                const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
+                if (!exists) {
+                  const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
+                  localStorage.setItem('user', JSON.stringify(next));
+                  // keep demo mirror in sync for other components
+                  try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+                }
+              } catch {}
               window.location.href = '/cart';
             }} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg">Add to Cart</button>
           </div>

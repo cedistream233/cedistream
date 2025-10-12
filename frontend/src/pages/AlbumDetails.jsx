@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ShoppingCart, Music, Clock, Calendar } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
@@ -158,7 +158,20 @@ export default function AlbumDetails() {
 
   const handleAddToCart = async () => {
     if (!user) {
-      await User.login();
+      const min = Number(album.price || 0);
+      setPostAuthIntent({
+        action: 'add-to-cart',
+        item: {
+          item_type: 'album',
+          item_id: album.id,
+          title: album.title,
+          price: min,
+          min_price: min,
+          image: album.cover_image
+        },
+        redirect: '/cart'
+      });
+      window.location.href = '/signup';
       return;
     }
     const minPrice = Number(album.price || 0);

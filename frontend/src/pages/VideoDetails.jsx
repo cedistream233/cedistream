@@ -4,7 +4,7 @@ import { User } from "@/entities/User";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ShoppingCart, Play, Clock, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import VideoPlayer from '@/components/media/VideoPlayer';
@@ -67,7 +67,20 @@ export default function VideoDetails() {
 
   const handleAddToCart = async () => {
     if (!user) {
-      await User.login();
+      const min = Number(video.price || 0);
+      setPostAuthIntent({
+        action: 'add-to-cart',
+        item: {
+          item_type: 'video',
+          item_id: video.id,
+          title: video.title,
+          price: min,
+          min_price: min,
+          image: video.thumbnail
+        },
+        redirect: '/cart'
+      });
+      window.location.href = '/signup';
       return;
     }
     const minPrice = Number(video.price || 0);

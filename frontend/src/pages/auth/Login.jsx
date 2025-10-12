@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Music2, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { consumePostAuthIntent, addItemToLocalCarts } from '@/utils';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -57,6 +58,23 @@ export default function Login() {
           }
         } catch {}
 
+        // Honor any pending post-auth intent (e.g., add-to-cart)
+        try {
+          const intent = consumePostAuthIntent();
+          if (intent && intent.action === 'add-to-cart' && intent.item) {
+            addItemToLocalCarts(intent.item);
+            const u = JSON.parse(localStorage.getItem('user') || 'null') || {};
+            const cart = Array.isArray(u.cart) ? u.cart : [];
+            const exists = cart.some(ci => ci.item_id === intent.item.item_id && ci.item_type === intent.item.item_type);
+            if (!exists) {
+              u.cart = [...cart, intent.item];
+              localStorage.setItem('user', JSON.stringify(u));
+            }
+            navigate(intent.redirect || '/cart', { replace: true });
+            return;
+          }
+        } catch {}
+
         // Redirect based on role
         navigate(data.user.role === 'creator' ? '/dashboard' : '/');
       } else {
@@ -70,7 +88,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex flex-col items-center justify-center p-4">
+      {/* Simple clickable logo header for auth pages */}
+      <div className="w-full max-w-md mb-4">
+        <Link to="/" className="inline-flex items-center gap-2">
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-2 rounded-lg">
+            <Music2 className="w-6 h-6 text-white" />
+          </div>
+          <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">CediStream</span>
+        </Link>
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

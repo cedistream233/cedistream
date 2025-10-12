@@ -6,10 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Music2, User, Eye, EyeOff } from 'lucide-react';
+import { consumePostAuthIntent, addItemToLocalCarts } from '@/utils';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -130,16 +133,36 @@ export default function Signup() {
       const data = await response.json();
 
       if (response.ok) {
-  // Store token and user data
+        // Store token and user data
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Redirect based on role
-        if (data.user.role === 'creator') {
-          navigate('/dashboard');
-        } else {
-          navigate('/');
-        }
+        // Update auth context immediately so protected routes allow access
+        try { login?.(data.user, data.token); } catch {}
+
+        // If there is a pending post-auth intent (e.g., add-to-cart), perform it then redirect accordingly
+        try {
+          const intent = consumePostAuthIntent();
+          if (intent && intent.action === 'add-to-cart' && intent.item) {
+            addItemToLocalCarts(intent.item);
+            // ensure user in localStorage reflects added cart for UI
+            try {
+              const u = JSON.parse(localStorage.getItem('user') || 'null') || {};
+              const cart = Array.isArray(u.cart) ? u.cart : [];
+              const exists = cart.some(ci => ci.item_id === intent.item.item_id && ci.item_type === intent.item.item_type);
+              if (!exists) {
+                u.cart = [...cart, intent.item];
+                localStorage.setItem('user', JSON.stringify(u));
+              }
+            } catch {}
+            // go to intended destination (default to /cart)
+            const next = intent.redirect || '/cart';
+            navigate(next, { replace: true });
+            return;
+          }
+        } catch {}
+
+        // Otherwise, redirect based on role
+        navigate(data.user.role === 'creator' ? '/dashboard' : '/');
       } else {
         setError(data.error || 'Registration failed');
       }
@@ -151,7 +174,16 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex flex-col items-center justify-center p-4">
+      {/* Simple clickable logo header for auth pages */}
+      <div className="w-full max-w-md mb-4">
+        <Link to="/" className="inline-flex items-center gap-2">
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-2 rounded-lg">
+            <Music2 className="w-6 h-6 text-white" />
+          </div>
+          <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">CediStream</span>
+        </Link>
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

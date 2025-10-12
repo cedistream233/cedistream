@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Music2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
+import { setPostAuthIntent } from '@/utils';
 
 export default function ContentCard({ item, type, onAddToCart, onViewDetails }) {
   // prefer cover_image, fallback to thumbnail
@@ -219,7 +220,36 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
                   View Details
                 </Button>
                 <Button
-                  onClick={(e)=>{ e.stopPropagation(); (onAddToCart||(()=>{}))(); }}
+                  onClick={(e)=>{
+                    e.stopPropagation();
+                    // If parent provided a handler (may open amount modal, etc), delegate
+                    if (onAddToCart) return onAddToCart();
+
+                    // If not authenticated, store intent and route to signup
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                      try {
+                        const min = Number(price || 0);
+                        setPostAuthIntent({
+                          action: 'add-to-cart',
+                          item: {
+                            item_type: type,
+                            item_id: item.id,
+                            title: title,
+                            price: min,
+                            min_price: min,
+                            image: item.cover_image || item.thumbnail || null,
+                          },
+                          redirect: '/cart'
+                        });
+                      } catch {}
+                      window.location.href = '/signup';
+                      return;
+                    }
+
+                    // Authenticated: call handler if provided
+                    (onAddToCart||(()=>{}))();
+                  }}
                   className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 >
                   Buy

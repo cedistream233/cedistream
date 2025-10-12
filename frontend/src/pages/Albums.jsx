@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import ContentCard from "../components/content/ContentCard";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import { useLocation, useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { Song } from "@/entities/Song";
 
 export default function Albums() {
@@ -71,7 +71,20 @@ export default function Albums() {
 
   const handleAddToCart = async (album, asSong = false) => {
     if (!user) {
-      await User.login();
+      const min = Number(album.price || 0);
+      setPostAuthIntent({
+        action: 'add-to-cart',
+        item: {
+          item_type: asSong ? 'song' : 'album',
+          item_id: album.id,
+          title: album.title,
+          price: min,
+          min_price: min,
+          image: album.cover_image
+        },
+        redirect: '/cart'
+      });
+      window.location.href = '/signup';
       return;
     }
     const minPrice = Number(album.price || 0);

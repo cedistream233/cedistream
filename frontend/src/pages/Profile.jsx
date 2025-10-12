@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import ConfirmModal from '@/components/ui/ConfirmModal.jsx';
 
 export default function ProfilePage() {
   const { open: openViewer } = useImageViewer();
@@ -113,6 +114,12 @@ export default function ProfilePage() {
     }
   };
 
+  // Confirmation modals
+  const [confirmRemoveImage, setConfirmRemoveImage] = useState(false);
+  const [confirmSaveProfile, setConfirmSaveProfile] = useState(false);
+  const [confirmChangePassword, setConfirmChangePassword] = useState(false);
+  const [confirmChangeEmail, setConfirmChangeEmail] = useState(false);
+
   const onSubmitDetails = async (e) => {
     e.preventDefault();
     setError('');
@@ -162,25 +169,7 @@ export default function ProfilePage() {
       setPwdMsg({ type: 'error', text: 'Password must be at least 6 characters' });
       return;
     }
-    setPwdLoading(true);
-    try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify(pwdForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setPwdMsg({ type: 'success', text: data.message || 'Password changed successfully' });
-        setPwdForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
-      } else {
-        setPwdMsg({ type: 'error', text: data.error || 'Failed to change password' });
-      }
-    } catch {
-      setPwdMsg({ type: 'error', text: 'Network error' });
-    } finally {
-      setPwdLoading(false);
-    }
+    setConfirmChangePassword(true);
   };
 
   const handleChangeEmail = async (e) => {
@@ -194,51 +183,31 @@ export default function ProfilePage() {
       setEmailMsg({ type: 'error', text: 'Enter a valid email address' });
       return;
     }
-    setEmailLoading(true);
-    try {
-      const res = await fetch('/api/auth/change-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify(emailForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setEmailMsg({ type: 'success', text: data.message || 'Email changed successfully' });
-        // refresh profile to reflect new email
-        await refreshProfile();
-        setEmailForm({ currentPassword: '', newEmail: '' });
-      } else {
-        setEmailMsg({ type: 'error', text: data.error || 'Failed to change email' });
-      }
-    } catch {
-      setEmailMsg({ type: 'error', text: 'Network error' });
-    } finally {
-      setEmailLoading(false);
-    }
+    setConfirmChangeEmail(true);
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6">
       <h2 className="text-2xl font-semibold text-white mb-4">Profile Settings</h2>
         {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
         {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
-        <div className="bg-slate-900/50 p-4 rounded-lg border border-purple-900/20 flex gap-6 items-center">
+        <div className="bg-slate-900/50 p-4 rounded-lg border border-purple-900/20 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start">
           {/* Profile image */}
-          <div className="flex flex-col items-center">
-            <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border border-slate-700 cursor-pointer" onClick={() => {
+          <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-slate-800 border border-slate-700 cursor-pointer mx-auto sm:mx-0" onClick={() => {
               if (profile?.profile_image) openViewer(profile.profile_image);
               else fileInputRef.current?.click();
             }}>
               {profile?.profile_image ? (
                 <img src={profile.profile_image} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
+                <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">No image</div>
               )}
             </div>
-            <div className="flex gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
               <Button size="sm" onClick={onPickImage} disabled={saving} className="bg-purple-600 hover:bg-purple-700">{profile?.profile_image ? 'Change' : 'Upload'}</Button>
               {profile?.profile_image && (
-                <Button size="sm" variant="outline" onClick={onRemoveImage} disabled={saving} className="border-slate-600 text-white hover:bg-slate-800">Remove</Button>
+                <Button size="sm" variant="outline" onClick={() => setConfirmRemoveImage(true)} disabled={saving} className="border-slate-600 text-white hover:bg-slate-800">Remove</Button>
               )}
               <input
                 ref={fileInputRef}
@@ -255,8 +224,8 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex-1">
-            <form onSubmit={onSubmitDetails} className="space-y-3">
+          <div className="flex-1 w-full">
+            <form onSubmit={(e)=>{ e.preventDefault(); setConfirmSaveProfile(true); }} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">First Name</label>
@@ -282,9 +251,8 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button type="submit" disabled={saving} className="bg-purple-600 hover:bg-purple-700">{saving ? 'Saving...' : 'Save Changes'}</Button>
+                <Button type="submit" disabled={saving} className="bg-purple-600 hover:bg-purple-700">Save Changes</Button>
               </div>
-              <p className="text-xs text-gray-500">Email and username are not editable here.</p>
             </form>
           </div>
         </div>
@@ -314,7 +282,7 @@ export default function ProfilePage() {
                 )}
               </div>
               <div className="flex justify-end">
-                <Button type="submit" disabled={pwdLoading} className="bg-purple-600 hover:bg-purple-700">{pwdLoading ? 'Updating...' : 'Update Password'}</Button>
+                <Button type="submit" disabled={pwdLoading} className="bg-purple-600 hover:bg-purple-700">Update Password</Button>
               </div>
             </form>
           </div>
@@ -336,7 +304,7 @@ export default function ProfilePage() {
                 <Input type="email" value={emailForm.newEmail} onChange={e=>setEmailForm(f=>({...f, newEmail: e.target.value}))} className="bg-slate-800 border-slate-700 text-white" required />
               </div>
               <div className="flex justify-end">
-                <Button type="submit" disabled={emailLoading} className="bg-purple-600 hover:bg-purple-700">{emailLoading ? 'Updating...' : 'Update Email'}</Button>
+                <Button type="submit" disabled={emailLoading} className="bg-purple-600 hover:bg-purple-700">Update Email</Button>
               </div>
             </form>
           </div>
@@ -363,6 +331,86 @@ export default function ProfilePage() {
           const fileToUpload = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
           await onUploadImage(fileToUpload);
         }}
+      />
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={confirmRemoveImage}
+        onClose={() => setConfirmRemoveImage(false)}
+        onConfirm={async () => { setConfirmRemoveImage(false); await onRemoveImage(); }}
+        title="Remove profile image?"
+        description="This will permanently remove your current profile image."
+        confirmText="Remove"
+      />
+
+      <ConfirmModal
+        isOpen={confirmSaveProfile}
+        onClose={() => setConfirmSaveProfile(false)}
+        onConfirm={async () => { setConfirmSaveProfile(false); await onSubmitDetails(new Event('submit')); }}
+        title="Save changes?"
+        description="Apply your updates to name, bio, phone and country."
+        confirmText="Save"
+      />
+
+      <ConfirmModal
+        isOpen={confirmChangePassword}
+        onClose={() => setConfirmChangePassword(false)}
+        onConfirm={async () => {
+          setConfirmChangePassword(false);
+          setPwdLoading(true);
+          try {
+            const res = await fetch('/api/auth/change-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+              body: JSON.stringify(pwdForm)
+            });
+            const data = await res.json();
+            if (res.ok) {
+              setPwdMsg({ type: 'success', text: data.message || 'Password changed successfully' });
+              setPwdForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+            } else {
+              setPwdMsg({ type: 'error', text: data.error || 'Failed to change password' });
+            }
+          } catch {
+            setPwdMsg({ type: 'error', text: 'Network error' });
+          } finally {
+            setPwdLoading(false);
+          }
+        }}
+        title="Change password?"
+        description="You'll be signed in with your new password next time."
+        confirmText="Change"
+      />
+
+      <ConfirmModal
+        isOpen={confirmChangeEmail}
+        onClose={() => setConfirmChangeEmail(false)}
+        onConfirm={async () => {
+          setConfirmChangeEmail(false);
+          setEmailLoading(true);
+          try {
+            const res = await fetch('/api/auth/change-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+              body: JSON.stringify(emailForm)
+            });
+            const data = await res.json();
+            if (res.ok) {
+              setEmailMsg({ type: 'success', text: data.message || 'Email changed successfully' });
+              await refreshProfile();
+              setEmailForm({ currentPassword: '', newEmail: '' });
+            } else {
+              setEmailMsg({ type: 'error', text: data.error || 'Failed to change email' });
+            }
+          } catch {
+            setEmailMsg({ type: 'error', text: 'Network error' });
+          } finally {
+            setEmailLoading(false);
+          }
+        }}
+        title="Change email?"
+        description="We'll update your account email to the new address."
+        confirmText="Update"
       />
 
     </div>

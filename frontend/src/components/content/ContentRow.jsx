@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Lock } from 'lucide-react';
+import { setPostAuthIntent } from '@/utils';
 
 export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails }) {
   const image = item.cover_image || item.thumbnail || null;
@@ -109,12 +110,24 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
               // if onAddToCart callback is provided, call it (page-level handlers may implement custom flows)
               if (onAddToCart) return onAddToCart();
 
-              // ensure demo user exists, otherwise trigger minimal login flow
-              let demo = JSON.parse(localStorage.getItem('demo_user') || 'null');
-              if (!demo) {
-                const { User } = await import('@/entities/User');
-                await User.login();
-                demo = JSON.parse(localStorage.getItem('demo_user') || 'null');
+              // If not authenticated, store intent and go to signup
+              const token = localStorage.getItem('token');
+              if (!token) {
+                const min = Number(price || 0);
+                setPostAuthIntent({
+                  action: 'add-to-cart',
+                  item: {
+                    item_type: type,
+                    item_id: item.id,
+                    title: title,
+                    price: min,
+                    min_price: min,
+                    image: item.cover_image || item.thumbnail || null,
+                  },
+                  redirect: '/cart'
+                });
+                window.location.href = '/signup';
+                return;
               }
 
               // construct cart item in the same shape other pages use
@@ -127,14 +140,16 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
                 image: item.cover_image || item.thumbnail || null,
               };
 
-              const currentCart = (demo?.cart) || [];
+              // use current cart from localStorage user if available
+              const u = JSON.parse(localStorage.getItem('user') || 'null') || JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+              const currentCart = (u?.cart) || [];
               const exists = currentCart.some(i => i.item_id === item.id && i.item_type === type);
               if (!exists) {
                 const updated = await (updateMyUserData ? updateMyUserData({ cart: [...currentCart, cartItem] }) : (async () => {
-                  demo.cart = [...currentCart, cartItem];
-                  localStorage.setItem('demo_user', JSON.stringify(demo));
-                  localStorage.setItem('user', JSON.stringify(demo));
-                  return demo;
+                  const next = { ...(u||{}), cart: [...currentCart, cartItem] };
+                  localStorage.setItem('demo_user', JSON.stringify(next));
+                  localStorage.setItem('user', JSON.stringify(next));
+                  return next;
                 })());
               }
 
