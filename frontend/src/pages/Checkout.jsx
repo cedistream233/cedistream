@@ -12,7 +12,8 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [purchases, setPurchases] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  // Paystack collects payment method; we don't need to show a choice here
+  const [paymentMethod, setPaymentMethod] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [amountInputs, setAmountInputs] = useState({});
   const [minMap, setMinMap] = useState({}); // key: `${type}:${id}` -> min price
@@ -35,14 +36,31 @@ export default function Checkout() {
         user_email: userData.email,
         payment_status: "pending"
       });
-      setPurchases(userPurchases);
-      // init empty amount inputs (display only) with placeholders showing item minimums
-      const init = {};
-      userPurchases.forEach(p => { init[p.id] = ''; });
-      setAmountInputs(init);
-
-      if (userPurchases.length === 0) {
-        navigate(createPageUrl("Cart"));
+      if (Array.isArray(userPurchases) && userPurchases.length > 0) {
+        setPurchases(userPurchases);
+        // init empty amount inputs (display only) with placeholders showing item minimums
+        const init = {};
+        userPurchases.forEach(p => { init[p.id] = ''; });
+        setAmountInputs(init);
+      } else {
+        // Fallback: build checkout view from local cart (no pending purchases yet)
+        if (!localCart.length) {
+          // truly nothing to pay for
+          navigate(createPageUrl("Cart"));
+          return;
+        }
+        const fallback = localCart.map(ci => ({
+          id: `${ci.item_type}:${ci.item_id}`,
+          item_type: ci.item_type,
+          item_id: ci.item_id,
+          item_title: ci.item_title || ci.title || 'Untitled',
+          amount: Number(ci.min_price ?? ci.price ?? 0) || 0,
+          payment_status: 'pending'
+        }));
+        setPurchases(fallback);
+        const init2 = {};
+        fallback.forEach(p => { init2[p.id] = ''; });
+        setAmountInputs(init2);
       }
     } catch (error) {
       navigate(createPageUrl("Home"));
@@ -87,6 +105,7 @@ export default function Checkout() {
         items: purchases.map(p => ({ item_type: p.item_type, item_id: p.item_id, item_title: p.item_title, amount: Number(p.amount) })),
         currency: 'GHS',
         metadata,
+        callback_base_url: window.location.origin,
       };
       const init = await Purchase.initializePayment(payload);
       const authUrl = init?.data?.authorization_url;
@@ -193,52 +212,6 @@ export default function Checkout() {
         </div>
 
         <div>
-          <h2 className="text-2xl font-bold text-white mb-6">Payment Method</h2>
-          
-          <div className="space-y-4 mb-6">
-            <Card
-              onClick={() => setPaymentMethod("card")}
-              className={`p-6 cursor-pointer transition-all ${
-                paymentMethod === "card"
-                  ? "bg-purple-900/30 border-purple-500"
-                  : "bg-slate-900/50 border-purple-900/20 hover:border-purple-700"
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  paymentMethod === "card" ? "bg-purple-600" : "bg-slate-800"
-                }`}>
-                  <CreditCard className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-white font-semibold">Card Payment</h3>
-                  <p className="text-sm text-gray-400">Pay with debit/credit card</p>
-                </div>
-              </div>
-            </Card>
-
-            <Card
-              onClick={() => setPaymentMethod("mobile_money")}
-              className={`p-6 cursor-pointer transition-all ${
-                paymentMethod === "mobile_money"
-                  ? "bg-purple-900/30 border-purple-500"
-                  : "bg-slate-900/50 border-purple-900/20 hover:border-purple-700"
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  paymentMethod === "mobile_money" ? "bg-purple-600" : "bg-slate-800"
-                }`}>
-                  <Smartphone className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-white font-semibold">Mobile Money</h3>
-                  <p className="text-sm text-gray-400">MTN, Vodafone, AirtelTigo</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-
           <Button
             onClick={handlePayment}
             disabled={isProcessing}
@@ -247,9 +220,7 @@ export default function Checkout() {
             {isProcessing ? "Processing..." : `Pay GH₵ ${calculateTotal().toFixed(2)}`}
           </Button>
 
-          <p className="text-center text-sm text-gray-400 mt-4">
-            Secured by Paystack 🔒
-          </p>
+          <p className="text-center text-sm text-gray-400 mt-4">Secured by Paystack 🔒</p>
         </div>
       </div>
     </div>

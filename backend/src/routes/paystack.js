@@ -79,7 +79,7 @@ router.post('/initialize', async (req, res, next) => {
         await query(
           `INSERT INTO purchases (user_id, item_type, item_id, item_title, amount, currency, payment_status, payment_reference, payment_method, gateway, platform_fee, paystack_fee, platform_net, creator_amount)
            VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,'paystack',$9,$10,$11,$12)
-           ON CONFLICT ON CONSTRAINT uniq_purchase_by_ref_user_item DO NOTHING
+           ON CONFLICT (user_id, item_type, item_id, payment_reference) DO NOTHING
            RETURNING id`,
           [user_id || null, it.item_type, it.item_id, title, amt, currency, ref, payment_method || null, platformFee, paystackFee, platformNet, creatorAmount]
         );
@@ -96,12 +96,17 @@ router.post('/initialize', async (req, res, next) => {
       purchase_ids: createdIds
     };
 
+    // Build callback URL to the frontend without requiring APP_URL; prefer client-provided/base origin
+    const baseFromClient = (req.body?.callback_base_url || req.headers.origin || '').toString().replace(/\/$/, '');
+    const base = baseFromClient || (process.env.APP_URL ? String(process.env.APP_URL).replace(/\/$/, '') : 'http://localhost:3000');
+    const callback_url = `${base}/purchase-success`;
+
     const resp = await paystack.post('/transaction/initialize', {
       email,
       amount: Math.round(Number(total) * 100),
       reference: ref,
       metadata: enrichedMeta,
-      callback_url: `${process.env.APP_URL || 'http://localhost:3000'}/checkout`,
+      callback_url,
       channels: ['card', 'mobile_money']
     });
     res.json(resp.data);

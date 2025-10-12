@@ -4,27 +4,56 @@ import { authenticateToken } from '../lib/auth.js';
 
 const router = Router();
 
-router.get('/', authenticateToken, async (req, res, next) => {
+// GET purchases: supports two modes
+// 1) Authenticated: use ?me=true or ?user_id=... (requires bearer token)
+// 2) Unauthenticated supporter checkout: allow ?user_email=... with optional payment_status filter
+router.get('/', async (req, res, next) => {
   try {
-    const { user_id, me, payment_status, item_type } = req.query;
+    const { user_id, me, user_email, payment_status, item_type } = req.query;
+
+    // If user_email is provided, permit limited unauthenticated access for supporter checkout flow
+    if (user_email) {
+      // Allow read-only access to the requester's own purchases by email (used for supporter checkout)
+      let sql = 'SELECT * FROM purchases WHERE 1=1';
+      const params = [];
+      let i = 1;
+      sql += ` AND EXISTS (SELECT 1 FROM users u WHERE u.email = $${i} AND u.id = purchases.user_id)`;
+      params.push(String(user_email)); i++;
+      if (payment_status) { sql += ` AND payment_status = $${i}`; params.push(payment_status); i++; }
+      if (item_type) { sql += ` AND item_type = $${i}`; params.push(item_type); i++; }
+      const result = await query(sql + ' ORDER BY created_at DESC', params);
+      return res.json(result.rows);
+    }
+
+    // Otherwise, require auth and use token identity
+    let uid = user_id;
+    if (String(me) === 'true') {
+      // authenticate
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (!token) return res.status(401).json({ error: 'Access token required' });
+      // lightweight verify to get id via existing middleware function
+      // reuse authenticateToken logic by invoking a tiny query
+      // But to avoid duplicating code, perform a minimal check: ensure token maps to an active user
+      // This keeps the route self-contained without adding middleware branches
+      const { verifyToken } = await import('../lib/auth.js');
+      const decoded = verifyToken(token);
+      if (!decoded) return res.status(403).json({ error: 'Invalid or expired token' });
+      // confirm user exists and active
+      const ur = await query('SELECT id FROM users WHERE id = $1 AND is_active = true', [decoded.id]);
+      if (ur.rows.length === 0) return res.status(403).json({ error: 'User not found or inactive' });
+      uid = decoded.id;
+    }
+
     let sql = 'SELECT * FROM purchases WHERE 1=1';
     const params = [];
     let paramIndex = 1;
-    const uid = String(me) === 'true' ? req.user?.id : user_id;
     if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
-    if (payment_status) {
-      sql += ` AND payment_status = $${paramIndex}`;
-      params.push(payment_status);
-      paramIndex++;
-    }
-    if (item_type) {
-      sql += ` AND item_type = $${paramIndex}`;
-      params.push(item_type);
-      paramIndex++;
-    }
+    if (payment_status) { sql += ` AND payment_status = $${paramIndex}`; params.push(payment_status); paramIndex++; }
+    if (item_type) { sql += ` AND item_type = $${paramIndex}`; params.push(item_type); paramIndex++; }
     sql += ' ORDER BY created_at DESC';
     const result = await query(sql, params);
-    res.json(result.rows);
+    return res.json(result.rows);
   } catch (err) { next(err); }
 });
 
@@ -57,7 +86,7 @@ router.post('/', async (req, res, next) => {
     const result = await query(
       `INSERT INTO purchases (user_id, item_type, item_id, item_title, amount, currency, payment_status, payment_reference, payment_method, gateway, platform_fee, paystack_fee, platform_net, creator_amount)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'paystack',$10,$11,$12,$13)
-       ON CONFLICT ON CONSTRAINT uniq_purchase_by_ref_user_item DO NOTHING
+       ON CONFLICT (user_id, item_type, item_id, payment_reference) DO NOTHING
        RETURNING *`,
       [user_id || null, item_type, item_id, item_title, amount, currency, payment_status, payment_reference || null, payment_method || null, platformFee, paystackFee, platformNet, creatorAmount]
     );

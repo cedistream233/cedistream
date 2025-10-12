@@ -54,3 +54,24 @@ export function addItemToLocalCarts(cartItem) {
     }
   } catch {}
 }
+export const Leaderboard = {
+  async topN(itemType, itemId, n = 5) {
+    const res = await fetch(`/api/leaderboard/${encodeURIComponent(itemType)}/${encodeURIComponent(itemId)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data.slice(0, n) : [];
+  },
+  async rank(itemType, itemId) {
+    try {
+      const userRaw = localStorage.getItem('user') || localStorage.getItem('demo_user');
+      const user = userRaw ? JSON.parse(userRaw) : null;
+      const uid = user?.id;
+      if (!uid) return { rank: null };
+      const res = await fetch(`/api/leaderboard/${encodeURIComponent(itemType)}/${encodeURIComponent(itemId)}/rank/${encodeURIComponent(uid)}`);
+      if (!res.ok) return { rank: null };
+      return res.json();
+    } catch {
+      return { rank: null };
+    }
+  }
+};

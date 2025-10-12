@@ -19,7 +19,21 @@ dotenv.config();
 const app = express();
 const BASE_PORT = Number(process.env.PORT) || 5000;
 
-app.use(cors({ origin: process.env.APP_URL || 'http://localhost:3000' }));
+// Allow frontend origin(s) for CORS
+const primaryFrontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+const allowedOrigins = new Set([
+  primaryFrontend,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+]);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // allow tools/curl
+    if (allowedOrigins.has(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+}));
 // Use JSON by default; Paystack webhook uses raw body at the route level
 // Raw body required for Paystack signature verification on webhook
 app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);

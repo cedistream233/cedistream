@@ -37,8 +37,17 @@ export const Purchase = {
     return res.json();
   },
   async filter(params = {}) {
-    const q = new URLSearchParams(params).toString();
-    const res = await fetch(`/api/purchases?${q}`);
+    // Attach auth token if available and default to querying "me" when authenticated
+    const token = localStorage.getItem('token');
+    const hasIdentityParam = Object.prototype.hasOwnProperty.call(params, 'me') ||
+      Object.prototype.hasOwnProperty.call(params, 'user_id');
+    const finalParams = { ...params };
+    if (token && !hasIdentityParam) {
+      finalParams.me = 'true';
+    }
+    const q = new URLSearchParams(finalParams).toString();
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    const res = await fetch(`/api/purchases?${q}`, { headers });
     if (!res.ok) return [];
     return res.json();
   },
