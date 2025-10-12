@@ -53,7 +53,7 @@ export default function PurchaseSuccess() {
               )) : <li>No item data</li>}
             </ul>
             <div className="mt-4">
-              <p className="text-sm text-gray-400">Creator receives ~80% of the sale. Platform net after Paystack fee is ~18%.</p>
+              <p className="text-sm text-gray-400">Thank you for supporting the creator.</p>
             </div>
           </div>
 

@@ -114,12 +114,7 @@ export default function Checkout() {
             You’re in control: pay the minimum or add a little extra to support your favorite creators. Thank you for being awesome.
           </AlertDescription>
         </Alert>
-        <Alert className="bg-emerald-900/20 border-emerald-600/50">
-          <Percent className="h-4 w-4 text-emerald-400" />
-          <AlertDescription className="text-emerald-100 text-sm font-medium">
-            Creator earns 80% from every sale. Platform takes 20% and covers Paystack’s 2% fee.
-          </AlertDescription>
-        </Alert>
+        {/* intentionally left blank for supporter-facing UI */}
       </div>
       
         {checkoutAlert?.type === 'error' && (

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Edit2, X } from 'lucide-react';
+// ...existing code...
 import Insights from '@/components/insights/Insights';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +52,12 @@ export default function CreatorDashboard() {
   // include songs list
   const [songsLoading, setSongsLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [momo, setMomo] = useState('');
+  const [momo2, setMomo2] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawSummary, setWithdrawSummary] = useState({ available: 0, minWithdrawal: 10, transferFee: 1.0, currency: 'GHS' });
 
   // hydrate basic user info and trigger an initial fetch without needing a manual refresh
   useEffect(() => {
@@ -182,6 +189,20 @@ export default function CreatorDashboard() {
       setLoading(false);
     }
   };
+
+  // Load withdrawal summary (available balance)
+  useEffect(() => {
+    (async () => {
+      try {
+        const tokenLocal = token || localStorage.getItem('token');
+        const res = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+        if (res.ok) {
+          const json = await res.json();
+          setWithdrawSummary(json);
+        }
+      } catch {}
+    })();
+  }, [token]);
 
   // Share/copy helpers
   const creatorPublicUrl = (() => {
@@ -394,6 +415,12 @@ export default function CreatorDashboard() {
                 <div id="share-link-feedback" className="text-xs text-green-300 min-w-[80px]"></div>
               </div>
             )}
+            {/* Withdraw button */}
+            <div className="mt-4">
+              <button onClick={() => setWithdrawOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow">
+                <DollarSign className="w-4 h-4" /> Withdraw Funds
+              </button>
+            </div>
           </motion.div>
         </div>
 
@@ -595,6 +622,85 @@ export default function CreatorDashboard() {
         confirmText="Remove"
         cancelText="Cancel"
       />
+        {/* Withdraw modal mount */}
+        <WithdrawModal
+          open={withdrawOpen}
+          onClose={() => { setWithdrawOpen(false); setWithdrawAmount(''); setMomo(''); setMomo2(''); }}
+          summary={withdrawSummary}
+          submitting={withdrawing}
+          amount={withdrawAmount}
+          setAmount={setWithdrawAmount}
+          momo={momo}
+          setMomo={setMomo}
+          momo2={momo2}
+          setMomo2={setMomo2}
+          onSubmit={async () => {
+            try {
+              setWithdrawing(true);
+              const tokenLocal = token || localStorage.getItem('token');
+              const res = await fetch('/api/withdrawals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' },
+                body: JSON.stringify({ amount: Number(withdrawAmount), momoNumber: momo, momoConfirm: momo2 })
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || 'Failed to submit withdrawal');
+              // Refresh summary
+              const sumRes = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+              if (sumRes.ok) setWithdrawSummary(await sumRes.json());
+              setWithdrawOpen(false);
+              setWithdrawAmount(''); setMomo(''); setMomo2('');
+              alert('Withdrawal request submitted. You will receive funds within 24 hours.');
+            } catch (e) {
+              alert(e.message || 'Withdrawal failed');
+            } finally {
+              setWithdrawing(false);
+            }
+          }}
+        />
+    </div>
+  );
+}
+
+// Modal for Withdraw
+function WithdrawModal({ open, onClose, summary, submitting, onSubmit, amount, setAmount, momo, setMomo, momo2, setMomo2 }) {
+  if (!open) return null;
+  const min = Number(summary?.minWithdrawal || 10);
+  const fee = Number(summary?.transferFee || 1);
+  const available = Number(summary?.available || 0);
+  const amt = Math.max(min, Number(amount || 0) || 0);
+  const toReceive = Math.max(0, +(amt - fee).toFixed(2));
+  const disabled = submitting || amt < min || amt > available || !momo || momo !== momo2 || String(momo).replace(/\D/g,'').length !== 10;
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg w-full max-w-md p-6">
+        <h3 className="text-xl font-semibold mb-2">Withdraw Funds</h3>
+        <p className="text-sm text-gray-500 mb-4">Available: {summary?.currency || 'GHS'} {available.toFixed(2)}</p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-gray-700">Amount ({summary?.currency || 'GHS'})</label>
+            <input type="number" min={min} value={amount} onChange={e=>setAmount(e.target.value)} placeholder={`Minimum ${summary?.currency || 'GHS'} ${min.toFixed(2)}`} className="w-full border rounded px-3 py-2" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-700">Mobile Money Number</label>
+            <input type="tel" value={momo} onChange={e=>setMomo(e.target.value)} placeholder="e.g. 0241234567" className="w-full border rounded px-3 py-2" />
+            <p className="text-xs text-gray-500 mt-1">Must be a 10-digit Ghana number starting with 020, 024, 054, etc.</p>
+          </div>
+          <div>
+            <label className="text-sm text-gray-700">Confirm Mobile Money Number</label>
+            <input type="tel" value={momo2} onChange={e=>setMomo2(e.target.value)} placeholder="Re-enter number" className="w-full border rounded px-3 py-2" />
+          </div>
+          <div className="bg-slate-100 rounded p-3 text-sm">
+            <div className="flex justify-between"><span>Estimated transfer fee</span><span>{summary?.currency || 'GHS'} {fee.toFixed(2)}</span></div>
+            <div className="flex justify-between mt-1"><span>Estimated amount to be received</span><span>{summary?.currency || 'GHS'} {toReceive.toFixed(2)}</span></div>
+            <p className="text-xs text-gray-500 mt-2">Note: Withdrawals can take up to 24 hours to process after you request them. Please allow up to one business day for the funds to arrive.</p>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={onClose} className="px-4 py-2 rounded bg-gray-200">Cancel</button>
+            <button disabled={disabled} onClick={onSubmit} className={`px-4 py-2 rounded text-white ${disabled ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>{submitting ? 'Submitting...' : 'Confirm Withdraw'}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

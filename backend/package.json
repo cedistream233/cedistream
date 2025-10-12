@@ -16,6 +16,7 @@
   "migrate-add-content-status": "node ./scripts/migrate-add-content-status.js",
   "migrate-add-songs-status": "node ./scripts/migrate-add-songs-status.js",
   "migrate-add-analytics-indexes": "node ./scripts/migrate-add-analytics-indexes.js",
+  "migrate-add-withdrawals": "node ./scripts/migrate-add-withdrawals.js",
   "migrate-add-fee-split": "node ./scripts/migrate-add-fee-split.js"
   },
   "dependencies": {
