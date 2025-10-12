@@ -16,6 +16,7 @@ export default function Checkout() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [amountInputs, setAmountInputs] = useState({});
   const [minMap, setMinMap] = useState({}); // key: `${type}:${id}` -> min price
+  const [checkoutAlert, setCheckoutAlert] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -53,12 +54,31 @@ export default function Checkout() {
   };
 
   const handlePayment = async () => {
+    // validate purchases against cart minimums (stored in localStorage 'user')
+    try {
+      const uRaw = localStorage.getItem('user') || localStorage.getItem('demo_user');
+      const u = uRaw ? JSON.parse(uRaw) : null;
+      const cartLocal = Array.isArray(u?.cart) ? u.cart : [];
+      const low = [];
+      for (const p of purchases) {
+        const k = `${p.item_type}:${p.item_id}`;
+        const minVal = Number(minMap[k] ?? (() => {
+          const found = cartLocal.find(c => c.item_id === p.item_id && c.item_type === p.item_type);
+          return found ? Number(found.min_price || found.price || 0) : Number(p.amount || 0);
+        })()) || 0;
+        if (Number(p.amount || 0) < minVal) low.push({ title: p.item_title, min: minVal, got: Number(p.amount||0) });
+      }
+      if (low.length > 0) {
+        setCheckoutAlert({ type: 'error', items: low });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    } catch (e) {
+      // ignore and proceed to placeholder behavior
+    }
+
     setIsProcessing(true);
 
-    // TODO: Integrate with Paystack here
-    // This is where you'll need to implement the actual Paystack payment
-    // For now, we'll simulate a successful payment
-    
     alert("⚠️ PAYSTACK INTEGRATION NEEDED\n\nTo complete payments, enable backend functions in Dashboard → Settings.\n\nYou'll need to:\n1. Add Paystack API keys\n2. Create payment initialization endpoint\n3. Handle payment verification\n4. Update purchase status\n\nFor now, this is a placeholder.");
 
     setIsProcessing(false);
@@ -82,6 +102,19 @@ export default function Checkout() {
           </AlertDescription>
         </Alert>
       </div>
+      
+        {checkoutAlert?.type === 'error' && (
+          <Alert className="mb-6 bg-red-900/20 border-red-600/40">
+            <AlertDescription className="text-red-200">
+              Some items are below the minimum required amount. Update amounts in your cart or on this page before paying:
+              <ul className="mt-2 list-disc list-inside text-sm text-red-100">
+                {checkoutAlert.items.map((it, idx) => (
+                  <li key={idx}>{it.title} — minimum GH₵ {Number(it.min).toFixed(2)} (you entered GH₵ {Number(it.got).toFixed(2)})</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
 
       <div className="grid md:grid-cols-2 gap-8">
         {/* Order Summary + Top supporters */}

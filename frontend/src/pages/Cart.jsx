@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
+import { useAuth } from '@/contexts/AuthContext';
 import { Purchase } from "@/entities/Purchase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Trash2, ShoppingBag, CreditCard } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -11,9 +13,19 @@ export default function Cart() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [cart, setCart] = useState([]);
+  const { updateMyUserData } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   // UI-only map that keeps inputs empty initially even if a minimum exists
   const [amountInputs, setAmountInputs] = useState({});
+  const [checkoutErrors, setCheckoutErrors] = useState([]);
+  // derived invalid items (amount < min)
+  const invalidItems = cart.map(item => {
+    const raw = (amountInputs[item.item_id] ?? '').toString().trim();
+    const entered = raw === '' ? Number(item.price || 0) : Number(raw);
+    const min = Number(item.min_price || item.price || 0) || 0;
+    const isInvalid = isNaN(entered) || entered < min;
+    return isInvalid ? { id: item.item_id, title: item.title, required: min, got: isNaN(entered) ? null : entered } : null;
+  }).filter(Boolean);
 
   useEffect(() => {
     loadCart();
@@ -36,7 +48,8 @@ export default function Cart() {
 
   const removeFromCart = async (itemId) => {
     const updatedCart = cart.filter(item => item.item_id !== itemId);
-    await User.updateMyUserData({ cart: updatedCart });
+    // update demo_user mirror and AuthProvider via updateMyUserData so header re-renders immediately
+    await updateMyUserData({ cart: updatedCart });
     setCart(updatedCart);
   };
 
@@ -45,16 +58,37 @@ export default function Cart() {
   };
 
   const handleCheckout = async () => {
-    setIsProcessing(true);
-    
-    // Create purchase records
+    setCheckoutErrors([]);
+    // Validate each cart item against its minimum
+    const bad = [];
+    const purchasesToCreate = [];
     for (const item of cart) {
+      const raw = (amountInputs[item.item_id] ?? '').toString().trim();
+      const entered = raw === '' ? Number(item.price || 0) : Number(raw);
+      const min = Number(item.min_price || item.price || 0) || 0;
+      if (isNaN(entered) || entered < min) {
+        bad.push({ id: item.item_id, title: item.title, required: min, got: isNaN(entered) ? null : entered });
+      } else {
+        purchasesToCreate.push({ item, amount: entered });
+      }
+    }
+
+    if (bad.length > 0) {
+      setCheckoutErrors(bad);
+      // scroll to top so user sees the error on small screens
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsProcessing(true);
+    // Create purchase records
+    for (const p of purchasesToCreate) {
       await Purchase.create({
         user_email: user.email,
-        item_type: item.item_type,
-        item_id: item.item_id,
-        item_title: item.title,
-        amount: item.price,
+        item_type: p.item.item_type,
+        item_id: p.item.item_id,
+        item_title: p.item.title,
+        amount: p.amount,
         payment_status: "pending"
       });
     }
@@ -85,67 +119,72 @@ export default function Cart() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-4xl font-bold text-white mb-8">Shopping Cart</h1>
 
+      {checkoutErrors.length > 0 && (
+        <Alert className="mb-6 bg-red-900/20 border-red-600/40">
+          <AlertDescription className="text-red-200">
+            Some items are below the minimum required amount. Please update the amounts before checking out:
+            <ul className="mt-2 list-disc list-inside text-sm text-red-100">
+              {checkoutErrors.map(err => (
+                <li key={err.id}>{err.title} — minimum GH₵ {Number(err.required).toFixed(2)}{err.got !== null ? ` (you entered GH₵ ${Number(err.got).toFixed(2)})` : ''}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-4 mb-8">
         {cart.map((item) => (
-          <Card key={item.item_id} className="bg-slate-900/50 border-purple-900/20 p-6">
-            <div className="flex items-center gap-6">
-              {item.image ? (
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-24 h-24 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-gradient-to-br from-purple-900 to-pink-900 rounded-lg" />
-              )}
+          <Card key={item.item_id} className="bg-slate-900/50 border-purple-900/20 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+              {/* Image */}
+              <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0">
+                {item.image ? (
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="w-full h-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 rounded-lg" />
+                )}
+              </div>
 
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-white mb-1">{item.title}</h3>
+              {/* Title and type */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-1 truncate">{item.title}</h3>
                 <p className="text-sm text-gray-400 capitalize">{item.item_type}</p>
               </div>
 
-              <div className="text-right">
-                <div className="mb-2 text-xs text-gray-400">Minimum: GH₵ {(Number(item.min_price||item.price)||0).toFixed(2)}</div>
-                <div className="flex items-center gap-2 mb-4 justify-end">
-                  <span className="text-gray-300 text-sm">Amount:</span>
+              {/* Amount section - full width on mobile, right-aligned on desktop */}
+              <div className="w-full sm:w-auto sm:text-right space-y-2 sm:space-y-0">
+                <div className="text-xs text-gray-400 mb-2">Minimum: GH₵ {(Number(item.min_price||item.price)||0).toFixed(2)}</div>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                  <span className="text-gray-300 text-sm whitespace-nowrap">Amount:</span>
                   <input
                     type="number"
-                    min={Number(item.min_price||item.price)||0}
                     placeholder={`Min ${(Number(item.min_price||item.price)||0).toFixed(2)}`}
                     value={amountInputs[item.item_id] ?? ''}
                     onChange={async (e) => {
                       const raw = e.target.value;
-                      // allow temporarily empty; clamp any number entered to the minimum
+                      // allow any typed value (including below min); store entered number in cart so totals update
                       setAmountInputs(prev => ({ ...prev, [item.item_id]: raw }));
-                      if (raw === '' || raw === undefined) return; // don't change stored price yet
-                      const min = Number(item.min_price || item.price) || 0;
                       const num = Number(raw);
-                      const clamped = isNaN(num) ? min : Math.max(min, num);
-                      // reflect clamped value in the UI if user typed below min
-                      if (!isNaN(num) && num < min) {
-                        setAmountInputs(prev => ({ ...prev, [item.item_id]: String(clamped) }));
-                      }
-                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: clamped } : ci);
+                      const stored = isNaN(num) ? 0 : num;
+                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: stored } : ci);
                       setCart(nextCart);
-                      await User.updateMyUserData({ cart: nextCart });
+                      await updateMyUserData({ cart: nextCart });
                     }}
-                    onBlur={async () => {
-                      // ensure cart keeps at least the minimum
-                      const min = Number(item.min_price || item.price) || 0;
-                      const nextCart = cart.map(ci => ci.item_id === item.item_id ? { ...ci, price: Math.max(min, Number(ci.price||0)) } : ci);
-                      setCart(nextCart);
-                      await User.updateMyUserData({ cart: nextCart });
-                    }}
-                    className="w-32 bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-right placeholder:text-slate-500"
+                    className="flex-1 sm:w-32 bg-slate-800 border border-slate-700 text-white rounded px-3 py-2 text-right placeholder:text-slate-500"
                   />
                 </div>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={() => removeFromCart(item.item_id)}
-                  className="text-red-400 hover:text-red-300"
+                  className="text-red-400 hover:text-red-300 w-full sm:w-auto"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Remove
                 </Button>
               </div>
             </div>
@@ -156,7 +195,7 @@ export default function Cart() {
       <Card className="bg-slate-900/50 border-purple-900/20 p-6">
         <div className="space-y-4">
           <div className="text-sm text-gray-400">
-            You can increase the amount above the minimum to show extra support. Every cedi goes directly to the creator.
+            You can contribute more than the minimum to show extra support. Top three supporters will be featured on the content’s leaderboard.
           </div>
           <div className="flex items-center justify-between text-lg">
             <span className="text-gray-400">Items:</span>
@@ -167,10 +206,16 @@ export default function Cart() {
             <span className="text-yellow-400">GH₵ {calculateTotal().toFixed(2)}</span>
           </div>
 
+          {invalidItems.length > 0 && (
+            <div className="p-3 rounded bg-red-900/20 border border-red-700 text-red-100 text-sm">
+              {invalidItems.length} item{invalidItems.length > 1 ? 's' : ''} below minimum: {invalidItems.map(i => i.title).join(', ')}. Please update the amounts before proceeding.
+            </div>
+          )}
+
           <Button
             onClick={handleCheckout}
-            disabled={isProcessing}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg py-6 mt-6"
+            disabled={isProcessing || invalidItems.length > 0}
+            className={`w-full mt-4 text-lg py-6 ${invalidItems.length > 0 ? 'opacity-60 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'}`}
           >
             <CreditCard className="w-5 h-5 mr-2" />
             {isProcessing ? "Processing..." : "Proceed to Checkout"}

@@ -2,9 +2,45 @@ import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
 import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
-import { Sparkles, Search, BarChart3 } from "lucide-react";
+import { Sparkles, Search, BarChart3, X, Clock } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useImageViewer } from "@/contexts/ImageViewerContext.jsx";
+
+const RECENT_SEARCHES_KEY = 'cedistream_recent_searches';
+const MAX_RECENT_SEARCHES = 5;
+
+// Helper functions for recent searches
+const getRecentSearches = () => {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveRecentSearch = (searchQuery) => {
+  if (!searchQuery || !searchQuery.trim()) return;
+  try {
+    const trimmed = searchQuery.trim();
+    let recent = getRecentSearches();
+    // remove if already exists (to move to top)
+    recent = recent.filter(s => s.toLowerCase() !== trimmed.toLowerCase());
+    // add to front
+    recent.unshift(trimmed);
+    // limit to MAX
+    recent = recent.slice(0, MAX_RECENT_SEARCHES);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recent));
+  } catch {}
+};
+
+const removeRecentSearch = (searchQuery) => {
+  try {
+    let recent = getRecentSearches();
+    recent = recent.filter(s => s.toLowerCase() !== searchQuery.toLowerCase());
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recent));
+  } catch {}
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -12,12 +48,15 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
   const { open: openViewer } = useImageViewer();
 
   useEffect(() => {
     (async () => {
       try { setUser(await User.me()); } catch {}
     })();
+    // load recent searches on mount
+    setRecentSearches(getRecentSearches());
   }, []);
 
   useEffect(() => {
@@ -28,10 +67,25 @@ export default function Home() {
         const res = await fetch(`/api/creators?q=${encodeURIComponent(query)}`);
         const data = res.ok ? await res.json() : [];
         setResults(data);
+        // save to recent searches when results are returned
+        if (data.length > 0) {
+          saveRecentSearch(query);
+          setRecentSearches(getRecentSearches());
+        }
       } finally { setSearching(false); }
     }, 250);
     return () => clearTimeout(h);
   }, [query]);
+
+  const handleRecentSearchClick = (searchTerm) => {
+    setQuery(searchTerm);
+  };
+
+  const handleRemoveRecentSearch = (searchTerm, e) => {
+    e.stopPropagation();
+    removeRecentSearch(searchTerm);
+    setRecentSearches(getRecentSearches());
+  };
 
   return (
     <div className="min-h-screen">
@@ -57,6 +111,36 @@ export default function Home() {
                   className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
+              
+              {/* Recently searched chips */}
+              {!query.trim() && recentSearches.length > 0 && (
+                <div className="mt-3 flex items-start gap-2 flex-wrap">
+                  <div className="flex items-center gap-1 text-xs text-gray-400 whitespace-nowrap">
+                    <Clock className="w-3 h-3" />
+                    Recent:
+                  </div>
+                  {recentSearches.map((search, idx) => (
+                    <div
+                      key={idx}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleRecentSearchClick(search)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRecentSearchClick(search); } }}
+                      className="group inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-900/30 border border-purple-700/30 hover:border-purple-500/50 text-sm text-purple-200 hover:text-purple-100 transition cursor-pointer"
+                    >
+                      <span className="truncate max-w-[140px]">{search}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveRecentSearch(search, e)}
+                        className="ml-1 p-1 rounded-full bg-transparent hover:bg-white/5 flex items-center justify-center"
+                        aria-label={`Remove ${search} from recent`}
+                      >
+                        <X className="w-3 h-3 text-purple-200 opacity-100 sm:opacity-0 group-hover:opacity-100 transition" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
         </div>
       </section>
