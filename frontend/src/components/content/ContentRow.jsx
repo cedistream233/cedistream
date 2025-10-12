@@ -9,7 +9,11 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
   const creator = item.artist || item.creator;
   const price = item.price;
   const [owned, setOwned] = useState(false);
-  const [hasPreview, setHasPreview] = useState(null); // null = unknown, true/false after check
+  // Optimistically show preview if metadata suggests it; null = unknown
+  const [hasPreview, setHasPreview] = useState(() => {
+    if (!item) return null;
+    return !!item.preview_url ? true : null;
+  });
   const { updateMyUserData, user } = useAuth();
 
   useEffect(() => {
@@ -24,24 +28,40 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
   useEffect(() => {
     let aborted = false;
     (async () => {
-      // Only check previews for songs for now
-      if (type !== 'song' || !item?.id) { setHasPreview(false); return; }
+      if (!item?.id) { setHasPreview(false); return; }
+      // If metadata contains preview_url for any type, we are done
+      if (item.preview_url) { setHasPreview(true); return; }
+
       try {
-        const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-        if (!aborted) {
-          if (res.ok) {
-            const d = await res.json();
-            setHasPreview(!!d?.url);
-          } else {
-            setHasPreview(false);
+        if (type === 'song') {
+          const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+          if (!aborted) {
+            if (res.ok) {
+              const d = await res.json();
+              setHasPreview(!!d?.url);
+            } else {
+              setHasPreview(false);
+            }
           }
+        } else if (type === 'video') {
+          const res = await fetch(`/api/media/video/${encodeURIComponent(item.id)}/preview`);
+          if (!aborted) {
+            if (res.ok) {
+              const d = await res.json();
+              setHasPreview(!!d?.url);
+            } else {
+              setHasPreview(false);
+            }
+          }
+        } else {
+          setHasPreview(false);
         }
       } catch {
         if (!aborted) setHasPreview(false);
       }
     })();
     return () => { aborted = true; };
-  }, [item?.id, type]);
+  }, [item?.id, type, item?.preview_url]);
 
   const getPublishedDate = () => {
     const raw = item?.release_date || item?.published_at || item?.published_date || item?.released_at || item?.created_at || item?.created_date;
@@ -79,24 +99,35 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
         </div>
       </div>
       <div className="pl-3 flex items-center gap-2">
-        {hasPreview ? (
+        {hasPreview !== false ? (
           <button
             onClick={async (e) => {
               e.stopPropagation();
               try {
-                // attempt to prefetch preview URL and store in sessionStorage for immediate use on details page
-                const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-                if (res.ok) {
-                  const d = await res.json();
-                  if (d?.url) {
-                    try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
+                // attempt to prefetch preview URL and store for immediate use on details page
+                if (type === 'song') {
+                  const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+                  if (res.ok) {
+                    const d = await res.json();
+                    if (d?.url) {
+                      try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
+                    }
+                  }
+                } else if (type === 'video') {
+                  const res = await fetch(`/api/media/video/${encodeURIComponent(item.id)}/preview`);
+                  if (res.ok) {
+                    const d = await res.json();
+                    if (d?.url) {
+                      try { sessionStorage.setItem(`preview:video:${item.id}`, d.url); } catch {}
+                    }
                   }
                 }
               } catch (err) {
                 // ignore
               }
               // navigate to details; the details page will pick up sessionStorage preview if present
-              window.location.href = `/songs/${encodeURIComponent(item.id)}`;
+              if (type === 'video') window.location.href = `/videos?id=${encodeURIComponent(item.id)}`;
+              else window.location.href = `/songs/${encodeURIComponent(item.id)}`;
             }}
             className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
           >

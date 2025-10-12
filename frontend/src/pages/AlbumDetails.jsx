@@ -84,6 +84,14 @@ export default function AlbumDetails() {
     try {
       const foundAlbum = await Album.get(albumId);
       setAlbum(foundAlbum);
+      // If album songs include preview/audio metadata, seed the maps so preview controls enable instantly
+      if (foundAlbum?.songs?.length) {
+        const previews = {};
+        for (const s of foundAlbum.songs) {
+          if (s.preview_url) previews[s.id] = s.preview_url;
+        }
+        if (Object.keys(previews).length) setTrackPreviewUrls(prev => ({ ...prev, ...previews }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -113,13 +121,17 @@ export default function AlbumDetails() {
       const previews = {};
       const fulls = {};
       for (const s of album.songs) {
-        // Fetch preview for all (if exists)
-        try {
-          const p = await Song.getPreviewUrl(s.id);
-          if (p) previews[s.id] = p;
-        } catch {}
+        // If preview_url is present on the song metadata, use it immediately
+        if (s.preview_url) {
+          previews[s.id] = s.preview_url;
+        } else {
+          try {
+            const p = await Song.getPreviewUrl(s.id);
+            if (p) previews[s.id] = p;
+          } catch {}
+        }
 
-        // Fetch full for owner or if purchased
+        // Fetch full for owner or if purchased (requires signed URL)
         if (isOwner || purchased) {
           try {
             const f = await Song.getSignedUrl(s.id, token);

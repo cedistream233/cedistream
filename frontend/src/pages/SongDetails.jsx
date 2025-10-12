@@ -6,6 +6,7 @@ import AudioPlayer from '@/components/media/AudioPlayer';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import { setPostAuthIntent } from '@/utils';
 import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
+import PayWhatYouWant from '@/components/ui/PayWhatYouWant';
 import { useToast, ToastContainer } from '@/components/ui/Toast';
 
 export default function SongDetails() {
@@ -37,6 +38,8 @@ export default function SongDetails() {
       setLoading(true);
       const data = await Song.get(id);
       setSong(data);
+      // Seed preview URL from metadata immediately so UI buttons render enabled sooner
+      if (data?.preview_url) setPreviewUrl(prev => prev || data.preview_url);
       setLoading(false);
     })();
   }, [id]);
@@ -48,7 +51,7 @@ export default function SongDetails() {
       try {
         const token = localStorage.getItem('token');
         let full = null;
-        // attempt to get signed/full URL if token exists
+        // Only treat signed URL as full-access; do not rely on raw audio_url
         if (token) {
           try { full = await Song.getSignedUrl(song.id, token); } catch (e) { full = null; }
         }
@@ -69,12 +72,16 @@ export default function SongDetails() {
           return;
         }
 
-        // no prefetched preview; fetch preview and full (full may be null if not owner/purchased)
+        // no prefetched preview; prefer metadata.preview_url then fall back to network
         let prev = null;
-        try { prev = await Song.getPreviewUrl(song.id); } catch (e) { prev = null; }
+        if (song.preview_url) {
+          prev = song.preview_url;
+        } else {
+          try { prev = await Song.getPreviewUrl(song.id); } catch (e) { prev = null; }
+        }
 
-        setPreviewUrl(prev || null);
-        setFullUrl(full || null);
+  setPreviewUrl(prev || null);
+  setFullUrl(full || null);
 
         if (full) {
           setPurchased(true);
@@ -159,49 +166,36 @@ export default function SongDetails() {
           onLoopModeChange={setLoopMode}
           embedded
         />
-        <div className="text-sm md:text-base text-gray-300">Pay what you want • Min GH₵ {parseFloat((optimisticPrice ?? song?.price) || 0)?.toFixed(2)}</div>
-        <div className="mt-2">
-          <div className="flex items-center gap-3 justify-center">
-            {isOwner && (
-              <PriceDisplay 
-                price={optimisticPrice ?? song?.price}
-                optimisticPrice={optimisticPrice}
-                canEdit={true}
-                onEdit={handlePriceEdit}
-                loading={priceLoading}
-              />
-            )}
-          </div>
-        </div>
-    <div className="w-full text-center text-sm text-gray-400 mt-2">You can choose to pay more to support the creator. Minimum applies.</div>
+        {/* Pay What You Want panel for supporters */}
         {!isOwner && (
-          <div className="w-full flex gap-3 mt-4">
-            <button onClick={async () => {
-              const token = localStorage.getItem('token');
-              const min = Number(song.price || 0);
-              if (!token) {
-                setPostAuthIntent({
-                  action: 'add-to-cart',
-                  item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
-                  redirect: '/cart'
-                });
-                window.location.href = '/signup';
-                return;
-              }
-              // If authenticated, we can rely on cart pages/other flows; just go to cart page
-              try {
-                const u = JSON.parse(localStorage.getItem('user') || 'null') || {};
-                const cart = Array.isArray(u.cart) ? u.cart : [];
-                const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
-                if (!exists) {
-                  const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
-                  localStorage.setItem('user', JSON.stringify(next));
-                  // keep demo mirror in sync for other components
-                  try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+          <div className="w-full mt-4">
+            <PayWhatYouWant
+              minPrice={Number(song.price || 1)}
+              onAdd={async () => {
+                const token = localStorage.getItem('token');
+                const min = Number(song.price || 1);
+                if (!token) {
+                  setPostAuthIntent({
+                    action: 'add-to-cart',
+                    item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
+                    redirect: '/cart'
+                  });
+                  window.location.href = '/signup';
+                  return;
                 }
-              } catch {}
-              window.location.href = '/cart';
-            }} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg">Add to Cart</button>
+                try {
+                  const u = JSON.parse(localStorage.getItem('user') || 'null') || {};
+                  const cart = Array.isArray(u.cart) ? u.cart : [];
+                  const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
+                  if (!exists) {
+                    const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
+                    try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
+                    try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+                  }
+                } catch {}
+                window.location.href = '/cart';
+              }}
+            />
           </div>
         )}
         {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}

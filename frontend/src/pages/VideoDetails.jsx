@@ -46,16 +46,26 @@ export default function VideoDetails() {
   useEffect(() => {
     (async () => {
       if (!video) return;
+
+      // First, check if a preview was pre-fetched and stored
+      try {
+        const stored = sessionStorage.getItem(`preview:video:${video.id}`);
+        if (stored) { setMediaUrl(stored); setCanAccess(false); sessionStorage.removeItem(`preview:video:${video.id}`); }
+      } catch {}
+
       const token = localStorage.getItem('token');
-      // try to get signed full video URL if authorized
-      let signed = null;
+      // If authorized, attempt to get full signed URL
       if (token) {
         const res = await fetch(`/api/media/video/${video.id}`, { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
-          const d = await res.json(); signed = d.url; setCanAccess(true); setMediaUrl(d.url); return;
+          const d = await res.json(); setCanAccess(true); setMediaUrl(d.url); return;
         }
       }
-      // fallback to preview
+
+      // fallback to preview; prefer metadata.preview_url
+      if (video.preview_url) {
+        setMediaUrl(video.preview_url); setCanAccess(false); return;
+      }
       const prevRes = await fetch(`/api/media/video/${video.id}/preview`);
       if (prevRes.ok) {
         const d = await prevRes.json(); setMediaUrl(d.url); setCanAccess(false);

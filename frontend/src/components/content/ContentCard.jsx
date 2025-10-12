@@ -34,6 +34,13 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
     // Prefer a dedicated preview endpoint for songs. We detect songs by presence of audio_url on the card item
     async function loadPreview() {
       if (!item?.id || !item?.audio_url) return;
+
+      // If backend included preview_url on the item metadata, use it immediately
+      if (item.preview_url) {
+        setPreviewUrl(item.preview_url || null);
+        return;
+      }
+
       setLoadingPreview(true);
       try {
         const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
