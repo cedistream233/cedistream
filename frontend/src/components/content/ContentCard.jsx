@@ -176,7 +176,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
               </div>
               {/* Center play button */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {previewUrl && (
+                {previewUrl ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="relative w-18 h-18">
                       {/* circular progress ring */}
@@ -215,7 +215,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
                     </div>
                     <div className="text-[11px] text-white/90 bg-purple-700/80 px-2 py-0.5 rounded-full">Preview</div>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {/* Bottom action row */}

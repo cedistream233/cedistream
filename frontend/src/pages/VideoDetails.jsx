@@ -130,6 +130,14 @@ export default function VideoDetails() {
             </div>
           </div>
         </div>
+        {(!canAccess && mediaUrl === null) && (
+          <div className="mt-4">
+            <div className="rounded-lg border border-purple-900/20 bg-slate-900/40 p-3 text-center">
+              <div className="text-sm text-gray-300">No preview available</div>
+              <div className="text-xs text-gray-500 mt-1">This creator hasn't uploaded a preview for this video.</div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -155,33 +163,44 @@ export default function VideoDetails() {
 
       <div className="grid md:grid-cols-2 gap-8">
         <div>
-          {mediaUrl ? (
-            <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} />
+          {(!isOwner && noPreviewAvailable) ? (
+            <div className="w-full rounded-lg overflow-hidden bg-black/60 p-6 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-sm text-gray-300">No preview available</div>
+                <div className="text-xs text-gray-500 mt-1">This creator hasn't uploaded a preview for this video.</div>
+              </div>
+            </div>
           ) : (
-            video.thumbnail ? (
-              <div className="relative group">
-                <img
-                  src={video.thumbnail}
-                  alt={video.title}
-                  className="w-full rounded-2xl shadow-2xl"
-                />
-                {!canAccess && (
-                  <div className="absolute top-3 left-3 text-[11px] uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded">Locked</div>
-                )}
-                <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
-                    <Play className="w-10 h-10 text-purple-900 ml-1" />
+            <div className="w-full rounded-lg overflow-hidden bg-black/60">
+              {mediaUrl ? (
+                <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} />
+              ) : (
+                video.thumbnail ? (
+                  <div className="relative group">
+                    <img
+                      src={video.thumbnail}
+                      alt={video.title}
+                      className="w-full rounded-2xl shadow-2xl"
+                    />
+                    {!canAccess && (
+                      <div className="absolute top-3 left-3 text-[11px] uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded">Locked</div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
+                        <Play className="w-10 h-10 text-purple-900 ml-1" />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full aspect-video bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl flex items-center justify-center">
-                <Play className="w-32 h-32 text-purple-300" />
-              </div>
-            )
+                ) : (
+                  <div className="w-full aspect-video bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl flex items-center justify-center">
+                    <Play className="w-32 h-32 text-purple-300" />
+                  </div>
+                )
+              )}
+            </div>
           )}
-        </div>
 
+        </div>
         <div className="flex flex-col justify-center">
           <div className="mb-6">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">{video.title}</h1>

@@ -96,6 +96,8 @@ export default function SongDetails() {
     })();
   }, [song?.id]);
 
+  const noPreviewAvailable = !audioFetching && !previewUrl && !fullUrl;
+
   const handlePriceEdit = () => {
     if (!token) { toast.error('Please log in as the creator to change the price.'); return; }
     setPriceEditModal(true);
@@ -150,22 +152,29 @@ export default function SongDetails() {
             </div>
           </div>
         )}
-        {/* Always render the player immediately so the UI is consistent;
-            player will show loading state while URLs are fetched and remain
-            disabled until a src is available. */}
-        <AudioPlayer
-          src={isOwner
-            ? (ownerPlayMode === 'full' ? (fullUrl || previewUrl) : (previewUrl || fullUrl))
-            : audioUrl}
-          loading={audioFetching}
-          title={song.title}
-          showPreviewBadge={!purchased}
-          hasPrev={false}
-          hasNext={false}
-          loopMode={loopMode}
-          onLoopModeChange={setLoopMode}
-          embedded
-        />
+        {/* Render preview player or a clear 'No preview' placeholder for visitors/supporters */}
+        {(!isOwner && noPreviewAvailable) ? (
+          <div className="w-full mt-4 flex justify-center">
+            <div className="rounded-lg border border-purple-900/20 bg-slate-900/40 p-6 text-center w-full">
+              <div className="text-sm text-gray-300">No preview available</div>
+              <div className="text-xs text-gray-500 mt-1">This creator hasn't uploaded a preview for this content.</div>
+            </div>
+          </div>
+        ) : (
+          <AudioPlayer
+            src={isOwner
+              ? (ownerPlayMode === 'full' ? (fullUrl || previewUrl) : (previewUrl || fullUrl))
+              : audioUrl}
+            loading={audioFetching}
+            title={song.title}
+            showPreviewBadge={!purchased}
+            hasPrev={false}
+            hasNext={false}
+            loopMode={loopMode}
+            onLoopModeChange={setLoopMode}
+            embedded
+          />
+        )}
         {/* Pay What You Want panel for supporters */}
         {!isOwner && (
           <div className="w-full mt-4">

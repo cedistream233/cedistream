@@ -357,32 +357,42 @@ export default function AlbumDetails() {
             </div>
           )}
           <div className="mb-4 md:mb-6">
-            {/* Always render the player immediately (shows loading while URLs fetch). */}
-            <AudioPlayer
-              src={( () => {
-                const currentSong = album.songs[currentIndex];
-                const sid = currentSong?.id;
-                if (isOwner) {
-                  return ownerPlayMode === 'full'
-                    ? (trackFullUrls[sid] || trackPreviewUrls[sid] || null)
-                    : (trackPreviewUrls[sid] || trackFullUrls[sid] || null);
-                }
-                if (purchased) return trackFullUrls[sid] || trackPreviewUrls[sid] || null;
-                return albumHasAnyPreview ? (trackPreviewUrls[sid] || null) : null;
-              })() }
-              autoPlay={autoPlayTrigger}
-              loading={audioFetching}
-              title={album.songs[currentIndex]?.title || 'Track'}
-              artwork={album.cover_image}
-              showPreviewBadge={!purchased && !isOwner}
-              onEnded={() => { if (loopMode === 'all') onNext(); }}
-              onPrev={onPrev}
-              onNext={onNext}
-              hasPrev={album.songs.length > 1}
-              hasNext={album.songs.length > 1}
-              loopMode={loopMode}
-              onLoopModeChange={setLoopMode}
-            />
+            {/* If there are no previews for this album (and the visitor isn't the owner or a purchaser),
+                show a clear placeholder. Otherwise render the player. */}
+            {(!isOwner && !purchased && !audioFetching && !albumHasAnyPreview) ? (
+              <div className="w-full mt-4 flex justify-center">
+                <div className="rounded-lg border border-purple-900/20 bg-slate-900/40 p-6 text-center w-full">
+                  <div className="text-sm text-gray-300">No previews available for this album</div>
+                  <div className="text-xs text-gray-500 mt-1">This creator hasn't uploaded previews for any track in this album.</div>
+                </div>
+              </div>
+            ) : (
+              <AudioPlayer
+                src={( () => {
+                  const currentSong = album.songs[currentIndex];
+                  const sid = currentSong?.id;
+                  if (isOwner) {
+                    return ownerPlayMode === 'full'
+                      ? (trackFullUrls[sid] || trackPreviewUrls[sid] || null)
+                      : (trackPreviewUrls[sid] || trackFullUrls[sid] || null);
+                  }
+                  if (purchased) return trackFullUrls[sid] || trackPreviewUrls[sid] || null;
+                  return albumHasAnyPreview ? (trackPreviewUrls[sid] || null) : null;
+                })() }
+                autoPlay={autoPlayTrigger}
+                loading={audioFetching}
+                title={album.songs[currentIndex]?.title || 'Track'}
+                artwork={album.cover_image}
+                showPreviewBadge={!purchased && !isOwner}
+                onEnded={() => { if (loopMode === 'all') onNext(); }}
+                onPrev={onPrev}
+                onNext={onNext}
+                hasPrev={album.songs.length > 1}
+                hasNext={album.songs.length > 1}
+                loopMode={loopMode}
+                onLoopModeChange={setLoopMode}
+              />
+            )}
           </div>
 
           <h3 className="text-xl font-semibold text-white mb-3">Tracklist</h3>
