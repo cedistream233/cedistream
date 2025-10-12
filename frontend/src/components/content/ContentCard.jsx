@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Play, Pause, Music2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import { setPostAuthIntent } from '@/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ContentCard({ item, type, onAddToCart, onViewDetails }) {
+  const { updateMyUserData } = useAuth();
   // prefer cover_image, fallback to thumbnail
   const image = item.cover_image || item.thumbnail || null;
   const title = item.title;
@@ -226,41 +228,66 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails }) 
                 >
                   View Details
                 </Button>
-                <Button
-                  onClick={(e)=>{
-                    e.stopPropagation();
-                    // If parent provided a handler (may open amount modal, etc), delegate
-                    if (onAddToCart) return onAddToCart();
+                {type !== 'album' && (
+                  <Button
+                    onClick={async (e)=>{
+                      e.stopPropagation();
+                      // Delegate to parent if it wants to handle add-to-cart (e.g., open modal)
+                      if (onAddToCart) return onAddToCart();
 
-                    // If not authenticated, store intent and route to signup
-                    const token = localStorage.getItem('token');
-                    if (!token) {
+                      const token = localStorage.getItem('token');
+                      const min = Number(price || 0);
+                      if (!token) {
+                        try {
+                          setPostAuthIntent({
+                            action: 'add-to-cart',
+                            item: {
+                              item_type: type,
+                              item_id: item.id,
+                              title: title,
+                              price: min,
+                              min_price: min,
+                              image: item.cover_image || item.thumbnail || null,
+                            },
+                            redirect: '/cart'
+                          });
+                        } catch {}
+                        window.location.href = '/signup';
+                        return;
+                      }
+
+                      // Authenticated: update cart in user/demo_user (use updateMyUserData when available)
                       try {
-                        const min = Number(price || 0);
-                        setPostAuthIntent({
-                          action: 'add-to-cart',
-                          item: {
-                            item_type: type,
-                            item_id: item.id,
-                            title: title,
-                            price: min,
-                            min_price: min,
-                            image: item.cover_image || item.thumbnail || null,
-                          },
-                          redirect: '/cart'
-                        });
-                      } catch {}
-                      window.location.href = '/signup';
-                      return;
-                    }
+                        const cartItem = {
+                          item_type: type,
+                          item_id: item.id,
+                          title: title,
+                          price: min,
+                          min_price: min,
+                          image: item.cover_image || item.thumbnail || null,
+                        };
+                        const u = JSON.parse(localStorage.getItem('user') || 'null') || JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+                        const currentCart = (u?.cart) || [];
+                        const exists = currentCart.some(i => i.item_id === item.id && i.item_type === type);
+                        if (!exists) {
+                          if (updateMyUserData) {
+                            await updateMyUserData({ cart: [...currentCart, cartItem] });
+                          } else {
+                            const next = { ...(u||{}), cart: [...currentCart, cartItem] };
+                            try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+                            try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
+                          }
+                        }
+                      } catch (err) { console.error(err); }
 
-                    // Authenticated: call handler if provided
-                    (onAddToCart||(()=>{}))();
-                  }}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                >
-                  Buy
-                </Button>
+                      // navigate to cart for checkout
+                      window.location.href = '/cart';
+                    }}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    Buy
+                  </Button>
+                )}
               </div>
             </div>
           </div>
