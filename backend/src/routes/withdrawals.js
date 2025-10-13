@@ -45,7 +45,7 @@ router.get('/me', authenticateToken, requireRole(['creator']), async (req, res, 
 // GET /api/withdrawals/admin?status=requested|processing|paid|rejected|cancelled (default: requested,processing)
 router.get('/admin', authenticateToken, requireRole(['admin']), async (req, res, next) => {
   try {
-    const { status, from, to } = req.query;
+    const { status, from, to, page = '1', limit = '25' } = req.query;
     let statuses = ['requested', 'processing'];
     if (status) {
       const parts = String(status).split(',').map(s => s.trim().toLowerCase());
@@ -60,15 +60,23 @@ router.get('/admin', authenticateToken, requireRole(['admin']), async (req, res,
     let dateCond = '';
     if (from) { dateCond += ` AND w.created_at >= $${p++}`; params.push(from); }
     if (to) { dateCond += ` AND w.created_at <= $${p++}`; params.push(to); }
+    // pagination
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(limit, 10) || 25));
+    const offset = (pageNum - 1) * pageSize;
     const sql = `
       SELECT w.*,
              u.email, u.username, u.first_name, u.last_name, u.phone
       FROM withdrawals w
       JOIN users u ON u.id = w.user_id
       WHERE w.status IN (${placeholders})${dateCond}
-      ORDER BY w.created_at ASC`;
-    const result = await query(sql, params);
-    res.json(result.rows);
+      ORDER BY w.created_at ASC
+      LIMIT $${p++} OFFSET $${p++}`;
+    const result = await query(sql, [...params, pageSize, offset]);
+    // total count
+    const countSql = `SELECT COUNT(1)::int AS total FROM withdrawals w WHERE w.status IN (${placeholders})${dateCond}`;
+    const totalRes = await query(countSql, params);
+    res.json({ items: result.rows, page: pageNum, limit: pageSize, total: totalRes.rows[0]?.total || 0 });
   } catch (e) { next(e); }
 });
 
@@ -89,7 +97,7 @@ router.get('/admin/summary', authenticateToken, requireRole(['admin']), async (r
 // Admin: CSV export of withdrawals with filters
 router.get('/admin/export', authenticateToken, requireRole(['admin']), async (req, res, next) => {
   try {
-    const { status, from, to } = req.query;
+    const { status, from, to, page = '1', limit = '1000' } = req.query;
     let statuses = null;
     if (status) {
       const parts = String(status).split(',').map(s => s.trim().toLowerCase());
@@ -107,6 +115,9 @@ router.get('/admin/export', authenticateToken, requireRole(['admin']), async (re
     if (from) { where += ` AND w.created_at >= $${p++}`; params.push(from); }
     if (to) { where += ` AND w.created_at <= $${p++}`; params.push(to); }
 
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(10000, Math.max(1, parseInt(limit, 10) || 1000));
+    const offset = (pageNum - 1) * pageSize;
     const sql = `
       SELECT w.id, w.created_at, w.status, w.amount, w.transfer_fee, w.amount_to_receive,
              w.destination_type, w.destination_account, w.reference, w.notes,
@@ -114,8 +125,9 @@ router.get('/admin/export', authenticateToken, requireRole(['admin']), async (re
       FROM withdrawals w
       JOIN users u ON u.id = w.user_id
       ${where}
-      ORDER BY w.created_at ASC`;
-    const result = await query(sql, params);
+      ORDER BY w.created_at ASC
+      LIMIT $${p++} OFFSET $${p++}`;
+    const result = await query(sql, [...params, pageSize, offset]);
     const rows = result.rows || [];
     const header = [
       'id','created_at','status','amount','transfer_fee','amount_to_receive','destination_type','destination_account','reference','notes',
@@ -200,7 +212,29 @@ router.patch('/:id', authenticateToken, requireRole(['admin']), async (req, res,
       [id, status, notes || null, reference || null]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Withdrawal not found' });
+    // Insert audit record
+    await query(
+      `INSERT INTO withdrawals_audit (withdrawal_id, admin_id, previous_status, new_status, notes, reference)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, req.user.id, from, status, notes || null, reference || null]
+    );
     res.json(result.rows[0]);
+  } catch (e) { next(e); }
+});
+
+// Admin: fetch audit log for a withdrawal
+router.get('/:id/audit', authenticateToken, requireRole(['admin']), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const r = await query(
+      `SELECT a.*, u.email as admin_email, u.username as admin_username
+       FROM withdrawals_audit a
+       LEFT JOIN users u ON u.id = a.admin_id
+       WHERE a.withdrawal_id = $1
+       ORDER BY a.created_at DESC`,
+      [id]
+    );
+    res.json(r.rows);
   } catch (e) { next(e); }
 });
 

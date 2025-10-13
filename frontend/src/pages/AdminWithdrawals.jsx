@@ -16,6 +16,9 @@ export default function AdminWithdrawals() {
   const [activeTab, setActiveTab] = useState('pending'); // pending | paid | rejected
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const [total, setTotal] = useState(0);
 
   const fetchRows = async () => {
     try {
@@ -26,12 +29,16 @@ export default function AdminWithdrawals() {
       if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
       if (from) params.set('from', from);
       if (to) params.set('to', to);
+      params.set('page', String(page));
+      params.set('limit', String(limit));
       const res = await fetch(`/api/withdrawals/admin?${params.toString()}`, {
         headers: { Authorization: token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to load withdrawals');
       const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+      setRows(items);
+      if (typeof data?.total === 'number') setTotal(data.total);
       setError('');
     } catch (e) {
       setError(e.message || 'Failed to load');
@@ -47,7 +54,7 @@ export default function AdminWithdrawals() {
     } catch {}
   };
 
-  useEffect(() => { fetchRows(); fetchSummary(); /* eslint-disable-next-line */ }, [token, activeTab]);
+  useEffect(() => { fetchRows(); fetchSummary(); /* eslint-disable-next-line */ }, [token, activeTab, page, limit]);
 
   const openAction = (id, action) => setConfirm({ open: true, id, action });
   const closeAction = () => setConfirm({ open: false, id: null, action: null });
@@ -105,7 +112,7 @@ export default function AdminWithdrawals() {
           <input type="date" value={to} onChange={e => setTo(e.target.value)} className="p-2 rounded bg-slate-800 border border-slate-700 text-gray-200" />
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchRows} className="bg-slate-700 hover:bg-slate-600">Apply</Button>
+          <Button onClick={() => { setPage(1); fetchRows(); }} className="bg-slate-700 hover:bg-slate-600">Apply</Button>
           <Button
             variant="secondary"
             onClick={async () => {
@@ -115,6 +122,8 @@ export default function AdminWithdrawals() {
               if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
               if (from) params.set('from', from);
               if (to) params.set('to', to);
+              params.set('page', String(page));
+              params.set('limit', String(limit));
               const res = await fetch(`/api/withdrawals/admin/export?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
               if (!res.ok) return alert('Export failed');
               const blob = await res.blob();
@@ -124,6 +133,20 @@ export default function AdminWithdrawals() {
               URL.revokeObjectURL(url);
             }}
           >Export CSV</Button>
+        </div>
+      </div>
+
+      {/* Pager */}
+      <div className="flex items-center justify-between mb-4 text-gray-300">
+        <div>
+          Page {page} • Showing {rows.length} of {total} • Per page:
+          <select value={limit} onChange={e => { setLimit(parseInt(e.target.value, 10)); setPage(1); }} className="ml-2 bg-slate-800 border border-slate-700 rounded p-1">
+            {[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="space-x-2">
+          <Button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="bg-slate-700 hover:bg-slate-600">Prev</Button>
+          <Button disabled={(page*limit) >= total} onClick={() => setPage(p => p+1)} className="bg-slate-700 hover:bg-slate-600">Next</Button>
         </div>
       </div>
 

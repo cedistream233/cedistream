@@ -73,6 +73,7 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!token && !!user;
   const isCreator = user?.role === 'creator';
   const isSupporter = user?.role === 'supporter';
+  const isAdmin = user?.role === 'admin';
 
   const value = {
     user,
@@ -83,6 +84,7 @@ export const AuthProvider = ({ children }) => {
     updateMyUserData,
     isAuthenticated,
     isCreator,
+    isAdmin,
     isSupporter,
     loading
   };

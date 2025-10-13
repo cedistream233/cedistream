@@ -17,7 +17,7 @@ import {
 export default function Layout({ children, currentPageName }) {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { user, logout, isAuthenticated, isCreator } = useAuth();
+	const { user, logout, isAuthenticated, isCreator, isAdmin } = useAuth();
 	const [showLogoutModal, setShowLogoutModal] = useState(false);
 	// derive cart count from auth context so it updates when demo_user/user changes
 	const cartCount = (user?.cart || []).length || 0;
@@ -36,8 +36,9 @@ export default function Layout({ children, currentPageName }) {
 	const navItems = [
 		{ name: "Home", url: createPageUrl("Home"), icon: Home },
 		...(isAuthenticated ? [
-			...(isCreator ? [{ name: "Dashboard", url: "/dashboard", icon: BarChart3 }] : []),
-			{ name: "My Library", url: createPageUrl("Library"), icon: Library },
+			...(isAdmin ? [{ name: "Admin", url: "/admin/withdrawals", icon: BarChart3 }] : []),
+			...(!isAdmin && isCreator ? [{ name: "Dashboard", url: "/dashboard", icon: BarChart3 }] : []),
+			...(!isAdmin ? [{ name: "My Library", url: createPageUrl("Library"), icon: Library }] : []),
 		] : []),
 	];
 
@@ -130,12 +131,23 @@ export default function Layout({ children, currentPageName }) {
 											<p className="text-xs text-purple-400 capitalize">{user.role}</p>
 										</div>
 										
-										{isCreator && (
+										{isCreator && !isAdmin && (
 											<>
 												<DropdownMenuItem asChild>
 													<Link to="/dashboard" className="flex items-center gap-2 text-gray-300 hover:text-white">
 														<BarChart3 className="w-4 h-4" />
 														Creator Dashboard
+													</Link>
+												</DropdownMenuItem>
+												<DropdownMenuSeparator className="bg-slate-700" />
+											</>
+										)}
+										{isAdmin && (
+											<>
+												<DropdownMenuItem asChild>
+													<Link to="/admin/withdrawals" className="flex items-center gap-2 text-gray-300 hover:text-white">
+														<BarChart3 className="w-4 h-4" />
+														Admin Panel
 													</Link>
 												</DropdownMenuItem>
 												<DropdownMenuSeparator className="bg-slate-700" />

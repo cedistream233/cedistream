@@ -19,6 +19,7 @@
   "migrate-add-withdrawals": "node ./scripts/migrate-add-withdrawals.js",
   "migrate-add-fee-split": "node ./scripts/migrate-add-fee-split.js",
   "migrate-add-admin-role": "node ./scripts/migrate-add-admin-role.js",
+  "migrate-add-withdrawals-audit": "node ./scripts/migrate-add-withdrawals-audit.js",
   "seed-admin": "node ./scripts/seed-admin.js"
   },
   "dependencies": {
