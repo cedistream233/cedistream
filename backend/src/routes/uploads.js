@@ -220,21 +220,32 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     const limit = Math.max(0, Number(req.query.limit || 10));
     // purchases joined with albums/videos by item_id; includes songs if table exists
     // include buyer name (from users if present) and payment_status
+    const offset = Number.isFinite(Number(req.query.offset)) ? Math.max(0, parseInt(req.query.offset, 10)) : 0;
+    // Build base WHERE clause
+    const whereClause = `p.payment_status = 'completed' AND (
+      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+      (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+      (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+    )`;
+
+    // total count
+    const countSql = `SELECT COUNT(*)::int as total FROM purchases p WHERE ${whereClause}`;
+    const countRes = await query(countSql, [userId]);
+    const total = countRes.rows?.[0]?.total || 0;
+
+    // items
     const sql = `SELECT p.id, p.item_type, p.item_title as item, p.amount, p.creator_amount, p.created_at as date, p.payment_status,
       COALESCE(cp.stage_name, CONCAT(u.first_name, ' ', u.last_name), u.email, '—') as buyer_name
          FROM purchases p
          LEFT JOIN users u ON u.id = p.user_id
          LEFT JOIN creator_profiles cp ON cp.user_id = u.id
-                 WHERE p.payment_status = 'completed'
-                   AND (
-                     (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
-                     (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
-                     (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
-                   )
-                 ORDER BY p.created_at DESC
-                 ${limit > 0 ? 'LIMIT ' + limit : ''}`;
-    const result = await query(sql, [userId]);
-    return res.json(result.rows);
+         WHERE ${whereClause}
+         ORDER BY p.created_at DESC
+         ${limit > 0 ? 'LIMIT $2 OFFSET $3' : ''}`;
+
+    const params = limit > 0 ? [userId, limit, offset] : [userId];
+    const result = await query(sql, params);
+    return res.json({ items: result.rows, total });
   } catch (err) {
     // If schema isn't fully migrated yet (e.g., songs table or user_id columns missing), return empty list gracefully
     if (err && (err.code === '42P01' /* undefined_table */ || err.code === '42703' /* undefined_column */)) {

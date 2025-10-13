@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { useNavigate } from 'react-router-dom';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
+import Pagination from '@/components/ui/Pagination';
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ export default function CreatorDashboard() {
   const [recentSales, setRecentSales] = useState([]);
   const [salesPage, setSalesPage] = useState(1);
   const [salesPageSize, setSalesPageSize] = useState(5);
+  const [salesTotal, setSalesTotal] = useState(0);
   const [salesHasMore, setSalesHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [myContent, setMyContent] = useState({ albums: [], videos: [] });
@@ -164,32 +166,35 @@ export default function CreatorDashboard() {
       }
 
       // Recent sales for this creator (paginated)
-      try {
-        const offset = (salesPage - 1) * salesPageSize;
-        const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
-          headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
-        });
-        if (salesRes.ok) {
-          const rows = await salesRes.json();
-          setRecentSales(Array.isArray(rows) ? rows.map(r => ({
-            id: r.id,
-            item: r.item,
-            type: r.item_type,
-            amount: parseFloat(r.amount || 0), // gross
-            creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
-            date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
-            buyer: r.buyer_name || '—'
-          })) : []);
-          setSalesHasMore(Array.isArray(rows) ? rows.length === salesPageSize : false);
-        } else {
+        try {
+          const offset = (salesPage - 1) * salesPageSize;
+          const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
+            headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
+          });
+          if (salesRes.ok) {
+            const data = await salesRes.json();
+            const rows = Array.isArray(data?.items) ? data.items : [];
+            setRecentSales(rows.map(r => ({
+              id: r.id,
+              item: r.item,
+              type: r.item_type,
+              amount: parseFloat(r.amount || 0), // gross
+              creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
+              date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
+              buyer: r.buyer_name || '—'
+            })));
+            setSalesTotal(typeof data?.total === 'number' ? data.total : rows.length);
+            setSalesHasMore(rows.length === salesPageSize && rows.length > 0);
+          } else {
+            setRecentSales([]);
+            setSalesHasMore(false);
+            setSalesTotal(0);
+          }
+        } catch (e) {
           setRecentSales([]);
           setSalesHasMore(false);
+          setSalesTotal(0);
         }
-      } catch (e) {
-        setRecentSales([]);
-        setSalesHasMore(false);
-      }
-
       // No hardcoded values; keep monthly/views at 0 unless we have analytics sources
       
     } catch (error) {
@@ -487,43 +492,36 @@ export default function CreatorDashboard() {
                       <p className="text-slate-400 text-sm">No sales yet. Your latest sales will appear here.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {recentSales.map((sale) => (
-                        <div key={sale.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-slate-800/50 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-purple-600/20 rounded-lg">
+                        <div key={sale.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 bg-slate-800/50 rounded-md sm:rounded-lg">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            <div className="p-1.5 sm:p-2 bg-purple-600/20 rounded-md">
                               {sale.type === 'album' ? (
-                                <Music2 className="w-4 h-4 text-purple-400" />
+                                <Music2 className="w-3 h-3 sm:w-4 sm:h-4 text-purple-400" />
                               ) : sale.type === 'song' ? (
-                                <Music className="w-4 h-4 text-yellow-400" />
+                                <Music className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
                               ) : (
-                                <Video className="w-4 h-4 text-pink-400" />
+                                <Video className="w-3 h-3 sm:w-4 sm:h-4 text-pink-400" />
                               )}
                             </div>
                             <div>
-                              <p className="text-white font-medium break-words">{sale.item}</p>
-                              <p className="text-gray-400 text-sm">{sale.buyer} • {sale.date}</p>
+                              <p className="text-white font-medium break-words text-sm sm:text-base">{sale.item}</p>
+                              <p className="text-gray-400 text-xs sm:text-sm">{sale.buyer} • {sale.date}</p>
                             </div>
                           </div>
-                          <div className="mt-2 sm:mt-0 text-right">
-                            <div className="text-green-400 font-bold">GH₵ {(sale.creatorAmount !== null ? sale.creatorAmount : (sale.amount * 0.8)).toFixed(2)}</div>
+                          <div className="mt-1 sm:mt-0 text-right">
+                            <div className="text-green-400 font-bold text-sm sm:text-base">GH₵ {(sale.creatorAmount !== null ? sale.creatorAmount : (sale.amount * 0.8)).toFixed(2)}</div>
                           </div>
                         </div>
                       ))}
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                          <div className="flex items-center gap-2">
-                            <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={() => setSalesPage(p => Math.max(1, p-1))} disabled={salesPage === 1}>Prev</button>
-                            <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={() => { if (salesHasMore) setSalesPage(p => p+1); }} disabled={!salesHasMore}>Next</button>
-                            <span className="text-sm text-gray-400 ml-2">Page {salesPage}</span>
-                          </div>
-                          <div className="flex items-center justify-end gap-2">
-                            <label className="text-sm text-gray-400">Per page</label>
-                            <select value={salesPageSize} onChange={e => { setSalesPageSize(parseInt(e.target.value,10)); setSalesPage(1); }} className="bg-slate-800 text-white px-2 py-1 rounded">
-                              <option value={5}>5</option>
-                              <option value={10}>10</option>
-                              <option value={25}>25</option>
-                            </select>
-                          </div>
+                        <div className="mt-4">
+                          <Pagination
+                            page={salesPage}
+                            limit={salesPageSize}
+                            total={typeof salesTotal === 'number' ? salesTotal : undefined}
+                            onChange={(p) => setSalesPage(Math.max(1, p))}
+                          />
                         </div>
                     </div>
                   )}
