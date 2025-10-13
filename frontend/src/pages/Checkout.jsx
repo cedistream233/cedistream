@@ -15,7 +15,6 @@ export default function Checkout() {
   // Paystack collects payment method; we don't need to show a choice here
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [amountInputs, setAmountInputs] = useState({});
   const [minMap, setMinMap] = useState({}); // key: `${type}:${id}` -> min price
   const [checkoutAlert, setCheckoutAlert] = useState(null);
 
@@ -41,10 +40,7 @@ export default function Checkout() {
         amount: Number(ci.price || ci.min_price || 0) || 0
       }));
       setPurchases(userPurchases);
-      // init empty inputs (so placeholders show minimums)
-      const init = {};
-      userPurchases.forEach(p => { init[p.id] = ''; });
-      setAmountInputs(init);
+  // amounts are fixed at checkout; edits happen in Cart
 
       if (userPurchases.length === 0) {
         navigate(createPageUrl('Cart'));
@@ -131,7 +127,7 @@ export default function Checkout() {
         {checkoutAlert?.type === 'error' && (
           <Alert className="mb-6 bg-red-900/20 border-red-600/40">
             <AlertDescription className="text-red-200">
-              Some items are below the minimum required amount. Update amounts in your cart or on this page before paying:
+              Some items are below the minimum required amount. Update amounts in your cart before paying:
               <ul className="mt-2 list-disc list-inside text-sm text-red-100">
                 {checkoutAlert.items.map((it, idx) => (
                   <li key={idx}>{it.title} — minimum GH₵ {Number(it.min).toFixed(2)} (you entered GH₵ {Number(it.got).toFixed(2)})</li>
@@ -153,29 +149,14 @@ export default function Checkout() {
                     <p className="text-white font-medium truncate">{p.item_title}</p>
                     <p className="text-xs text-gray-400 capitalize">{p.item_type}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={(() => { const k = `${p.item_type}:${p.item_id}`; return Number(minMap[k] ?? p.amount ?? 0) || 0; })()}
-                      placeholder={`Min ${(() => { const k = `${p.item_type}:${p.item_id}`; const v = Number(minMap[k] ?? p.amount ?? 0) || 0; return v.toFixed(2); })()}`}
-                      value={amountInputs[p.id] ?? ''}
-                      onChange={async (e) => {
-                        const raw = e.target.value;
-                        setAmountInputs(prev => ({ ...prev, [p.id]: raw }));
-                        if (raw === '' || raw === undefined) return;
-                        const k = `${p.item_type}:${p.item_id}`;
-                        const min = Number(minMap[k] ?? p.amount ?? 0) || 0;
-                        const num = Number(raw);
-                        const clamped = isNaN(num) ? min : Math.max(min, num);
-                        if (!isNaN(num) && num < min) {
-                          setAmountInputs(prev => ({ ...prev, [p.id]: String(clamped) }));
-                        }
-                        // reflect to local state so total updates in real time
-                        setPurchases(prev => prev.map(pi => pi.id === p.id ? { ...pi, amount: clamped } : pi));
-                      }}
-                      className="w-28 sm:w-32 bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-right placeholder:text-slate-500"
-                    />
-                    <span className="text-yellow-400 font-semibold hidden sm:inline">GH₵ {Number(p.amount||0).toFixed(2)}</span>
+                  <div className="flex items-center gap-3">
+                    {/* Non-editable minimum badge */}
+                    <span className="text-[11px] px-2 py-1 rounded bg-slate-800 border border-slate-700 text-gray-300 whitespace-nowrap">
+                      Min {(() => { const k = `${p.item_type}:${p.item_id}`; const v = Number(minMap[k] ?? p.amount ?? 0) || 0; return v.toFixed(2); })()}
+                    </span>
+                    {/* Fixed amount display */}
+                    <span className="text-gray-300 text-sm hidden sm:inline">Amount:</span>
+                    <span className="text-yellow-400 font-semibold">GH₵ {Number(p.amount||0).toFixed(2)}</span>
                   </div>
                 </div>
               ))}

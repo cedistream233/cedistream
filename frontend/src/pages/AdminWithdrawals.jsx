@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Pagination from '@/components/ui/Pagination';
@@ -21,6 +21,8 @@ export default function AdminWithdrawals() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
+  const cacheRef = useRef(new Map()); // key -> { items, total }
+  const abortRef = useRef(null);
 
   const fetchRows = async () => {
     try {
@@ -33,14 +35,27 @@ export default function AdminWithdrawals() {
       if (to) params.set('to', to);
       params.set('page', String(page));
       params.set('limit', String(limit));
+      const key = `${activeTab}|${from}|${to}|${page}|${limit}`;
+      const cached = cacheRef.current.get(key);
+      if (cached) {
+        setRows(cached.items);
+        setTotal(cached.total);
+        setLoading(false);
+      }
+      // cancel previous
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       const res = await fetch(`/api/withdrawals/admin?${params.toString()}`, {
-        headers: { Authorization: token ? `Bearer ${token}` : '' }
+        headers: { Authorization: token ? `Bearer ${token}` : '' },
+        signal: controller.signal
       });
       if (!res.ok) throw new Error('Failed to load withdrawals');
       const data = await res.json();
       const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
       setRows(items);
       if (typeof data?.total === 'number') setTotal(data.total);
+      cacheRef.current.set(key, { items, total: typeof data?.total === 'number' ? data.total : (items.length || 0) });
       setError('');
     } catch (e) {
       setError(e.message || 'Failed to load');
@@ -57,6 +72,31 @@ export default function AdminWithdrawals() {
   };
 
   useEffect(() => { fetchRows(); fetchSummary(); /* eslint-disable-next-line */ }, [token, activeTab, page, limit]);
+
+  // Prefetch next page when inputs change
+  useEffect(() => {
+    const prefNext = async () => {
+      try {
+        const nextPage = page + 1;
+        const params = new URLSearchParams();
+        if (activeTab === 'pending') params.set('status', 'requested');
+        if (activeTab === 'paid') params.set('status', 'paid');
+        if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        params.set('page', String(nextPage));
+        params.set('limit', String(limit));
+        const key = `${activeTab}|${from}|${to}|${nextPage}|${limit}`;
+        if (cacheRef.current.get(key)) return;
+        const res = await fetch(`/api/withdrawals/admin?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+        cacheRef.current.set(key, { items, total: typeof data?.total === 'number' ? data.total : (items.length || 0) });
+      } catch {}
+    };
+    prefNext();
+  }, [activeTab, from, to, page, limit, token]);
 
   const openAction = (id, action) => setConfirm({ open: true, id, action });
   const closeAction = () => setConfirm({ open: false, id: null, action: null });

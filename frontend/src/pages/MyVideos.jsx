@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Pagination from '@/components/ui/Pagination';
@@ -11,19 +11,63 @@ export default function MyVideos() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const cacheRef = useRef(new Map());
+  const abortRef = useRef(null);
   // advanced filters removed
   const navigate = useNavigate();
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (!user?.id) return;
-    setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: '12' });
+    const LIMIT = 12;
+    const key = JSON.stringify({ uid: user.id, page, limit: LIMIT, search: search || '' });
+
+    const cached = cacheRef.current.get(key);
+    if (cached) {
+      setItems(cached.items);
+      setPages(cached.pages);
+      setTotal(cached.total);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
     if (search) params.set('search', search);
-    fetch(`/api/creators/${user.id}/videos?${params.toString()}`)
-      .then(r => r.json())
-      .then(d => { setItems(d.items||[]); setPages(d.pages||1); setTotal(d.total||0); })
-      .finally(()=>setLoading(false));
+    fetch(`/api/creators/${user.id}/videos?${params.toString()}`, { signal: controller.signal })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to load')))
+      .then(d => {
+        const itemsArr = Array.isArray(d.items) ? d.items : [];
+        const next = { items: itemsArr, pages: d.pages || 1, total: d.total || itemsArr.length || 0 };
+        cacheRef.current.set(key, next);
+        setItems(next.items);
+        setPages(next.pages);
+        setTotal(next.total);
+      })
+      .catch(e => { if (e.name !== 'AbortError') console.error(e); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+
+    // Prefetch next page
+    const nextPage = page + 1;
+    const nextKey = JSON.stringify({ uid: user.id, page: nextPage, limit: LIMIT, search: search || '' });
+    if (!cacheRef.current.get(nextKey)) {
+      const nextParams = new URLSearchParams({ page: String(nextPage), limit: String(LIMIT) });
+      if (search) nextParams.set('search', search);
+      fetch(`/api/creators/${user.id}/videos?${nextParams.toString()}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (!d) return;
+          const itemsArr = Array.isArray(d.items) ? d.items : [];
+          cacheRef.current.set(nextKey, { items: itemsArr, pages: d.pages || 1, total: d.total || itemsArr.length || 0 });
+        })
+        .catch(() => {});
+    }
+
+    return () => { controller.abort(); };
   }, [page, search]);
 
   return (

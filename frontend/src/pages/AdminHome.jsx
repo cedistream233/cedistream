@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/AdminLayout';
@@ -12,21 +12,58 @@ export default function AdminHome() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
+  const cacheRef = useRef(new Map());
 
+  // Fetch summary only when token changes
   useEffect(() => {
     (async () => {
       try {
         const s = await fetch('/api/withdrawals/admin/summary', { headers: { Authorization: token ? `Bearer ${token}` : '' } });
         if (s.ok) setSummary(await s.json());
+      } catch {}
+    })();
+  }, [token]);
+
+  // Fetch recent list with caching and respect page/limit
+  useEffect(() => {
+    (async () => {
+      try {
+        const key = `${page}|${limit}`;
+        const cached = cacheRef.current.get(key);
+        if (cached) {
+          setRecent(cached.items);
+          setTotal(cached.total);
+          setLoading(false);
+        } else {
+          setLoading(true);
+        }
         const r = await fetch(`/api/withdrawals/admin?status=paid&page=${page}&limit=${limit}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
         if (r.ok) {
           const data = await r.json();
-          setRecent(Array.isArray(data?.items) ? data.items : []);
-          if (typeof data?.total === 'number') setTotal(data.total);
+          const items = Array.isArray(data?.items) ? data.items : [];
+          setRecent(items);
+          const t = typeof data?.total === 'number' ? data.total : items.length || 0;
+          setTotal(t);
+          cacheRef.current.set(key, { items, total: t });
         }
       } finally { setLoading(false); }
     })();
-  }, [token]);
+  }, [page, limit, token]);
+
+  // Prefetch next page
+  useEffect(() => {
+    (async () => {
+      const nextPage = page + 1;
+      const key = `${nextPage}|${limit}`;
+      if (cacheRef.current.get(key)) return;
+      const r = await fetch(`/api/withdrawals/admin?status=paid&page=${nextPage}&limit=${limit}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } }).catch(() => null);
+      if (r && r.ok) {
+        const data = await r.json();
+        const items = Array.isArray(data?.items) ? data.items : [];
+        cacheRef.current.set(key, { items, total: typeof data?.total === 'number' ? data.total : items.length || 0 });
+      }
+    })();
+  }, [page, limit, token]);
 
   return (
     <AdminLayout currentPageName="Admin Dashboard" showShortcuts>
