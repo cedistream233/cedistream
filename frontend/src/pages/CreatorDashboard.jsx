@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,6 +58,8 @@ export default function CreatorDashboard() {
   const [salesTotal, setSalesTotal] = useState(0);
   const [salesHasMore, setSalesHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const recentCache = useRef(new Map());
+  const recentAbort = useRef(null);
   const [myContent, setMyContent] = useState({ albums: [], videos: [] });
   // include songs list
   const [songsLoading, setSongsLoading] = useState(false);
@@ -81,8 +83,92 @@ export default function CreatorDashboard() {
   useEffect(() => {
     if (!token) return; // wait until token is ready so creator-protected routes succeed
     fetchDashboardData();
-    // re-fetch when pagination changes so recent sales update
+    // only re-run the full dashboard when token changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Recent sales fetch (separate from full dashboard to avoid re-fetching everything on page change)
+  useEffect(() => {
+    if (!token) return;
+    const fetchRecent = async () => {
+      const key = JSON.stringify({ page: salesPage, size: salesPageSize });
+
+      // serve from cache immediately if present
+      const cached = recentCache.current.get(key);
+      if (cached) {
+        setRecentSales(cached.items);
+        setSalesTotal(cached.total);
+        setSalesHasMore(cached.hasMore);
+      }
+
+      // cancel previous request
+      if (recentAbort.current) recentAbort.current.abort();
+      const controller = new AbortController();
+      recentAbort.current = controller;
+
+      try {
+        const offset = (salesPage - 1) * salesPageSize;
+        const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
+          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+          signal: controller.signal
+        });
+        if (salesRes.ok) {
+          const data = await salesRes.json();
+          const rows = Array.isArray(data?.items) ? data.items : [];
+          const items = rows.map(r => ({
+            id: r.id,
+            item: r.item,
+            type: r.item_type,
+            amount: parseFloat(r.amount || 0), // gross
+            creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
+            date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
+            buyer: r.buyer_name || '—'
+          }));
+          const total = typeof data?.total === 'number' ? data.total : rows.length;
+          const hasMore = rows.length === salesPageSize && rows.length > 0;
+          recentCache.current.set(key, { items, total, hasMore });
+          setRecentSales(items);
+          setSalesTotal(total);
+          setSalesHasMore(hasMore);
+        } else {
+          setRecentSales([]);
+          setSalesHasMore(false);
+          setSalesTotal(0);
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          console.error('Recent sales fetch failed', e);
+          setRecentSales([]);
+          setSalesHasMore(false);
+          setSalesTotal(0);
+        }
+      }
+
+      // Prefetch next page
+      try {
+        const nextPage = salesPage + 1;
+        const nextKey = JSON.stringify({ page: nextPage, size: salesPageSize });
+        if (!recentCache.current.get(nextKey)) {
+          const nextOffset = (nextPage - 1) * salesPageSize;
+          const r = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${nextOffset}`, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
+          if (r && r.ok) {
+            const d = await r.json();
+            const rows2 = Array.isArray(d?.items) ? d.items : [];
+            const items2 = rows2.map(rw => ({
+              id: rw.id,
+              item: rw.item,
+              type: rw.item_type,
+              amount: parseFloat(rw.amount || 0),
+              creatorAmount: typeof rw.creator_amount !== 'undefined' ? parseFloat(rw.creator_amount || 0) : null,
+              date: rw.date ? new Date(rw.date).toISOString().slice(0,10) : '',
+              buyer: rw.buyer_name || '—'
+            }));
+            recentCache.current.set(nextKey, { items: items2, total: typeof d?.total === 'number' ? d.total : rows2.length, hasMore: rows2.length === salesPageSize });
+          }
+        }
+      } catch {}
+    };
+    fetchRecent();
   }, [token, salesPage, salesPageSize]);
 
   // Refresh when tab gains focus or page becomes visible
@@ -515,13 +601,25 @@ export default function CreatorDashboard() {
                           </div>
                         </div>
                       ))}
-                        <div className="mt-4">
-                          <Pagination
-                            page={salesPage}
-                            limit={salesPageSize}
-                            total={typeof salesTotal === 'number' ? salesTotal : undefined}
-                            onChange={(p) => setSalesPage(Math.max(1, p))}
-                          />
+                        <div className="mt-4 flex flex-col items-center gap-2">
+                          <div className="w-full max-w-xs">
+                            <Pagination
+                              page={salesPage}
+                              limit={salesPageSize}
+                              total={typeof salesTotal === 'number' ? salesTotal : undefined}
+                              onChange={(p) => setSalesPage(Math.max(1, p))}
+                              showLabel={false}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-300">
+                            {(() => {
+                              const total = Number.isFinite(salesTotal) ? salesTotal : 0;
+                              if (total === 0) return 'Showing 0 of 0';
+                              const start = (salesPage - 1) * salesPageSize + 1;
+                              const end = Math.min(total, salesPage * salesPageSize);
+                              return `Showing ${start}-${end} of ${total}`;
+                            })()}
+                          </div>
                         </div>
                     </div>
                   )}
