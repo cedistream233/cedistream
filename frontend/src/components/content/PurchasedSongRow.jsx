@@ -32,15 +32,9 @@ export default function PurchasedSongRow({ song }) {
       <div className="pl-3 flex items-center gap-2">
         <button
           onClick={(e) => { e.stopPropagation(); navigate(`/songs/${encodeURIComponent(song.id)}?autoplay=1`); }}
-          className="px-3 py-2 rounded-md bg-slate-800 text-white text-sm hover:bg-slate-700"
-        >
-          Play
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); navigate(`/songs/${encodeURIComponent(song.id)}`); }}
           className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700"
         >
-          Open
+          Play
         </button>
       </div>
     </div>

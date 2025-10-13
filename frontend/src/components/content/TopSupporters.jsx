@@ -4,6 +4,7 @@ import { Trophy, Medal, Award } from 'lucide-react';
 export default function TopSupporters({ itemType, itemId, className = '' }) {
   const [supporters, setSupporters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     if (!itemType || !itemId) return;
@@ -26,15 +27,20 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
   if (loading) {
     return (
       <div className={`bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-purple-900/30 rounded-xl p-4 sm:p-6 ${className}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Trophy className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-400" />
+            <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+          </div>
+          <button className="text-sm text-gray-400" onClick={() => setCollapsed(c => !c)}>{collapsed ? 'Expand' : 'Collapse'}</button>
         </div>
-        <div className="space-y-3 animate-pulse">
-          <div className="h-16 bg-slate-700/40 rounded-lg"></div>
-          <div className="h-16 bg-slate-700/40 rounded-lg"></div>
-          <div className="h-16 bg-slate-700/40 rounded-lg"></div>
-        </div>
+        {!collapsed && (
+          <div className="space-y-3 animate-pulse">
+            <div className="h-16 bg-slate-700/40 rounded-lg"></div>
+            <div className="h-16 bg-slate-700/40 rounded-lg"></div>
+            <div className="h-16 bg-slate-700/40 rounded-lg"></div>
+          </div>
+        )}
       </div>
     );
   }
@@ -42,13 +48,18 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
   if (!supporters.length) {
     return (
       <div className={`bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-purple-900/30 rounded-xl p-4 sm:p-6 ${className}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Trophy className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-400" />
+            <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+          </div>
+          <button className="text-sm text-gray-400" onClick={() => setCollapsed(c => !c)}>{collapsed ? 'Expand' : 'Collapse'}</button>
         </div>
-        <p className="text-sm text-gray-400 text-center py-6">
-          Be the first to support this content and claim the #1 spot!
-        </p>
+        {!collapsed && (
+          <p className="text-sm text-gray-400 text-center py-6">
+            Be the first to support this content and claim the #1 spot!
+          </p>
+        )}
       </div>
     );
   }
@@ -81,63 +92,68 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
 
   return (
     <div className={`bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-purple-900/30 rounded-xl p-4 sm:p-6 backdrop-blur-sm ${className}`}>
-      <div className="flex items-center gap-2 mb-4">
-        <Trophy className="w-5 h-5 text-yellow-400" />
-        <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-yellow-400" />
+          <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+        </div>
+        <button className="text-sm text-gray-400" onClick={() => setCollapsed(c => !c)}>{collapsed ? 'Expand' : 'Collapse'}</button>
       </div>
-      
-      <div className="space-y-3">
-        {supporters.map((supporter, index) => (
-          <div
-            key={supporter.user_id || index}
-            className={`relative bg-gradient-to-r ${getRankGradient(index)} border rounded-lg p-3 sm:p-4 transition-all hover:scale-[1.02] hover:shadow-lg`}
-          >
-            <div className="flex items-center gap-3">
-              {/* Rank Icon */}
-              <div className="flex-shrink-0">
-                {getRankIcon(index)}
-              </div>
 
-              {/* Avatar */}
-              <div className="flex-shrink-0">
-                {supporter.profile_image ? (
-                  <img
-                    src={supporter.profile_image}
-                    alt={supporter.name}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white/10"
-                  />
-                ) : (
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-2 border-white/10">
-                    <span className="text-white font-bold text-sm sm:text-base">
-                      {supporter.name?.[0]?.toUpperCase() || 'A'}
-                    </span>
-                  </div>
-                )}
-              </div>
+      {!collapsed && (
+        <div className="space-y-3">
+          {supporters.map((supporter, index) => (
+            <div
+              key={supporter.user_id || index}
+              className={`relative bg-gradient-to-r ${getRankGradient(index)} border rounded-lg p-3 sm:p-4 transition-all hover:scale-[1.02] hover:shadow-lg`}
+            >
+              <div className="flex items-center gap-3">
+                {/* Rank Icon */}
+                <div className="flex-shrink-0">
+                  {getRankIcon(index)}
+                </div>
 
-              {/* Name and Stats */}
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold text-sm sm:text-base truncate">
-                  {supporter.name || 'Anonymous'}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {supporter.purchase_count} {supporter.purchase_count === 1 ? 'purchase' : 'purchases'}
-                </p>
-              </div>
+                {/* Avatar */}
+                <div className="flex-shrink-0">
+                  {supporter.profile_image ? (
+                    <img
+                      src={supporter.profile_image}
+                      alt={supporter.name}
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white/10"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-2 border-white/10">
+                      <span className="text-white font-bold text-sm sm:text-base">
+                        {supporter.name?.[0]?.toUpperCase() || 'A'}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Amount */}
-              <div className="flex-shrink-0 text-right">
-                <p className="text-yellow-400 font-bold text-sm sm:text-base">
-                  GH₵ {Number(supporter.total_amount || 0).toFixed(2)}
-                </p>
-                <p className="text-xs text-gray-500">total</p>
+                {/* Name and Stats */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold text-sm sm:text-base truncate">
+                    {supporter.name || 'Anonymous'}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {supporter.purchase_count} {supporter.purchase_count === 1 ? 'purchase' : 'purchases'}
+                  </p>
+                </div>
+
+                {/* Points (no currency) */}
+                <div className="flex-shrink-0 text-right">
+                  <p className="text-yellow-400 font-bold text-sm sm:text-base">
+                    {Math.round(Number(supporter.total_amount || 0))} pts
+                  </p>
+                  <p className="text-xs text-gray-500">total</p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {supporters.length < 3 && (
+      {supporters.length < 3 && !collapsed && (
         <p className="text-xs text-gray-500 text-center mt-4">
           {3 - supporters.length} {supporters.length === 2 ? 'spot' : 'spots'} available on the leaderboard
         </p>

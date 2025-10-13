@@ -5,6 +5,7 @@ import { Album } from "@/entities/Album";
 import { Video } from "@/entities/Video";
 import { Song } from "@/entities/Song";
 import { Card } from "@/components/ui/card";
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Music, Video as VideoIcon, Download, Play } from "lucide-react";
 import PurchasedSongRow from '@/components/content/PurchasedSongRow';
@@ -55,23 +56,7 @@ export default function Library() {
     setIsLoading(false);
   };
 
-  if (isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-12 bg-slate-800 rounded w-64"></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i}>
-                <div className="aspect-square bg-slate-800 rounded-lg mb-4"></div>
-                <div className="h-4 bg-slate-800 rounded w-3/4"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingOverlay text="Loading library" />;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
