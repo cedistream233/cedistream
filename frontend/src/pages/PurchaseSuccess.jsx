@@ -26,6 +26,19 @@ export default function PurchaseSuccess() {
         setLoading(true);
         const resp = await Purchase.verify(reference);
         setData(resp.data || resp);
+        // remove purchased items from local cart
+        try {
+          const items = (resp?.data?.metadata?.items || resp?.metadata?.items || []);
+          const raw = localStorage.getItem('user') || localStorage.getItem('demo_user');
+          const u = raw ? JSON.parse(raw) : null;
+          if (u && Array.isArray(u.cart)) {
+            const bought = new Set(items.map(it => `${it.item_type}:${it.item_id}`));
+            const nextCart = u.cart.filter(ci => !bought.has(`${ci.item_type}:${ci.item_id}`));
+            const updated = { ...u, cart: nextCart, last_checkout_ref: undefined };
+            localStorage.setItem('user', JSON.stringify(updated));
+            localStorage.setItem('demo_user', JSON.stringify(updated));
+          }
+        } catch {}
         // try to load top 5 and rank using returned metadata
         const items = (resp?.data?.metadata?.items || resp?.metadata?.items || [])
           .filter(it => it?.item_id && it?.item_type);

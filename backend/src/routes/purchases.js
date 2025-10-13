@@ -9,7 +9,7 @@ const router = Router();
 // 2) Unauthenticated supporter checkout: allow ?user_email=... with optional payment_status filter
 router.get('/', async (req, res, next) => {
   try {
-    const { user_id, me, user_email, payment_status, item_type } = req.query;
+  const { user_id, me, user_email, payment_status, item_type, payment_reference } = req.query;
 
     // If user_email is provided, permit limited unauthenticated access for supporter checkout flow
     if (user_email) {
@@ -17,6 +17,7 @@ router.get('/', async (req, res, next) => {
       let sql = 'SELECT * FROM purchases WHERE 1=1';
       const params = [];
       let i = 1;
+      if (payment_reference) { sql += ` AND payment_reference = $${i}`; params.push(String(payment_reference)); i++; }
       sql += ` AND EXISTS (SELECT 1 FROM users u WHERE u.email = $${i} AND u.id = purchases.user_id)`;
       params.push(String(user_email)); i++;
       if (payment_status) { sql += ` AND payment_status = $${i}`; params.push(payment_status); i++; }
@@ -48,7 +49,8 @@ router.get('/', async (req, res, next) => {
     let sql = 'SELECT * FROM purchases WHERE 1=1';
     const params = [];
     let paramIndex = 1;
-    if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
+  if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
+  if (payment_reference) { sql += ` AND payment_reference = $${paramIndex}`; params.push(payment_reference); paramIndex++; }
     if (payment_status) { sql += ` AND payment_status = $${paramIndex}`; params.push(payment_status); paramIndex++; }
     if (item_type) { sql += ` AND item_type = $${paramIndex}`; params.push(item_type); paramIndex++; }
     sql += ' ORDER BY created_at DESC';

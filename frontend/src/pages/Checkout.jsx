@@ -32,35 +32,22 @@ export default function Checkout() {
       localCart.forEach(ci => { m[`${ci.item_type}:${ci.item_id}`] = Number(ci.min_price || ci.price || 0) || 0; });
       setMinMap(m);
       
-      const userPurchases = await Purchase.filter({ 
-        user_email: userData.email,
-        payment_status: "pending"
-      });
-      if (Array.isArray(userPurchases) && userPurchases.length > 0) {
-        setPurchases(userPurchases);
-        // init empty amount inputs (display only) with placeholders showing item minimums
-        const init = {};
-        userPurchases.forEach(p => { init[p.id] = ''; });
-        setAmountInputs(init);
-      } else {
-        // Fallback: build checkout view from local cart (no pending purchases yet)
-        if (!localCart.length) {
-          // truly nothing to pay for
-          navigate(createPageUrl("Cart"));
-          return;
-        }
-        const fallback = localCart.map(ci => ({
-          id: `${ci.item_type}:${ci.item_id}`,
-          item_type: ci.item_type,
-          item_id: ci.item_id,
-          item_title: ci.item_title || ci.title || 'Untitled',
-          amount: Number(ci.min_price ?? ci.price ?? 0) || 0,
-          payment_status: 'pending'
-        }));
-        setPurchases(fallback);
-        const init2 = {};
-        fallback.forEach(p => { init2[p.id] = ''; });
-        setAmountInputs(init2);
+      // Build purchases view from cart directly to avoid mixing with old pending rows
+      const userPurchases = localCart.map(ci => ({
+        id: `${ci.item_type}:${ci.item_id}`,
+        item_type: ci.item_type,
+        item_id: ci.item_id,
+        item_title: ci.title,
+        amount: Number(ci.price || ci.min_price || 0) || 0
+      }));
+      setPurchases(userPurchases);
+      // init empty inputs (so placeholders show minimums)
+      const init = {};
+      userPurchases.forEach(p => { init[p.id] = ''; });
+      setAmountInputs(init);
+
+      if (userPurchases.length === 0) {
+        navigate(createPageUrl('Cart'));
       }
     } catch (error) {
       navigate(createPageUrl("Home"));
@@ -99,6 +86,10 @@ export default function Checkout() {
     try {
       const email = user?.email || user?.username || 'supporter@example.com';
       const metadata = { source: 'checkout', return: window.location.href };
+      // Try to find a shared reference created at Cart step (if present in any pending purchase)
+      // Since we're building from cart, we won't fetch pending purchases here. Reference is optional.
+      const storedUser = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null');
+      const ref = storedUser?.last_checkout_ref || null;
       const payload = {
         email,
         user_id: user?.id || null,
@@ -107,6 +98,7 @@ export default function Checkout() {
         metadata,
         callback_base_url: window.location.origin,
       };
+      if (ref) payload.reference = ref;
       const init = await Purchase.initializePayment(payload);
       const authUrl = init?.data?.authorization_url;
       if (authUrl) {

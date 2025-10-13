@@ -99,7 +99,7 @@ router.post('/initialize', async (req, res, next) => {
     // Build callback URL to the frontend without requiring APP_URL; prefer client-provided/base origin
     const baseFromClient = (req.body?.callback_base_url || req.headers.origin || '').toString().replace(/\/$/, '');
     const base = baseFromClient || (process.env.APP_URL ? String(process.env.APP_URL).replace(/\/$/, '') : 'http://localhost:3000');
-    const callback_url = `${base}/purchase-success`;
+  const callback_url = `${base}/purchase/success`;
 
     const resp = await paystack.post('/transaction/initialize', {
       email,

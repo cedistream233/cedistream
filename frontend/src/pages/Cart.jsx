@@ -86,20 +86,31 @@ export default function Cart() {
     }
 
     setIsProcessing(true);
-    // Create purchase records
+    // Create purchase records with a shared reference to bind this checkout session
+    const reference = `CDS_CART_${Date.now()}_${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    try {
+      // persist the reference for the next step so Checkout can pass it to Paystack initialize
+      const rawU = localStorage.getItem('user') || localStorage.getItem('demo_user');
+      const u = rawU ? JSON.parse(rawU) : {};
+      const next = { ...u, last_checkout_ref: reference };
+      localStorage.setItem('user', JSON.stringify(next));
+      localStorage.setItem('demo_user', JSON.stringify(next));
+    } catch {}
     for (const p of purchasesToCreate) {
       await Purchase.create({
+        user_id: user.id,
         user_email: user.email,
         item_type: p.item.item_type,
         item_id: p.item.item_id,
         item_title: p.item.title,
         amount: p.amount,
-        payment_status: "pending"
+        payment_status: 'pending',
+        payment_reference: reference
       });
     }
 
     // Navigate to checkout page
-    navigate(createPageUrl("Checkout"));
+  navigate(createPageUrl("Checkout"));
   };
 
   if (cart.length === 0) {

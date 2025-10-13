@@ -49,8 +49,8 @@ export default function App() {
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />
   <Route path="/creators/:id" element={withLayout(Creator, 'Creator')} />
         <Route path="/cart" element={<ProtectedRoute>{withLayout(Cart, 'Cart')}</ProtectedRoute>} />
-        <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
-  <Route path="/purchase/success" element={<ProtectedRoute>{withLayout(PurchaseSuccess, 'Purchase Success')}</ProtectedRoute>} />
+    <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
+    <Route path="/purchase/success" element={withLayout(PurchaseSuccess, 'Purchase Success')} />
         <Route path="/library" element={<ProtectedRoute>{withLayout(Library, 'Library')}</ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute>{withLayout(Admin, 'Admin')}</ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute>{withLayout(CreatorDashboard, 'Dashboard')}</ProtectedRoute>} />
