@@ -24,8 +24,13 @@ export default function AdminHome() {
   }, [token]);
 
   return (
-    <AdminLayout currentPageName="Admin Dashboard">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+    <AdminLayout currentPageName="Admin Dashboard" showShortcuts>
+      <div className="mb-4">
+        <div className="bg-yellow-500/15 border border-yellow-600/30 text-yellow-200 text-sm rounded-md p-3">
+          Amounts listed include a Paystack transfer fee of GH₵1.00. When paying creators, send the net amount shown (amount minus GH₵1).
+        </div>
+      </div>
+      <h1 className="text-3xl font-bold mb-6">Admin</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Requested', value: summary.counts.requested, color: 'bg-yellow-500/20 text-yellow-300' },

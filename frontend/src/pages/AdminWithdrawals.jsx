@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import AdminLayout from '@/AdminLayout';
 
 export default function AdminWithdrawals() {
   const { token } = useAuth();
@@ -82,9 +83,13 @@ export default function AdminWithdrawals() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-white mb-4">Withdrawal Requests</h1>
-      <p className="text-sm text-gray-400 mb-6">Approve or decline creators' withdrawal requests after manual payment.</p>
+    <AdminLayout currentPageName="Withdrawals" showShortcuts>
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-yellow-500/15 border border-yellow-600/30 text-yellow-200 text-sm rounded-md p-3 mb-6">
+          Amounts listed include a Paystack transfer fee of GH₵1.00. When paying creators, send the net amount shown (amount minus GH₵1).
+        </div>
+
+        <h1 className="text-3xl font-bold text-white mb-2">Admin</h1>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -154,7 +159,7 @@ export default function AdminWithdrawals() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-slate-900/50 mb-4">
           <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="paid">Paid</TabsTrigger>
+          <TabsTrigger value="paid">Approved</TabsTrigger>
           <TabsTrigger value="rejected">Declined</TabsTrigger>
         </TabsList>
         <TabsContent value="pending">
@@ -162,45 +167,32 @@ export default function AdminWithdrawals() {
             <div className="text-gray-300">Loading...</div>
           ) : error ? (
             <div className="text-red-400">{error}</div>
-          ) : (
+          ) : rows.length === 0 ? (
             <Card className="bg-slate-900/60 border-slate-700 p-4">
-              {rows.length === 0 ? (
-                <div className="text-gray-400">No requests.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-400">
-                      <tr>
-                        <th className="p-2">Requested At</th>
-                        <th className="p-2">Creator</th>
-                        <th className="p-2">Contact</th>
-                        <th className="p-2">Amount</th>
-                        <th className="p-2">Destination</th>
-                        <th className="p-2">Status</th>
-                        <th className="p-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-200">
-                      {rows.map(r => (
-                        <tr key={r.id} className="border-t border-slate-800">
-                          <td className="p-2">{new Date(r.created_at).toLocaleString()}</td>
-                          <td className="p-2">{r.first_name} {r.last_name} ({r.username || r.email})</td>
-                          <td className="p-2">{r.phone || '—'}</td>
-                          <td className="p-2">GH₵ {Number(r.amount).toFixed(2)} <span className="text-xs text-gray-400">(to receive {Number(r.amount_to_receive).toFixed(2)})</span></td>
-                          <td className="p-2">{r.destination_type}: {r.destination_account}</td>
-                          <td className="p-2">{r.status}</td>
-                          <td className="p-2 space-x-2">
-                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => openAction(r.id, 'processing')}>Mark Processing</Button>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Mark Paid</Button>
-                            <Button size="sm" variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <div className="text-gray-400">No pending withdrawals.</div>
             </Card>
+          ) : (
+            <div className="space-y-4">
+              {rows.map(r => (
+                <Card key={r.id} className="bg-slate-900/60 border-slate-700">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm text-indigo-300">{r.username ? `@${r.username}` : r.email}</div>
+                        <div className="font-semibold text-white">{r.first_name || r.last_name ? `${r.first_name || ''} ${r.last_name || ''}`.trim() : 'Creator'}</div>
+                        <div className="text-green-300 font-semibold mt-1">GH₵ {Number(r.amount).toFixed(2)} <span className="text-xs text-gray-400">net GH₵ {Number(r.amount_to_receive).toFixed(2)}</span></div>
+                        <div className="text-sm text-gray-300 mt-1">Send via {r.destination_type === 'mobile_money' ? 'Mobile Money' : r.destination_type}: {r.destination_account}</div>
+                        <div className="text-xs text-gray-400 mt-1">Mobile: {r.phone || '—'} • Requested: {new Date(r.created_at).toLocaleString()}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Mark as Sent</Button>
+                        <Button variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
         <TabsContent value="paid">
@@ -266,50 +258,6 @@ export default function AdminWithdrawals() {
           )}
         </TabsContent>
       </Tabs>
-      {loading ? (
-        <div className="text-gray-300">Loading...</div>
-      ) : error ? (
-        <div className="text-red-400">{error}</div>
-      ) : (
-        <Card className="bg-slate-900/60 border-slate-700 p-4">
-          {rows.length === 0 ? (
-            <div className="text-gray-400">No pending requests.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-gray-400">
-                  <tr>
-                    <th className="p-2">Requested At</th>
-                    <th className="p-2">Creator</th>
-                    <th className="p-2">Contact</th>
-                    <th className="p-2">Amount</th>
-                    <th className="p-2">Destination</th>
-                    <th className="p-2">Status</th>
-                    <th className="p-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-200">
-                  {rows.map(r => (
-                    <tr key={r.id} className="border-t border-slate-800">
-                      <td className="p-2">{new Date(r.created_at).toLocaleString()}</td>
-                      <td className="p-2">{r.first_name} {r.last_name} ({r.username || r.email})</td>
-                      <td className="p-2">{r.phone || '—'}</td>
-                      <td className="p-2">GH₵ {Number(r.amount).toFixed(2)} <span className="text-xs text-gray-400">(to receive {Number(r.amount_to_receive).toFixed(2)})</span></td>
-                      <td className="p-2">{r.destination_type}: {r.destination_account}</td>
-                      <td className="p-2">{r.status}</td>
-                      <td className="p-2 space-x-2">
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => openAction(r.id, 'processing')}>Mark Processing</Button>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Mark Paid</Button>
-                        <Button size="sm" variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
 
       <div className="mt-6 max-w-xl">
         <label className="block text-sm text-gray-400 mb-1">Internal notes (optional)</label>
@@ -325,5 +273,6 @@ export default function AdminWithdrawals() {
         confirmText={confirm.action === 'rejected' ? 'Decline' : 'Confirm'}
       />
     </div>
+    </AdminLayout>
   );
 }
