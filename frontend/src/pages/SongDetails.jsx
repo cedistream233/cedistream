@@ -30,8 +30,18 @@ export default function SongDetails() {
   const localUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null'); } catch { return null; }
   }, []);
+  // helper: decode user id from JWT if local user isn't present
+  const getIdFromToken = (tok) => {
+    try {
+      const parts = String(tok || '').split('.');
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload?.id || payload?.sub || payload?.user_id || null;
+    } catch (e) { return null; }
+  };
+
   const isOwner = useMemo(() => {
-    const uid = localUser?.id;
+    const uid = localUser?.id || getIdFromToken(localStorage.getItem('token'));
     return uid && song?.user_id && String(uid) === String(song.user_id);
   }, [localUser?.id, song?.user_id]);
   const [ownerPlayMode, setOwnerPlayMode] = useState('full'); // 'full' | 'preview'
@@ -47,12 +57,14 @@ export default function SongDetails() {
       // fetch sales summary if owner
       try {
         const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
-        if (u?.id && data?.user_id && String(u.id) === String(data.user_id)) {
+        const ownerId = u?.id || getIdFromToken(localStorage.getItem('token'));
+        if (ownerId && data?.user_id && String(ownerId) === String(data.user_id)) {
           const token = localStorage.getItem('token');
           const res = await fetch(`/api/uploads/sales/song/${data.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
           if (res.ok) setSalesSummary(await res.json());
+          else setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 });
         }
-      } catch (e) {}
+      } catch (e) { setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 }); }
       setLoading(false);
     })();
   }, [id]);

@@ -25,8 +25,17 @@ export default function VideoDetails() {
   const localUser = React.useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null'); } catch { return null; }
   }, []);
+  const getIdFromToken = (tok) => {
+    try {
+      const parts = String(tok || '').split('.');
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload?.id || payload?.sub || payload?.user_id || null;
+    } catch (e) { return null; }
+  };
+
   const isOwner = React.useMemo(() => {
-    const uid = user?.id || localUser?.id;
+    const uid = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
     return uid && video?.user_id && String(uid) === String(video.user_id);
   }, [user?.id, localUser?.id, video?.user_id]);
 
@@ -88,11 +97,14 @@ export default function VideoDetails() {
   useEffect(() => {
     (async () => {
       try {
-        if (!video || !isOwner) return;
+        if (!video) return;
+        const ownerId = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
+        if (!ownerId || String(ownerId) !== String(video.user_id)) return;
         const token = localStorage.getItem('token');
         const res = await fetch(`/api/uploads/sales/video/${video.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
         if (res.ok) setSalesSummary(await res.json());
-      } catch (e) {}
+        else setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 });
+      } catch (e) { setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 }); }
     })();
   }, [video?.id, isOwner]);
 

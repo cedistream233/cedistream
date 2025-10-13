@@ -44,8 +44,17 @@ export default function AlbumDetails() {
       return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null');
     } catch { return null; }
   }, []);
+  const getIdFromToken = (tok) => {
+    try {
+      const parts = String(tok || '').split('.');
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload?.id || payload?.sub || payload?.user_id || null;
+    } catch (e) { return null; }
+  };
+
   const isOwner = useMemo(() => {
-    const uid = user?.id || localUser?.id;
+    const uid = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
     return uid && album?.user_id && String(uid) === String(album.user_id);
   }, [user?.id, localUser?.id, album?.user_id]);
 
@@ -116,19 +125,23 @@ export default function AlbumDetails() {
     })();
   }, [album?.id, user?.id]);
 
-  // fetch sales summary for owners
+  // fetch sales summary for owners (use localUser fallback so the creator sees zero sales even if User.me() hasn't returned yet)
   useEffect(() => {
     (async () => {
       try {
-        if (!album || !user) return;
-        const uid = user?.id;
-        if (!uid || String(uid) !== String(album.user_id)) return;
+        if (!album) return;
+        const ownerId = user?.id || localUser?.id;
+        if (!ownerId || String(ownerId) !== String(album.user_id)) return;
         const token = localStorage.getItem('token');
         const res = await fetch(`/api/uploads/sales/album/${album.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
         if (res.ok) setSalesSummary(await res.json());
-      } catch (e) {}
+        else setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 });
+      } catch (e) {
+        // on error, still show zero so creators know there are no sales (or the endpoint failed)
+        setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 });
+      }
     })();
-  }, [album?.id, user?.id]);
+  }, [album?.id, user?.id, localUser?.id]);
 
   useEffect(() => {
     (async () => {
@@ -354,17 +367,16 @@ export default function AlbumDetails() {
           </div>
 
           {/* price editor above will update album state (removed empty decorative bar) */}
-
-          {!isOwner && (
-            <Button
-              onClick={handleAddToCart}
-              size="lg"
-              className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
-            >
-              <ShoppingCart className="w-5 h-5 mr-2" />
-              <span>Add to Cart</span>
-            </Button>
-          )}
+                  {!isOwner && (
+                    <Button
+                      onClick={handleAddToCart}
+                      size="lg"
+                      className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
+                    >
+                      <ShoppingCart className="w-5 h-5 mr-2" />
+                      <span>Add to Cart</span>
+                    </Button>
+                  )}
         </div>
       </div>
 
