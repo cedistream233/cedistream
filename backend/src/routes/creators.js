@@ -6,14 +6,31 @@ const router = Router();
 // Helper: resolve an identifier that may be a user id or a username
 async function resolveUserIdentifier(identifier) {
   // Only resolve creators, never admin/supporter
+  // Strategy:
+  // 1) If identifier looks like a UUID, query by id (uses index, fast).
+  // 2) Otherwise normalize (trim + lowercase) and match against username OR email.
   try {
-    const byId = await query("SELECT id FROM users WHERE id = $1 AND role = 'creator'", [identifier]);
-    if (byId.rows.length > 0) return byId.rows[0].id;
+    if (typeof identifier === 'string') {
+      const raw = identifier.trim();
+      // UUID v1-5 pattern
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (uuidRe.test(raw)) {
+        const byId = await query("SELECT id FROM users WHERE id = $1 AND role = 'creator'", [raw]);
+        if (byId.rows.length > 0) return byId.rows[0].id;
+        return null;
+      }
+
+      // Normalize for username/email lookup
+      const norm = raw.toLowerCase();
+      const byIdentity = await query(
+        "SELECT id FROM users WHERE (LOWER(username) = $1 OR LOWER(email) = $1) AND role = 'creator'",
+        [norm]
+      );
+      if (byIdentity.rows.length > 0) return byIdentity.rows[0].id;
+    }
   } catch (e) {
-    // ignore - not a valid id format
+    // ignore DB errors here; caller will handle not-found
   }
-  const byUsername = await query("SELECT id FROM users WHERE username = $1 AND role = 'creator'", [identifier]);
-  if (byUsername.rows.length > 0) return byUsername.rows[0].id;
   return null;
 }
 
