@@ -174,6 +174,7 @@ export default function Albums() {
                   price: song.price,
                   cover_image: song.cover_image,
                   audio_url: song.audio_url,
+                  is_song: true,
                   songs: []
                 }}
                 type="album"

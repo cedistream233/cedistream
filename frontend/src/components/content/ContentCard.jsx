@@ -33,9 +33,9 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
   const [owned, setOwned] = useState(false);
 
   useEffect(() => {
-    // Prefer a dedicated preview endpoint for songs. We detect songs by presence of audio_url on the card item
+    // Prefer a dedicated preview endpoint for songs. We detect songs by presence of audio_url or explicit is_song flag
     async function loadPreview() {
-      if (!item?.id || !item?.audio_url) return;
+      if (!item?.id || !(item?.audio_url || item?.is_song)) return;
 
       // If backend included preview_url on the item metadata, use it immediately
       if (item.preview_url) {
@@ -56,7 +56,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
         setPreviewUrl(null);
       } finally { setLoadingPreview(false); }
     }
-    loadPreview();
+  loadPreview();
     (async () => {
       try {
         const u = JSON.parse(localStorage.getItem('demo_user') || 'null');

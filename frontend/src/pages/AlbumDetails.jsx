@@ -122,7 +122,7 @@ export default function AlbumDetails() {
       const previews = {};
       const fulls = {};
       for (const s of album.songs) {
-        // If preview_url is present on the song metadata, use it immediately
+        // Seed preview from metadata or fetch preview URL
         if (s.preview_url) {
           previews[s.id] = s.preview_url;
         } else {
@@ -132,8 +132,8 @@ export default function AlbumDetails() {
           } catch {}
         }
 
-        // Fetch full for owner or if purchased (requires signed URL)
-        if (isOwner || purchased) {
+        // Always attempt per-song full fetch when logged in; backend authorizes purchase/ownership
+        if (token) {
           try {
             const f = await Song.getSignedUrl(s.id, token);
             if (f) fulls[s.id] = f;
@@ -144,7 +144,7 @@ export default function AlbumDetails() {
       setTrackFullUrls(fulls);
       setAudioFetching(false);
     })();
-  }, [album?.songs, purchased, isOwner, token]);
+  }, [album?.songs, token]);
 
   const onPrev = () => {
     if (!album?.songs?.length) return;
@@ -401,7 +401,11 @@ export default function AlbumDetails() {
                 loading={audioFetching}
                 title={album.songs[currentIndex]?.title || 'Track'}
                 artwork={album.cover_image}
-                showPreviewBadge={!purchased && !isOwner}
+                showPreviewBadge={( () => {
+                  const sid = album.songs[currentIndex]?.id;
+                  const hasFull = !!trackFullUrls[sid];
+                  return !isOwner && !hasFull;
+                })()}
                 onEnded={() => { if (loopMode === 'all') onNext(); }}
                 onPrev={onPrev}
                 onNext={onNext}

@@ -48,14 +48,25 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
     // Owner shortcut
     let canAccess = song.user_id === userId;
 
+    // Load user's email to support legacy purchases recorded by email
+    let userEmail = null;
+    try {
+      const ur = await query('SELECT email FROM users WHERE id = $1', [userId]);
+      userEmail = ur.rows?.[0]?.email || null;
+    } catch {}
+
     if (!canAccess) {
-      // Check purchases for song or parent album
+      // Check purchases for song or parent album (by user_id or legacy user_email)
       const pRes = await query(
-        `SELECT 1 FROM purchases WHERE user_id = $1 AND payment_status = 'completed' AND (
-           (item_type = 'song' AND item_id = $2) OR
-           (item_type = 'album' AND item_id IN (SELECT album_id FROM songs WHERE id = $2))
-         ) LIMIT 1`,
-        [userId, id]
+        `SELECT 1 FROM purchases
+         WHERE (user_id = $1 OR ($3 IS NOT NULL AND user_email = $3))
+           AND (payment_status = 'completed' OR payment_status = 'success')
+           AND (
+             (item_type = 'song' AND item_id = $2) OR
+             (item_type = 'album' AND item_id IN (SELECT album_id FROM songs WHERE id = $2))
+           )
+         LIMIT 1`,
+        [userId, id, userEmail]
       );
       canAccess = pRes.rows.length > 0;
     }
@@ -126,10 +137,22 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
     const video = vRes.rows[0];
 
     let canAccess = video.user_id === userId;
+
+    // Load user's email for legacy purchases
+    let userEmail = null;
+    try {
+      const ur = await query('SELECT email FROM users WHERE id = $1', [userId]);
+      userEmail = ur.rows?.[0]?.email || null;
+    } catch {}
+
     if (!canAccess) {
       const pRes = await query(
-        `SELECT 1 FROM purchases WHERE user_id = $1 AND payment_status = 'completed' AND item_type = 'video' AND item_id = $2 LIMIT 1`,
-        [userId, id]
+        `SELECT 1 FROM purchases
+         WHERE (user_id = $1 OR ($3 IS NOT NULL AND user_email = $3))
+           AND (payment_status = 'completed' OR payment_status = 'success')
+           AND item_type = 'video' AND item_id = $2
+         LIMIT 1`,
+        [userId, id, userEmail]
       );
       canAccess = pRes.rows.length > 0;
     }
@@ -147,3 +170,34 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
 });
 
 export default router;
+// Optional: ownership checker (not wired in server.js by default)
+export const checkOwnership = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!items.length) return res.json([]);
+    const ur = await query('SELECT email FROM users WHERE id = $1', [userId]);
+    const userEmail = ur.rows?.[0]?.email || null;
+    const out = [];
+    for (const it of items) {
+      const { item_type, item_id } = it || {};
+      if (!item_type || !item_id) { out.push({ ...it, owned: false }); continue; }
+      let q = '';
+      const params = [userId, item_id, userEmail];
+      if (item_type === 'song') {
+        q = `SELECT 1 FROM purchases WHERE (user_id=$1 OR ($3 IS NOT NULL AND user_email=$3)) AND (payment_status='completed' OR payment_status='success') AND ((item_type='song' AND item_id=$2) OR (item_type='album' AND item_id IN (SELECT album_id FROM songs WHERE id=$2))) LIMIT 1`;
+      } else if (item_type === 'album') {
+        q = `SELECT 1 FROM purchases WHERE (user_id=$1 OR ($3 IS NOT NULL AND user_email=$3)) AND (payment_status='completed' OR payment_status='success') AND item_type='album' AND item_id=$2 LIMIT 1`;
+      } else if (item_type === 'video') {
+        q = `SELECT 1 FROM purchases WHERE (user_id=$1 OR ($3 IS NOT NULL AND user_email=$3)) AND (payment_status='completed' OR payment_status='success') AND item_type='video' AND item_id=$2 LIMIT 1`;
+      }
+      if (!q) { out.push({ ...it, owned: false }); continue; }
+      const r = await query(q, params);
+      out.push({ ...it, owned: r.rows.length > 0 });
+    }
+    return res.json(out);
+  } catch (e) {
+    console.error('ownership check error', e);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
