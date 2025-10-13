@@ -69,6 +69,7 @@ export default function Login() {
             if (!exists) {
               u.cart = [...cart, intent.item];
               localStorage.setItem('user', JSON.stringify(u));
+              try { updateUser?.(u); } catch {}
             }
             navigate(intent.redirect || '/cart', { replace: true });
             return;

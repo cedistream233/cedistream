@@ -9,11 +9,13 @@ import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import VideoPlayer from '@/components/media/VideoPlayer';
 import TopSupporters from '@/components/content/TopSupporters';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function VideoDetails() {
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const videoId = urlParams.get("id");
+  const { updateMyUserData } = useAuth();
   
   const [video, setVideo] = useState(null);
   const [user, setUser] = useState(null);
@@ -131,18 +133,18 @@ export default function VideoDetails() {
       return;
     }
 
-    // Add to local storage cart and redirect (mirrors Song behavior)
+    // Authenticated: update via context so header/cart badge updates instantly, then navigate
     try {
-      const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+      const uRaw = localStorage.getItem('user');
+      const u = uRaw ? JSON.parse(uRaw) : {};
       const cart = Array.isArray(u.cart) ? u.cart : [];
       const exists = cart.some(i => i.item_id === video.id && i.item_type === 'video');
       if (!exists) {
-        const next = { ...u, cart: [...cart, { item_type: 'video', item_id: video.id, title: video.title, price: min, min_price: min, image: video.thumbnail }] };
-        try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
-        try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+        const nextCart = [...cart, { item_type: 'video', item_id: video.id, title: video.title, price: min, min_price: min, image: video.thumbnail }];
+        await updateMyUserData({ cart: nextCart });
       }
     } catch {}
-    window.location.href = '/cart';
+    navigate(createPageUrl('Cart'));
   };
 
   const onModalCancel = () => setAmountModal({ visible: false, min: 0 });
@@ -155,10 +157,12 @@ export default function VideoDetails() {
       min_price: Number(video.price || 0),
       image: video.thumbnail
     };
-    const currentCart = user.cart || [];
+    const currentCart = (user && Array.isArray(user.cart)) ? user.cart : (() => {
+      try { const ur = localStorage.getItem('user'); const uu = ur ? JSON.parse(ur) : null; return Array.isArray(uu?.cart) ? uu.cart : []; } catch { return []; }
+    })();
     const itemExists = currentCart.some(i => i.item_id === video.id);
     if (!itemExists) {
-      await User.updateMyUserData({ cart: [...currentCart, cartItem] });
+      await updateMyUserData({ cart: [...currentCart, cartItem] });
       navigate(createPageUrl("Cart"));
     }
     onModalCancel();

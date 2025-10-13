@@ -43,14 +43,17 @@ export function addItemToLocalCarts(cartItem) {
     }
   } catch {}
   try {
-    // update 'demo_user' mirror
-    const dRaw = localStorage.getItem('demo_user');
-    const d = dRaw ? JSON.parse(dRaw) : {};
-    const cart = Array.isArray(d.cart) ? d.cart : [];
-    const exists = cart.some(ci => ci.item_id === cartItem.item_id && ci.item_type === cartItem.item_type);
-    if (!exists) {
-      d.cart = [...cart, cartItem];
-      localStorage.setItem('demo_user', JSON.stringify(d));
+    // Only update demo_user if not authenticated
+    const hasToken = !!localStorage.getItem('token');
+    if (!hasToken) {
+      const dRaw = localStorage.getItem('demo_user');
+      const d = dRaw ? JSON.parse(dRaw) : {};
+      const cart = Array.isArray(d.cart) ? d.cart : [];
+      const exists = cart.some(ci => ci.item_id === cartItem.item_id && ci.item_type === cartItem.item_type);
+      if (!exists) {
+        d.cart = [...cart, cartItem];
+        localStorage.setItem('demo_user', JSON.stringify(d));
+      }
     }
   } catch {}
 }

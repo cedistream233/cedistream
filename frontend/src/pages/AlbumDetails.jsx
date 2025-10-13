@@ -14,10 +14,12 @@ import AudioPlayer from '@/components/media/AudioPlayer';
 import { PriceEditModal, PriceDisplay } from '@/components/ui/PriceEditModal';
 import { useToast, ToastContainer } from '@/components/ui/Toast';
 import TopSupporters from '@/components/content/TopSupporters';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AlbumDetails() {
   const navigate = useNavigate();
   const { id: albumId } = useParams();
+  const { updateMyUserData } = useAuth();
   
   const [album, setAlbum] = useState(null);
   const [user, setUser] = useState(null);
@@ -221,18 +223,18 @@ export default function AlbumDetails() {
       return;
     }
 
-    // Add to local storage cart (mirrors Song behavior) and redirect to cart
+    // Authenticated: update via context so header/cart badge updates instantly, then navigate
     try {
-      const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+      const uRaw = localStorage.getItem('user');
+      const u = uRaw ? JSON.parse(uRaw) : {};
       const cart = Array.isArray(u.cart) ? u.cart : [];
       const exists = cart.some(i => i.item_id === album.id && i.item_type === 'album');
       if (!exists) {
-        const next = { ...u, cart: [...cart, { item_type: 'album', item_id: album.id, title: album.title, price: min, min_price: min, image: album.cover_image }] };
-        try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
-        try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+        const nextCart = [...cart, { item_type: 'album', item_id: album.id, title: album.title, price: min, min_price: min, image: album.cover_image }];
+        await updateMyUserData({ cart: nextCart });
       }
     } catch {}
-    window.location.href = '/cart';
+    navigate(createPageUrl('Cart'));
   };
 
   const onModalCancel = () => setAmountModal({ visible: false, min: 0 });
@@ -245,10 +247,12 @@ export default function AlbumDetails() {
       min_price: Number(album.price || 0),
       image: album.cover_image
     };
-    const currentCart = user.cart || [];
+    const currentCart = (user && Array.isArray(user.cart)) ? user.cart : (() => {
+      try { const ur = localStorage.getItem('user'); const uu = ur ? JSON.parse(ur) : null; return Array.isArray(uu?.cart) ? uu.cart : []; } catch { return []; }
+    })();
     const itemExists = currentCart.some(i => i.item_id === album.id);
     if (!itemExists) {
-      await User.updateMyUserData({ cart: [...currentCart, cartItem] });
+      await updateMyUserData({ cart: [...currentCart, cartItem] });
       navigate(createPageUrl("Cart"));
     }
     onModalCancel();

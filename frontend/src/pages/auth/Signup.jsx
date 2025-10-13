@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, updateUser } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -152,6 +152,7 @@ export default function Signup() {
               if (!exists) {
                 u.cart = [...cart, intent.item];
                 localStorage.setItem('user', JSON.stringify(u));
+                try { updateUser?.(u); } catch {}
               }
             } catch {}
             // go to intended destination (default to /cart)
