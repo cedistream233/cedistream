@@ -27,7 +27,8 @@ export default function PurchaseSuccess() {
       try {
         setLoading(true);
         const resp = await Purchase.verify(reference);
-        setData(resp.data || resp);
+  const verified = resp.data || resp;
+  setData(verified);
         // remove purchased items from local cart
         try {
           const items = (resp?.data?.metadata?.items || resp?.metadata?.items || []);
@@ -43,8 +44,19 @@ export default function PurchaseSuccess() {
             try { await updateMyUserData({ cart: nextCart, last_checkout_ref: undefined }); } catch {}
           }
         } catch {}
+        // clear any leftover server-side pending purchases for this reference (cart mirror)
+        try {
+          const token = localStorage.getItem('token');
+          if (token && reference) {
+            await fetch(`/api/purchases/pending/${encodeURIComponent(reference)}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+        } catch {}
+
         // try to load top 5 and rank using returned metadata
-        const items = (resp?.data?.metadata?.items || resp?.metadata?.items || [])
+        const items = (verified?.metadata?.items || [])
           .filter(it => it?.item_id && it?.item_type);
         if (items.length > 0) {
           const first = items[0];
@@ -89,9 +101,19 @@ export default function PurchaseSuccess() {
               <h3 className="font-semibold text-white">Your Items</h3>
               <ul className="mt-2 space-y-2">
                 {Array.isArray(data?.metadata?.items) ? data.metadata.items.map((it, idx) => (
-                  <li key={idx} className="flex items-center justify-between text-sm text-gray-200">
-                    <span className="truncate mr-2">{it.item_title || it.item_id}</span>
-                    <span className="text-yellow-400 font-semibold">GH₵ {Number(it.amount || it?.amount).toFixed(2)}</span>
+                  <li key={idx} className="flex items-center justify-between gap-3 text-sm text-gray-200">
+                    <div className="min-w-0 flex-1">
+                      <span className="truncate mr-2">{it.item_title || it.item_id}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-yellow-400 font-semibold">GH₵ {Number(it.amount || 0).toFixed(2)}</span>
+                      {it.item_type === 'song' && (
+                        <button
+                          className="px-3 py-1.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                          onClick={() => navigate(`/songs/${encodeURIComponent(it.item_id)}?autoplay=1`)}
+                        >Play now</button>
+                      )}
+                    </div>
                   </li>
                 )) : <li className="text-sm text-gray-400">No item data</li>}
               </ul>

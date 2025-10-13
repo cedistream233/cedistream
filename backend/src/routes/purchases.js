@@ -59,6 +59,39 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Server authoritative summary for a given checkout reference
+// Accessible if requester is the user (via auth) or via user_email + reference as in supporter checkout
+router.get('/summary', async (req, res, next) => {
+  try {
+    const { payment_reference, user_email, me, user_id } = req.query;
+    if (!payment_reference) return res.status(400).json({ error: 'payment_reference is required' });
+
+    let uid = null;
+    if (user_email) {
+      // derive uid from email
+      const u = await query('SELECT id FROM users WHERE email = $1', [String(user_email)]);
+      uid = u.rows[0]?.id || null;
+    } else if (String(me) === 'true' || user_id) {
+      // require auth
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (!token) return res.status(401).json({ error: 'Access token required' });
+      const { verifyToken } = await import('../lib/auth.js');
+      const decoded = verifyToken(token);
+      if (!decoded) return res.status(403).json({ error: 'Invalid or expired token' });
+      uid = user_id || decoded.id;
+    }
+
+    const params = [String(payment_reference)];
+    let sql = 'SELECT item_type, item_id, item_title, amount, currency, payment_status FROM purchases WHERE payment_reference = $1';
+    if (uid) { sql += ' AND user_id = $2'; params.push(uid); }
+    const rows = (await query(sql + ' ORDER BY created_at ASC', params)).rows;
+    const items = rows.map(r => ({ item_type: r.item_type, item_id: r.item_id, item_title: r.item_title, amount: Number(r.amount || 0), currency: r.currency, payment_status: r.payment_status }));
+    const totals = items.reduce((acc, it) => { acc.amount += Number(it.amount || 0); return acc; }, { amount: 0 });
+    return res.json({ payment_reference, items, totals });
+  } catch (err) { next(err); }
+});
+
 router.post('/', async (req, res, next) => {
   try {
   const { user_id, user_email, item_type, item_id, item_title, amount, currency = 'GHS', payment_status = 'pending', payment_reference, payment_method } = req.body;
@@ -121,3 +154,19 @@ router.patch('/:id', async (req, res, next) => {
 });
 
 export default router;
+
+// Delete pending purchases for a given checkout reference (server-side cart clear)
+// Authenticated only; removes only rows for the current user and matching reference
+router.delete('/pending/:reference', authenticateToken, async (req, res, next) => {
+  try {
+    const { reference } = req.params;
+    if (!reference) return res.status(400).json({ error: 'Reference is required' });
+    const result = await query(
+      `DELETE FROM purchases
+       WHERE user_id = $1 AND payment_reference = $2 AND payment_status = 'pending'`,
+      [req.user.id, reference]
+    );
+    // node-postgres delete doesn't return rowCount in rows; use commandTag count via result.rowCount
+    return res.json({ cleared: result.rowCount || 0, reference });
+  } catch (err) { next(err); }
+});

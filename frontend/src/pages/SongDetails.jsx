@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Song } from '@/entities/Song';
 import { Card } from '@/components/ui/card';
 import AudioPlayer from '@/components/media/AudioPlayer';
@@ -12,6 +12,8 @@ import TopSupporters from '@/components/content/TopSupporters';
 
 export default function SongDetails() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const autoplayRequested = (searchParams.get('autoplay') || '').toString() === '1' || (searchParams.get('autoplay') || '').toString().toLowerCase() === 'true';
   const [song, setSong] = useState(null);
   const [loading, setLoading] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -173,6 +175,7 @@ export default function SongDetails() {
               : audioUrl}
             loading={audioFetching}
             title={song.title}
+            autoPlay={!!(autoplayRequested && purchased)}
             showPreviewBadge={!purchased}
             hasPrev={false}
             hasNext={false}
