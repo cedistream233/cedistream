@@ -17,7 +17,9 @@
   "migrate-add-songs-status": "node ./scripts/migrate-add-songs-status.js",
   "migrate-add-analytics-indexes": "node ./scripts/migrate-add-analytics-indexes.js",
   "migrate-add-withdrawals": "node ./scripts/migrate-add-withdrawals.js",
-  "migrate-add-fee-split": "node ./scripts/migrate-add-fee-split.js"
+  "migrate-add-fee-split": "node ./scripts/migrate-add-fee-split.js",
+  "migrate-add-admin-role": "node ./scripts/migrate-add-admin-role.js",
+  "seed-admin": "node ./scripts/seed-admin.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

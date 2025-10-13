@@ -5,15 +5,14 @@ const router = Router();
 
 // Helper: resolve an identifier that may be a user id or a username
 async function resolveUserIdentifier(identifier) {
-  // try by id first
+  // Only resolve creators, never admin/supporter
   try {
-    const byId = await query('SELECT id, username FROM users WHERE id = $1', [identifier]);
+    const byId = await query("SELECT id FROM users WHERE id = $1 AND role = 'creator'", [identifier]);
     if (byId.rows.length > 0) return byId.rows[0].id;
   } catch (e) {
     // ignore - not a valid id format
   }
-  // fallback to username lookup
-  const byUsername = await query('SELECT id, username FROM users WHERE username = $1', [identifier]);
+  const byUsername = await query("SELECT id FROM users WHERE username = $1 AND role = 'creator'", [identifier]);
   if (byUsername.rows.length > 0) return byUsername.rows[0].id;
   return null;
 }

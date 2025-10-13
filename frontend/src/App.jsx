@@ -15,6 +15,8 @@ import Checkout from './pages/Checkout.jsx';
 import PurchaseSuccess from './pages/PurchaseSuccess.jsx';
 import Library from './pages/Library.jsx';
 import Admin from './pages/Admin.jsx';
+import AdminWithdrawals from './pages/AdminWithdrawals.jsx';
+import AdminProtectedRoute from './components/AdminProtectedRoute.jsx';
 import Login from './pages/auth/Login.jsx';
 import Signup from './pages/auth/Signup.jsx';
 import ForgotPassword from './pages/auth/ForgotPassword.jsx';
@@ -52,7 +54,8 @@ export default function App() {
     <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
     <Route path="/purchase/success" element={withLayout(PurchaseSuccess, 'Purchase Success')} />
         <Route path="/library" element={<ProtectedRoute>{withLayout(Library, 'Library')}</ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute>{withLayout(Admin, 'Admin')}</ProtectedRoute>} />
+  <Route path="/admin" element={<ProtectedRoute>{withLayout(Admin, 'Admin')}</ProtectedRoute>} />
+  <Route path="/admin/withdrawals" element={<AdminProtectedRoute>{withLayout(AdminWithdrawals, 'Withdrawals')}</AdminProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute>{withLayout(CreatorDashboard, 'Dashboard')}</ProtectedRoute>} />
   <Route path="/my/albums" element={<ProtectedRoute>{withLayout(MyAlbums, 'My Albums')}</ProtectedRoute>} />
   <Route path="/my/songs" element={<ProtectedRoute>{withLayout(MySongs, 'My Songs')}</ProtectedRoute>} />

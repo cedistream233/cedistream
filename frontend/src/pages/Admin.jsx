@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from 'react-router-dom';
 import { Album } from "@/entities/Album";
 import { Video } from "@/entities/Video";
 import { User } from "@/entities/User";
@@ -61,11 +62,14 @@ export default function Admin() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-4xl font-bold text-white mb-8">Admin Panel</h1>
 
-      <Alert className="mb-8 bg-blue-900/20 border-blue-500/50">
+      <Alert className="mb-4 bg-blue-900/20 border-blue-500/50">
         <AlertDescription className="text-blue-200">
           Manage your content inventory. Add new albums and videos for sale.
         </AlertDescription>
       </Alert>
+      <div className="mb-8">
+        <Link to="/admin/withdrawals" className="inline-flex items-center px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700">View Withdrawal Requests</Link>
+      </div>
 
       <Tabs defaultValue="albums">
         <TabsList className="bg-slate-900/50 mb-8">
