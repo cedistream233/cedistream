@@ -13,19 +13,19 @@ export default function AdminWithdrawals() {
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState({ open: false, id: null, action: null });
   const [notes, setNotes] = useState('');
-  const [summary, setSummary] = useState({ counts: { requested: 0, processing: 0, paid: 0, rejected: 0, cancelled: 0 } });
+  const [summary, setSummary] = useState({ counts: { requested: 0, paid: 0, rejected: 0, cancelled: 0 } });
   const [activeTab, setActiveTab] = useState('pending'); // pending | paid | rejected
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
+  const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
 
   const fetchRows = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (activeTab === 'pending') params.set('status', 'requested,processing');
+  if (activeTab === 'pending') params.set('status', 'requested');
       if (activeTab === 'paid') params.set('status', 'paid');
       if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
       if (from) params.set('from', from);
@@ -92,16 +92,18 @@ export default function AdminWithdrawals() {
         <h1 className="text-3xl font-bold text-white mb-2">Admin</h1>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
-          { label: 'Requested', value: summary.counts.requested, color: 'bg-yellow-500/20 text-yellow-300' },
-          { label: 'Processing', value: summary.counts.processing, color: 'bg-blue-500/20 text-blue-300' },
-          { label: 'Paid', value: summary.counts.paid, color: 'bg-green-500/20 text-green-300' },
-          { label: 'Declined', value: summary.counts.rejected + summary.counts.cancelled, color: 'bg-red-500/20 text-red-300' },
+          { label: 'Requested', value: summary.counts.requested, color: 'bg-yellow-100 text-yellow-800', ring: 'ring-yellow-500/20' },
+          { label: 'Paid', value: summary.counts.paid, color: 'bg-green-100 text-green-800', ring: 'ring-green-500/20' },
+          { label: 'Declined', value: summary.counts.rejected + summary.counts.cancelled, color: 'bg-red-100 text-red-800', ring: 'ring-red-500/20' },
         ].map((c) => (
-          <Card key={c.label} className="bg-slate-900/60 border-slate-700 p-4">
-            <div className={`text-sm ${c.color}`}>{c.label}</div>
-            <div className="text-2xl text-white font-semibold">{c.value || 0}</div>
+          <Card key={c.label} className={`bg-slate-900/50 border-slate-700 p-4 flex items-center justify-between ${c.ring}`}>
+            <div>
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${c.color}`}>{c.label}</div>
+              <div className="mt-2 text-2xl font-bold text-white">{c.value || 0}</div>
+            </div>
+            <div className="text-sm text-gray-400">&nbsp;</div>
           </Card>
         ))}
       </div>
@@ -122,7 +124,7 @@ export default function AdminWithdrawals() {
             variant="secondary"
             onClick={async () => {
               const params = new URLSearchParams();
-              if (activeTab === 'pending') params.set('status', 'requested,processing');
+              if (activeTab === 'pending') params.set('status', 'requested');
               if (activeTab === 'paid') params.set('status', 'paid');
               if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
               if (from) params.set('from', from);
@@ -142,18 +144,7 @@ export default function AdminWithdrawals() {
       </div>
 
       {/* Pager */}
-      <div className="flex items-center justify-between mb-4 text-gray-300">
-        <div>
-          Page {page} • Showing {rows.length} of {total} • Per page:
-          <select value={limit} onChange={e => { setLimit(parseInt(e.target.value, 10)); setPage(1); }} className="ml-2 bg-slate-800 border border-slate-700 rounded p-1">
-            {[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-        <div className="space-x-2">
-          <Button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="bg-slate-700 hover:bg-slate-600">Prev</Button>
-          <Button disabled={(page*limit) >= total} onClick={() => setPage(p => p+1)} className="bg-slate-700 hover:bg-slate-600">Next</Button>
-        </div>
-      </div>
+      {/* pagination moved below the requests display */}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -259,19 +250,35 @@ export default function AdminWithdrawals() {
         </TabsContent>
       </Tabs>
 
-      <div className="mt-6 max-w-xl">
-        <label className="block text-sm text-gray-400 mb-1">Internal notes (optional)</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-gray-200" rows={3} placeholder="Transaction reference, operator, etc." />
-      </div>
-
       <ConfirmModal
         isOpen={confirm.open}
         onClose={closeAction}
         onConfirm={doAction}
-        title={confirm.action === 'paid' ? 'Mark as Paid' : confirm.action === 'rejected' ? 'Decline Request' : 'Move to Processing'}
-        description={confirm.action === 'paid' ? 'Confirm you have manually sent the funds to the creator. This will mark the request as paid.' : confirm.action === 'rejected' ? 'This will decline the request. Are you sure?' : 'This will mark the request as processing.'}
+        title={confirm.action === 'paid' ? 'Mark as Paid' : confirm.action === 'rejected' ? 'Decline Request' : 'Confirm Action'}
+        description={confirm.action === 'paid' ? 'Confirm you have manually sent the funds to the creator. This will mark the request as paid.' : confirm.action === 'rejected' ? 'This will decline the request. Are you sure?' : 'Confirm this action.'}
         confirmText={confirm.action === 'rejected' ? 'Decline' : 'Confirm'}
       />
+
+      {/* Pagination - centered below requests */}
+      <div className="flex items-center justify-center mb-6">
+        <div className="inline-flex items-center gap-3 bg-transparent p-2 rounded-lg">
+          <button
+            onClick={() => setPage(p => Math.max(1, p-1))}
+            disabled={page <= 1}
+            className={`px-3 py-2 rounded-full ${page <= 1 ? 'bg-slate-800 text-gray-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>
+            Prev
+          </button>
+
+          <div className="px-4 py-2 rounded-full bg-slate-900/60 text-gray-300">Page {page} of {Math.max(1, Math.ceil((total || 0) / limit))}</div>
+
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= Math.max(1, Math.ceil((total || 0) / limit))}
+            className={`px-3 py-2 rounded-full ${page >= Math.max(1, Math.ceil((total || 0) / limit)) ? 'bg-slate-800 text-gray-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>
+            Next
+          </button>
+        </div>
+      </div>
     </div>
     </AdminLayout>
   );

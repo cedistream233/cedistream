@@ -57,7 +57,7 @@ export default function App() {
     <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
     <Route path="/purchase/success" element={withLayout(PurchaseSuccess, 'Purchase Success')} />
         <Route path="/library" element={<ProtectedRoute>{withLayout(Library, 'Library')}</ProtectedRoute>} />
-  <Route path="/admin" element={<AdminProtectedRoute><AdminHome /></AdminProtectedRoute>} />
+  <Route path="/admin" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
   <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
   <Route path="/admin/platform-earnings" element={<AdminProtectedRoute><AdminEarnings /></AdminProtectedRoute>} />
   <Route path="/admin/support-tickets" element={<AdminProtectedRoute><AdminSupportTickets /></AdminProtectedRoute>} />
