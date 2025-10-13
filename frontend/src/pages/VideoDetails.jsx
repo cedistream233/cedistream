@@ -35,7 +35,10 @@ export default function VideoDetails() {
   };
 
   const isOwner = React.useMemo(() => {
-    const uid = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
+    // Require an auth token before considering the user the owner to avoid showing owner-only UI
+    const tok = localStorage.getItem('token');
+    if (!tok) return false;
+    const uid = user?.id || localUser?.id || getIdFromToken(tok);
     return uid && video?.user_id && String(uid) === String(video.user_id);
   }, [user?.id, localUser?.id, video?.user_id]);
 

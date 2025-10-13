@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Song } from '@/entities/Song';
@@ -41,7 +42,10 @@ export default function SongDetails() {
   };
 
   const isOwner = useMemo(() => {
-    const uid = localUser?.id || getIdFromToken(localStorage.getItem('token'));
+    // Only consider the user the owner if there's a real auth token present.
+    const tok = localStorage.getItem('token');
+    if (!tok) return false;
+    const uid = localUser?.id || getIdFromToken(tok);
     return uid && song?.user_id && String(uid) === String(song.user_id);
   }, [localUser?.id, song?.user_id]);
   const [ownerPlayMode, setOwnerPlayMode] = useState('full'); // 'full' | 'preview'
@@ -210,7 +214,7 @@ export default function SongDetails() {
             embedded
           />
         )}
-        {/* Pay What You Want panel for supporters — hide if this user already purchased and is viewing */}
+  {/* Pay What You Want panel for supporters — hide if this user already purchased and is viewing */}
         {!isOwner && !purchased && (
           <div className="w-full mt-4">
             <PayWhatYouWant
@@ -242,7 +246,17 @@ export default function SongDetails() {
             />
           </div>
         )}
-        {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}
+  {song.description && <div className="text-gray-300 mt-2">{song.description}</div>}
+  {/* Price display/edit - only allow editing for the owner */}
+  <div className="w-full mt-4">
+    <PriceDisplay
+      price={song?.price}
+      onEdit={handlePriceEdit}
+      canEdit={isOwner}
+      optimisticPrice={optimisticPrice}
+      loading={priceLoading}
+    />
+  </div>
       </Card>
 
       <PriceEditModal

@@ -54,7 +54,11 @@ export default function AlbumDetails() {
   };
 
   const isOwner = useMemo(() => {
-    const uid = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
+    // Require an auth token before considering the user the owner. This prevents demo/local users
+    // from being treated as owners when not logged in.
+    const tok = localStorage.getItem('token');
+    if (!tok) return false;
+    const uid = user?.id || localUser?.id || getIdFromToken(tok);
     return uid && album?.user_id && String(uid) === String(album.user_id);
   }, [user?.id, localUser?.id, album?.user_id]);
 

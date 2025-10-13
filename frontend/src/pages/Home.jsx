@@ -178,20 +178,7 @@ export default function Home() {
         ) : (
           <div className="space-y-4">
             <div className="text-gray-400">Search to discover creators.</div>
-            {user?.role === 'creator' && (
-              <div className="p-4 rounded-xl bg-slate-900/50 border border-purple-900/20 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-purple-600/20">
-                    <BarChart3 className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <div className="text-white font-semibold">Creator Dashboard</div>
-                    <div className="text-sm text-gray-400">Manage your albums, songs and videos</div>
-                  </div>
-                </div>
-                <Button onClick={()=>navigate('/dashboard')} className="bg-purple-600 hover:bg-purple-700">Open</Button>
-              </div>
-            )}
+            {/* Creator Dashboard card removed because a dashboard option already exists in the header/navigation */}
           </div>
         )}
       </div>
