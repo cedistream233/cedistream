@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Music, Video as VideoIcon, Download, Play } from "lucide-react";
 import PurchasedSongRow from '@/components/content/PurchasedSongRow';
+import PurchasedAlbumRow from '@/components/content/PurchasedAlbumRow';
+import PurchasedVideoRow from '@/components/content/PurchasedVideoRow';
 import { Button } from "@/components/ui/button";
 
 export default function Library() {
@@ -99,28 +101,9 @@ export default function Library() {
               <p className="text-gray-400 text-lg">No albums purchased yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-3">
               {purchasedItems.albums.map((album) => (
-                <Card key={album.id} className="bg-slate-900/50 border-purple-900/20 overflow-hidden group">
-                  <div className="relative aspect-square">
-                    {album.cover_image ? (
-                      <img src={album.cover_image} alt={album.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
-                        <Music className="w-16 h-16 text-purple-300" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button size="icon" className="bg-white text-black hover:bg-gray-200">
-                        <Play className="w-6 h-6" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-white truncate">{album.title}</h3>
-                    <p className="text-sm text-gray-400 truncate">{album.artist}</p>
-                  </div>
-                </Card>
+                <PurchasedAlbumRow key={album.id} album={album} />
               ))}
             </div>
           )}
@@ -148,28 +131,9 @@ export default function Library() {
               <p className="text-gray-400 text-lg">No videos purchased yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-3">
               {purchasedItems.videos.map((video) => (
-                <Card key={video.id} className="bg-slate-900/50 border-purple-900/20 overflow-hidden group">
-                  <div className="relative aspect-square">
-                    {video.thumbnail ? (
-                      <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
-                        <Play className="w-16 h-16 text-purple-300" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button size="icon" className="bg-white text-black hover:bg-gray-200">
-                        <Play className="w-6 h-6" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-white truncate">{video.title}</h3>
-                    <p className="text-sm text-gray-400 truncate">{video.creator}</p>
-                  </div>
-                </Card>
+                <PurchasedVideoRow key={video.id} video={video} />
               ))}
             </div>
           )}

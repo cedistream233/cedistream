@@ -1,18 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function PurchasedSongRow({ song }) {
+export default function PurchasedVideoRow({ video }) {
   const navigate = useNavigate();
-  const image = song?.cover_image || null;
-  const title = song?.title || 'Untitled';
-  const artist = song?.artist || '—';
+  const image = video?.thumbnail || null;
+  const title = video?.title || 'Untitled';
+  const creator = video?.creator || '—';
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => navigate(`/songs/${encodeURIComponent(song.id)}`)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/songs/${encodeURIComponent(song.id)}`); } }}
+      onClick={() => navigate(`/videos/${encodeURIComponent(video.id)}`)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/videos/${encodeURIComponent(video.id)}`); } }}
       className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition cursor-pointer"
     >
       <div className="flex items-center gap-3 min-w-0">
@@ -25,20 +25,14 @@ export default function PurchasedSongRow({ song }) {
         </div>
         <div className="min-w-0">
           <div className="text-white font-medium truncate">{title}</div>
-          <div className="text-xs text-gray-400 truncate">{artist}</div>
+          <div className="text-xs text-gray-400 truncate">{creator}</div>
           <div className="text-[11px] text-green-400 mt-0.5">Purchased</div>
         </div>
       </div>
       <div className="pl-3 flex items-center gap-2">
         <button
-          onClick={(e) => { e.stopPropagation(); navigate(`/songs/${encodeURIComponent(song.id)}?autoplay=1`); }}
-          className="px-3 py-2 rounded-md bg-slate-800 text-white text-sm hover:bg-slate-700"
-        >
-          Play
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); navigate(`/songs/${encodeURIComponent(song.id)}`); }}
-          className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700"
+          onClick={(e) => { e.stopPropagation(); navigate(`/videos/${encodeURIComponent(video.id)}`); }}
+          className="px-3 py-1.5 rounded-md bg-slate-800 text-white text-sm hover:bg-slate-700"
         >
           Open
         </button>
