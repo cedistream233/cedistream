@@ -9,19 +9,39 @@ const router = Router();
 // 2) Unauthenticated supporter checkout: allow ?user_email=... with optional payment_status filter
 router.get('/', async (req, res, next) => {
   try {
-  const { user_id, me, user_email, payment_status, item_type, payment_reference } = req.query;
+    const { user_id, me, user_email, payment_status, item_type, payment_reference } = req.query;
 
-    // If user_email is provided, permit limited unauthenticated access for supporter checkout flow
+    // If user_email is provided, restrict usage for security
     if (user_email) {
-      // Allow read-only access to the requester's own purchases by email (used for supporter checkout)
-      let sql = 'SELECT * FROM purchases WHERE 1=1';
-      const params = [];
-      let i = 1;
-      if (payment_reference) { sql += ` AND payment_reference = $${i}`; params.push(String(payment_reference)); i++; }
-      sql += ` AND EXISTS (SELECT 1 FROM users u WHERE u.email = $${i} AND u.id = purchases.user_id)`;
-      params.push(String(user_email)); i++;
-      if (payment_status) { sql += ` AND payment_status = $${i}`; params.push(payment_status); i++; }
-      if (item_type) { sql += ` AND item_type = $${i}`; params.push(item_type); i++; }
+      // Two safe cases:
+      // 1) email + payment_reference (checkout confirmation screens). No auth required, but strictly filtered to the reference.
+      // 2) Authenticated user whose token email matches the provided email.
+      if (payment_reference) {
+        let sql = 'SELECT * FROM purchases WHERE payment_reference = $1';
+        const params = [String(payment_reference)];
+        // additionally ensure the reference belongs to that email/user mapping when possible
+        sql += ' AND EXISTS (SELECT 1 FROM users u WHERE u.id = purchases.user_id AND u.email = $2)';
+        params.push(String(user_email));
+        if (payment_status) { sql += ' AND payment_status = $3'; params.push(payment_status); }
+        if (item_type) { sql += payment_status ? ' AND item_type = $4' : ' AND item_type = $3'; params.push(item_type); }
+        const result = await query(sql + ' ORDER BY created_at DESC', params);
+        return res.json(result.rows);
+      }
+      // Otherwise, require auth and matching email
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (!token) return res.status(401).json({ error: 'Access token required' });
+      const { verifyToken } = await import('../lib/auth.js');
+      const decoded = verifyToken(token);
+      if (!decoded) return res.status(403).json({ error: 'Invalid or expired token' });
+      // Ensure the token email matches the requested email
+      const ur = await query('SELECT id FROM users WHERE id = $1 AND email = $2 AND is_active = true', [decoded.id, String(user_email)]);
+      if (ur.rows.length === 0) return res.status(403).json({ error: 'Forbidden' });
+      // Now safely return only this user's purchases
+      let sql = 'SELECT * FROM purchases WHERE user_id = $1';
+      const params = [decoded.id];
+      if (payment_status) { sql += ' AND payment_status = $2'; params.push(payment_status); }
+      if (item_type) { sql += payment_status ? ' AND item_type = $3' : ' AND item_type = $2'; params.push(item_type); }
       const result = await query(sql + ' ORDER BY created_at DESC', params);
       return res.json(result.rows);
     }
@@ -46,11 +66,15 @@ router.get('/', async (req, res, next) => {
       uid = decoded.id;
     }
 
+    // If no identity could be established, do not return all purchases
+    if (!uid) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     let sql = 'SELECT * FROM purchases WHERE 1=1';
     const params = [];
     let paramIndex = 1;
-  if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
-  if (payment_reference) { sql += ` AND payment_reference = $${paramIndex}`; params.push(payment_reference); paramIndex++; }
+    if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
+    if (payment_reference) { sql += ` AND payment_reference = $${paramIndex}`; params.push(payment_reference); paramIndex++; }
     if (payment_status) { sql += ` AND payment_status = $${paramIndex}`; params.push(payment_status); paramIndex++; }
     if (item_type) { sql += ` AND item_type = $${paramIndex}`; params.push(item_type); paramIndex++; }
     sql += ' ORDER BY created_at DESC';

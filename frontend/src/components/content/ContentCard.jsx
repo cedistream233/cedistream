@@ -39,6 +39,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
 
       // If backend included preview_url on the item metadata, use it immediately
       if (item.preview_url) {
+        // Only accept explicit preview_url; never use raw audio_url for playback
         setPreviewUrl(item.preview_url || null);
         return;
       }

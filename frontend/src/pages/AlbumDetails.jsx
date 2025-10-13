@@ -406,6 +406,7 @@ export default function AlbumDetails() {
                   const hasFull = !!trackFullUrls[sid];
                   return !isOwner && !hasFull;
                 })()}
+                previewCapSeconds={(!isOwner && !purchased) ? 30 : undefined}
                 onEnded={() => { if (loopMode === 'all') onNext(); }}
                 onPrev={onPrev}
                 onNext={onNext}

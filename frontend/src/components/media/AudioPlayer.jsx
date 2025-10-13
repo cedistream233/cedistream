@@ -6,6 +6,7 @@ export default function AudioPlayer({
   src,
   title = 'Audio',
   showPreviewBadge = false,
+  previewCapSeconds,
   autoPlay = false,
   onEnded,
   onPrev,
@@ -24,13 +25,35 @@ export default function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [seeking, setSeeking] = useState(false);
+  const capRef = useRef(null);
+
+  // keep a live ref of the effective preview cap
+  useEffect(() => {
+    const cap = (showPreviewBadge && Number.isFinite(previewCapSeconds)) ? Math.max(0, Number(previewCapSeconds)) : null;
+    capRef.current = cap;
+  }, [showPreviewBadge, previewCapSeconds]);
 
   useEffect(() => {
     const el = new Audio();
     audioRef.current = el;
     el.preload = 'metadata';
-  const onLoaded = () => { setDuration(el.duration || 0); setAudioLoading(false); };
-    const onTime = () => { if (!seeking) setCurrent(el.currentTime || 0); };
+    const onLoaded = () => { setDuration(el.duration || 0); setAudioLoading(false); };
+    const onTime = () => {
+      if (seeking) return;
+      const cap = capRef.current;
+      if (cap != null && isFinite(cap)) {
+        if ((el.currentTime || 0) >= cap) {
+          try { el.pause(); } catch {}
+          setPlaying(false);
+          setCurrent(cap);
+          if (onEnded) onEnded();
+          return;
+        }
+        setCurrent(Math.min(el.currentTime || 0, cap));
+      } else {
+        setCurrent(el.currentTime || 0);
+      }
+    };
     const onEnd = () => { setPlaying(false); setCurrent(0); onEnded && onEnded(); };
     el.addEventListener('loadedmetadata', onLoaded);
     el.addEventListener('timeupdate', onTime);
@@ -73,8 +96,14 @@ export default function AudioPlayer({
 
   const toggle = async () => {
     const el = audioRef.current; if (!el || !src || audioLoading || loading) return;
+    const cap = capRef.current;
     if (playing) { el.pause(); setPlaying(false); }
-    else { try { await el.play(); setPlaying(true); } catch {} }
+    else {
+      try {
+        if (cap != null && isFinite(cap) && el.currentTime >= cap) el.currentTime = 0;
+        await el.play(); setPlaying(true);
+      } catch {}
+    }
   };
   const format = (t) => {
     if (!isFinite(t)) return '0:00';
@@ -83,7 +112,10 @@ export default function AudioPlayer({
   };
   const onSeek = (e) => {
     const v = Number(e.target.value);
-    setCurrent(v); setSeeking(true);
+    // When in preview mode, prevent seeking beyond the cap
+    const cap = (showPreviewBadge && Number.isFinite(previewCapSeconds)) ? Math.max(0, Number(previewCapSeconds)) : null;
+    const next = cap != null ? Math.min(v, cap) : v;
+    setCurrent(next); setSeeking(true);
   };
   const onSeekEnd = () => {
     const el = audioRef.current; if (!el) return;
@@ -134,8 +166,9 @@ export default function AudioPlayer({
             </div>
           </div>
           <div className="text-center text-white font-semibold text-base sm:text-lg mb-1 line-clamp-1">{title}</div>
-          <input type="range" min={0} max={isFinite(duration)? duration : 0} step={0.1}
+          <input type="range" min={0} step={0.1}
             value={current}
+            max={(() => { const cap = capRef.current; return isFinite(duration) ? (cap!=null? Math.min(duration, cap): duration) : 0; })()}
             onChange={onSeek}
             onMouseUp={onSeekEnd}
             onTouchEnd={onSeekEnd}

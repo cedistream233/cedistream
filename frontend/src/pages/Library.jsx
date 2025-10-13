@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { User } from "@/entities/User";
 import { Purchase } from "@/entities/Purchase";
 import { Album } from "@/entities/Album";
 import { Video } from "@/entities/Video";
@@ -12,32 +11,39 @@ import PurchasedSongRow from '@/components/content/PurchasedSongRow';
 import PurchasedAlbumRow from '@/components/content/PurchasedAlbumRow';
 import PurchasedVideoRow from '@/components/content/PurchasedVideoRow';
 import { Button } from "@/components/ui/button";
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Library() {
-  const [user, setUser] = useState(null);
+  const { user, token } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [purchasedItems, setPurchasedItems] = useState({ albums: [], songs: [], videos: [] });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadLibrary();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?.id]);
 
   const loadLibrary = async () => {
     setIsLoading(true);
     try {
-      const userData = await User.me();
-      setUser(userData);
+      if (!token) {
+        setPurchases([]);
+        setPurchasedItems({ albums: [], songs: [], videos: [] });
+        setIsLoading(false);
+        return;
+      }
 
-      const userPurchases = await Purchase.filter({
-        user_email: userData.email,
-        payment_status: "completed"
-      });
-      setPurchases(userPurchases);
+      // Fetch authenticated user's purchases only
+      const userPurchases = await Purchase.filter({ me: 'true' });
+      const filtered = (Array.isArray(userPurchases) ? userPurchases : []).filter(p => (
+        p.payment_status === 'completed' || p.payment_status === 'success'
+      ));
+      setPurchases(filtered);
 
-      const albumIds = userPurchases.filter(p => p.item_type === "album").map(p => p.item_id);
-      const videoIds = userPurchases.filter(p => p.item_type === "video").map(p => p.item_id);
-      const songIds = userPurchases.filter(p => p.item_type === "song").map(p => p.item_id);
+      const albumIds = filtered.filter(p => p.item_type === "album").map(p => p.item_id);
+      const videoIds = filtered.filter(p => p.item_type === "video").map(p => p.item_id);
+      const songIds = filtered.filter(p => p.item_type === "song").map(p => p.item_id);
 
       const [allAlbums, allVideos, allSongs] = await Promise.all([
         Album.list(),
@@ -57,6 +63,19 @@ export default function Library() {
   };
 
   if (isLoading) return <LoadingOverlay text="Loading library" />;
+
+  if (!token) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <h1 className="text-4xl font-bold text-white mb-2">My Library</h1>
+        <p className="text-gray-400 mb-6">Sign in to view your purchased content.</p>
+        <div className="flex justify-center gap-3">
+          <a href="/login" className="px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-700 text-white">Log in</a>
+          <a href="/signup" className="px-4 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-gray-200 border border-slate-700">Create account</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

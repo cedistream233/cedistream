@@ -177,6 +177,7 @@ export default function SongDetails() {
             title={song.title}
             autoPlay={!!(autoplayRequested && purchased)}
             showPreviewBadge={!purchased}
+            previewCapSeconds={!purchased ? 30 : undefined}
             hasPrev={false}
             hasNext={false}
             loopMode={loopMode}
