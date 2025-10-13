@@ -328,20 +328,20 @@ export default function CreatorDashboard() {
       transition={{ duration: 0.2 }}
     >
       <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm font-medium">{title}</p>
-              <p className="text-2xl font-bold text-white mt-1">{value}</p>
+              <p className="text-gray-400 text-xs sm:text-sm font-medium">{title}</p>
+              <p className="text-xl sm:text-2xl font-bold text-white mt-1">{value}</p>
               {change && (
-                <p className="text-green-400 text-sm mt-1 flex items-center">
+                <p className="text-green-400 text-xs sm:text-sm mt-1 flex items-center">
                   <TrendingUp className="w-3 h-3 mr-1" />
                   {change}
                 </p>
               )}
             </div>
-            <div className={`p-3 rounded-full bg-slate-800 ${color}`}>
-              <Icon className="w-6 h-6" />
+            <div className={`p-2 sm:p-3 rounded-full bg-slate-800 ${color}`}>
+              <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
         </CardContent>
@@ -434,7 +434,7 @@ export default function CreatorDashboard() {
         </div>
 
         {/* Stats Grid - always visible, values sourced from backend */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
           <StatCard
             icon={DollarSign}
             title="Total Earnings"
