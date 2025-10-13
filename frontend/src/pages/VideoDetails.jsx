@@ -256,14 +256,16 @@ export default function VideoDetails() {
             </div>
           </div>
 
-          <Button
-            onClick={handleAddToCart}
-            size="lg"
-            className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
-          >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            <span>Add to Cart</span>
-          </Button>
+          {!canAccess && (
+            <Button
+              onClick={handleAddToCart}
+              size="lg"
+              className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
+            >
+              <ShoppingCart className="w-5 h-5 mr-2" />
+              <span>Add to Cart</span>
+            </Button>
+          )}
         </div>
       </div>
 

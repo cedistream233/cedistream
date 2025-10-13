@@ -184,8 +184,8 @@ export default function SongDetails() {
             embedded
           />
         )}
-        {/* Pay What You Want panel for supporters */}
-        {!isOwner && (
+        {/* Pay What You Want panel for supporters — hide if this user already purchased and is viewing */}
+        {!isOwner && !purchased && (
           <div className="w-full mt-4">
             <PayWhatYouWant
               minPrice={Number(song.price || 1)}
@@ -202,7 +202,7 @@ export default function SongDetails() {
                   return;
                 }
                 try {
-                  const u = JSON.parse(localStorage.getItem('user') || 'null') || {};
+                  const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
                   const cart = Array.isArray(u.cart) ? u.cart : [];
                   const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
                   if (!exists) {
