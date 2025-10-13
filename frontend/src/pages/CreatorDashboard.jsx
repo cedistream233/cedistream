@@ -53,7 +53,7 @@ export default function CreatorDashboard() {
   });
   const [recentSales, setRecentSales] = useState([]);
   const [salesPage, setSalesPage] = useState(1);
-  const [salesPageSize, setSalesPageSize] = useState(10);
+  const [salesPageSize, setSalesPageSize] = useState(5);
   const [salesHasMore, setSalesHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [myContent, setMyContent] = useState({ albums: [], videos: [] });
@@ -404,8 +404,8 @@ export default function CreatorDashboard() {
                 const display = user?.creatorProfile?.stage_name || full || fallback;
                 return `Welcome back, ${display}!`;
               })()}
-            </h1>
-            <p className="text-gray-400">Here's what's happening with your content</p>
+            </h1>           
+            <p className="text-sm text-gray-400 mt-2">NOTE: amounts shown under earnings are your net share after the platform's 20% fee.</p>
 
             {/* Shareable Profile Link */}
             {creatorPublicUrl && (
@@ -510,13 +510,13 @@ export default function CreatorDashboard() {
                           </div>
                         </div>
                       ))}
-                        <div className="flex items-center justify-between mt-4">
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                           <div className="flex items-center gap-2">
                             <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={() => setSalesPage(p => Math.max(1, p-1))} disabled={salesPage === 1}>Prev</button>
                             <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={() => { if (salesHasMore) setSalesPage(p => p+1); }} disabled={!salesHasMore}>Next</button>
-                            <span className="text-sm text-gray-400">Page {salesPage}</span>
+                            <span className="text-sm text-gray-400 ml-2">Page {salesPage}</span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-end gap-2">
                             <label className="text-sm text-gray-400">Per page</label>
                             <select value={salesPageSize} onChange={e => { setSalesPageSize(parseInt(e.target.value,10)); setSalesPage(1); }} className="bg-slate-800 text-white px-2 py-1 rounded">
                               <option value={5}>5</option>
@@ -596,6 +596,8 @@ export default function CreatorDashboard() {
                 <CardContent className="p-6">
                   <div className="text-center">
                     <p className="text-gray-400 text-sm">Available Balance</p>
+                    {/* Short note immediately above the total earnings amount */}
+                    <p className="text-xs text-gray-400 mt-1">Shown net of platform fee — you receive 80%</p>
                     <p className="text-3xl font-bold text-green-400 mt-2">GH₵ {stats.totalEarnings.toFixed(2)}</p>
                     <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700 w-full" onClick={() => setWithdrawOpen(true)}>
                       Withdraw Funds

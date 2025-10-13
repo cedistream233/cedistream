@@ -84,12 +84,13 @@ router.get('/:id', async (req, res, next) => {
       `SELECT
          COALESCE((SELECT COUNT(1) FROM albums a WHERE a.user_id = $1), 0) as albums_count,
          COALESCE((SELECT COUNT(1) FROM videos v WHERE v.user_id = $1), 0) as videos_count,
-         COALESCE((SELECT SUM(p.amount) FROM purchases p
-                    WHERE p.payment_status = 'completed' AND (
-                      (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
-                      (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
-                      (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
-                    )), 0) as total_earnings,
+        -- Use creator_amount (net) for total earnings so creators see their net revenue after platform fees
+        COALESCE((SELECT SUM(p.creator_amount) FROM purchases p
+                     WHERE p.payment_status = 'completed' AND (
+                       (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+                       (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+                       (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+                     )), 0) as total_earnings,
          COALESCE((SELECT COUNT(1) FROM purchases p
                     WHERE p.payment_status = 'completed' AND (
                       (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
