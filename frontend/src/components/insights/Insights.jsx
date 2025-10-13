@@ -25,11 +25,24 @@ export default function Insights({ creatorId, token }) {
         if (!res.ok) throw new Error('Failed to load insights');
         const data = await res.json();
         if (!mounted) return;
-  setOverview({ viewsThisMonth: data.viewsThisMonth || 0, monthlyRevenue: data.monthlyRevenue || 0 });
-  setTotal(data.totalRevenue || data.monthlyRevenue || 0);
+  // Prefer creator/net revenue fields when available (backend may return creatorRevenue/creator_amount)
+  const platformShare = 0.8; // creators receive 80% by default if backend doesn't provide net values
+  const monthlyRevenue = (typeof data.monthlyRevenue !== 'undefined') ? data.monthlyRevenue : 0;
+  const totalRevenue = (typeof data.totalRevenue !== 'undefined') ? data.totalRevenue : monthlyRevenue;
+  // If backend provides a creator-specific total, prefer that
+  const monthlyCreatorRevenue = (typeof data.monthlyCreatorRevenue !== 'undefined') ? data.monthlyCreatorRevenue : (typeof data.monthlyCreatorRevenueNet !== 'undefined' ? data.monthlyCreatorRevenueNet : null);
+  const totalCreatorRevenue = (typeof data.totalCreatorRevenue !== 'undefined') ? data.totalCreatorRevenue : (typeof data.totalCreatorRevenueNet !== 'undefined' ? data.totalCreatorRevenueNet : null);
+
+  setOverview({ viewsThisMonth: data.viewsThisMonth || 0, monthlyRevenue: (monthlyCreatorRevenue !== null ? monthlyCreatorRevenue : monthlyRevenue * platformShare) });
+  setTotal(totalCreatorRevenue !== null ? totalCreatorRevenue : (totalRevenue * platformShare));
   setTotalSales(data.totalSales || 0);
   setViewsSeries([]); // no views series now; use sales instead
-  setRevenueSeries((data.series || []).map(s => ({ date: s.date, revenue: s.revenue || 0, sales: s.sales || 0 })));
+  // Map series and prefer creator/net revenue per point when present; otherwise multiply gross revenue by platformShare
+  setRevenueSeries((data.series || []).map(s => {
+    const gross = typeof s.revenue !== 'undefined' ? s.revenue : 0;
+    const creatorNet = (typeof s.creator_revenue !== 'undefined') ? s.creator_revenue : (typeof s.creator_amount !== 'undefined' ? s.creator_amount : (typeof s.creatorNet !== 'undefined' ? s.creatorNet : null));
+    return ({ date: s.date, revenue: (creatorNet !== null ? creatorNet : gross * platformShare), sales: s.sales || 0 });
+  }));
       } catch (e) {
         console.error(e);
       } finally {
