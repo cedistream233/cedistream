@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Home, Music, ShoppingCart, Library, LogOut, User as UserIcon, BarChart3, Menu } from "lucide-react";
+import { Home, Music, ShoppingCart, Library, LogOut, User as UserIcon, BarChart3, Menu, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import LogoutConfirmModal from "@/components/ui/LogoutConfirmModal";
+import ContactSupportModal from "@/components/ui/ContactSupportModal";
 import BackToTop from "@/components/ui/BackToTop.jsx";
 import {
 	DropdownMenu,
@@ -21,6 +22,7 @@ export default function Layout({ children, currentPageName }) {
 	const [showLogoutModal, setShowLogoutModal] = useState(false);
 	// derive cart count from auth context so it updates when demo_user/user changes
 	const cartCount = (user?.cart || []).length || 0;
+	const [showSupport, setShowSupport] = useState(false);
 
 	const handleLogoutClick = () => {
 		setShowLogoutModal(true);
@@ -124,7 +126,7 @@ export default function Layout({ children, currentPageName }) {
 											<Menu className="w-6 h-6" />
 										</Button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end" className="bg-slate-900 border-purple-900/20 min-w-[200px]">
+									<DropdownMenuContent align="end" className="bg-slate-900 border-purple-900/20 min-w-[220px]">
 										<div className="px-3 py-2 border-b border-slate-700">
 											<p className="text-sm font-medium text-white">{getUserDisplayName()}</p>
 											<p className="text-xs text-gray-400">{user.email}</p>
@@ -141,7 +143,7 @@ export default function Layout({ children, currentPageName }) {
 												</DropdownMenuItem>
 												<DropdownMenuSeparator className="bg-slate-700" />
 											</>
-										)}
+											)}
 										{isAdmin && (
 											<>
 												<DropdownMenuItem asChild>
@@ -159,6 +161,13 @@ export default function Layout({ children, currentPageName }) {
 												<UserIcon className="w-4 h-4" />
 												Profile Settings
 											</Link>
+										</DropdownMenuItem>
+
+										<DropdownMenuSeparator className="bg-slate-700" />
+
+										<DropdownMenuItem onClick={() => setShowSupport(true)} className="flex items-center gap-2 text-gray-300 hover:text-white">
+											<LifeBuoy className="w-4 h-4" />
+											Contact Support
 										</DropdownMenuItem>
 										
 										<DropdownMenuSeparator className="bg-slate-700" />
@@ -219,6 +228,9 @@ export default function Layout({ children, currentPageName }) {
 
 			{/* Back to top */}
 			<BackToTop />
+
+			{/* Contact Support Modal */}
+			<ContactSupportModal open={showSupport} onOpenChange={setShowSupport} />
 
 			{/* Logout Confirmation Modal */}
 			<LogoutConfirmModal
