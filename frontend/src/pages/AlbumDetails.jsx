@@ -36,6 +36,7 @@ export default function AlbumDetails() {
   const [priceLoading, setPriceLoading] = useState(false);
   const { toasts, toast, removeToast } = useToast();
   const token = useMemo(() => localStorage.getItem('token') || null, []);
+  const [salesSummary, setSalesSummary] = useState({ count: 0, gross_total: 0, creator_total: 0 });
 
   // Determine ownership robustly from multiple sources
   const localUser = useMemo(() => {
@@ -112,6 +113,20 @@ export default function AlbumDetails() {
           setPurchased(rows?.some(r => r.item_id === album.id && r.payment_status === 'completed'));
         } else { setPurchased(false); }
       } catch { setPurchased(false); }
+    })();
+  }, [album?.id, user?.id]);
+
+  // fetch sales summary for owners
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!album || !user) return;
+        const uid = user?.id;
+        if (!uid || String(uid) !== String(album.user_id)) return;
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/uploads/sales/album/${album.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
+        if (res.ok) setSalesSummary(await res.json());
+      } catch (e) {}
     })();
   }, [album?.id, user?.id]);
 
@@ -332,6 +347,9 @@ export default function AlbumDetails() {
                   loading={priceLoading}
                 />
               </div>
+                {isOwner && (
+                  <div className="text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+                )}
             </div>
           </div>
 

@@ -21,6 +21,14 @@ export default function VideoDetails() {
   const [canAccess, setCanAccess] = useState(false);
   const [mediaUrl, setMediaUrl] = useState(null);
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
+  const [salesSummary, setSalesSummary] = useState({ count: 0, gross_total: 0, creator_total: 0 });
+  const localUser = React.useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null'); } catch { return null; }
+  }, []);
+  const isOwner = React.useMemo(() => {
+    const uid = user?.id || localUser?.id;
+    return uid && video?.user_id && String(uid) === String(video.user_id);
+  }, [user?.id, localUser?.id, video?.user_id]);
 
   useEffect(() => {
     if (videoId) {
@@ -75,6 +83,18 @@ export default function VideoDetails() {
       }
     })();
   }, [video?.id]);
+
+  // fetch sales summary for owners
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!video || !isOwner) return;
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/uploads/sales/video/${video.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
+        if (res.ok) setSalesSummary(await res.json());
+      } catch (e) {}
+    })();
+  }, [video?.id, isOwner]);
 
   const handleAddToCart = async () => {
     const token = localStorage.getItem('token');
@@ -254,6 +274,9 @@ export default function VideoDetails() {
               <span className="text-gray-400">Minimum price:</span>
               <span className="text-3xl font-bold text-yellow-400">From GH₵ {video.price?.toFixed(2)}</span>
             </div>
+            {isOwner && (
+              <div className="text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+            )}
           </div>
 
           {!canAccess && (

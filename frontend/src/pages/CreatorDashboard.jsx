@@ -410,7 +410,7 @@ export default function CreatorDashboard() {
                 return `Welcome back, ${display}!`;
               })()}
             </h1>           
-            <p className="text-sm text-gray-400 mt-2">NOTE: Amounts shown under Earnings are your net share after the platform’s fee.</p>
+            <p className="text-sm text-gray-400 mt-2">NOTE: Amounts shown under Earnings are your net share after the platform’s fee 20%.</p>
 
             {/* Shareable Profile Link */}
             {creatorPublicUrl && (

@@ -333,3 +333,40 @@ router.get('/sales-export', authenticateToken, requireRole(['creator']), async (
 });
 
 export default router;
+
+// GET /api/uploads/sales/:itemType/:itemId
+// Return aggregate sales data for a single item (count, gross_total, creator_total)
+router.get('/sales/:itemType/:itemId', authenticateToken, requireRole(['creator']), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { itemType, itemId } = req.params;
+    if (!['album','song','video'].includes(itemType)) return res.status(400).json({ error: 'Invalid item type' });
+
+    // Verify ownership: the item must belong to this creator
+    let owns = false;
+    if (itemType === 'album') {
+      const r = await query('SELECT 1 FROM albums WHERE id = $1 AND user_id = $2', [itemId, userId]);
+      owns = r && r.rowCount > 0;
+    } else if (itemType === 'song') {
+      const r = await query('SELECT 1 FROM songs WHERE id = $1 AND user_id = $2', [itemId, userId]);
+      owns = r && r.rowCount > 0;
+    } else if (itemType === 'video') {
+      const r = await query('SELECT 1 FROM videos WHERE id = $1 AND user_id = $2', [itemId, userId]);
+      owns = r && r.rowCount > 0;
+    }
+
+    if (!owns) return res.status(403).json({ error: 'Not authorized for this item' });
+
+    const agg = await query(
+      `SELECT COUNT(1)::int as count, COALESCE(SUM(p.amount),0)::numeric::float8 as gross_total, COALESCE(SUM(p.creator_amount),0)::numeric::float8 as creator_total
+       FROM purchases p
+       WHERE p.payment_status = 'completed' AND p.item_type = $1 AND p.item_id = $2`,
+      [itemType, itemId]
+    );
+
+    return res.json(agg.rows?.[0] || { count: 0, gross_total: 0, creator_total: 0 });
+  } catch (err) {
+    console.error('sales aggregate error:', err);
+    return res.status(500).json({ error: 'Failed to load sales summary' });
+  }
+});

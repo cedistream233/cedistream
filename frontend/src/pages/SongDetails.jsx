@@ -35,6 +35,7 @@ export default function SongDetails() {
     return uid && song?.user_id && String(uid) === String(song.user_id);
   }, [localUser?.id, song?.user_id]);
   const [ownerPlayMode, setOwnerPlayMode] = useState('full'); // 'full' | 'preview'
+  const [salesSummary, setSalesSummary] = useState({ count: 0, gross_total: 0, creator_total: 0 });
 
   useEffect(() => {
     (async () => {
@@ -43,6 +44,15 @@ export default function SongDetails() {
       setSong(data);
       // Seed preview URL from metadata immediately so UI buttons render enabled sooner
       if (data?.preview_url) setPreviewUrl(prev => prev || data.preview_url);
+      // fetch sales summary if owner
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+        if (u?.id && data?.user_id && String(u.id) === String(data.user_id)) {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/uploads/sales/song/${data.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
+          if (res.ok) setSalesSummary(await res.json());
+        }
+      } catch (e) {}
       setLoading(false);
     })();
   }, [id]);
@@ -142,6 +152,9 @@ export default function SongDetails() {
         <img src={song.cover_image || 'https://via.placeholder.com/160?text=%F0%9F%8E%B5'} alt={song.title} className="w-40 h-40 rounded-lg object-cover mb-2" />
         <h1 className="text-2xl font-bold text-white mb-0.5">{song.title}</h1>
         <div className="text-gray-400 mb-1">{song.artist}</div>
+        {isOwner && (
+          <div className="text-sm text-slate-300 mt-1">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+        )}
         {/* Render the player immediately; pass loading while the audio URL is being resolved */}
         {isOwner && (
           <div className="flex items-center gap-2">
