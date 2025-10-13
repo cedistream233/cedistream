@@ -112,17 +112,25 @@ export default function AudioPlayer({
         <div className="w-full">
           <div className="flex items-center justify-center mb-2">
         <div className={`flex items-end gap-[3px] ${playing? 'opacity-100':'opacity-50'}`} aria-hidden>
-              {([6,9,13,8,14,7,12,10,15,9,13,8]).map((h,i)=> (
-                <span
-                  key={i}
-                  className="w-1.5 rounded-t origin-bottom bg-gradient-to-t from-green-600 to-emerald-300"
-                  style={{
-                    height: `${h}px`,
-                    animation: playing ? `eqGrow ${0.8 + (i%5)*0.12}s infinite ease-in-out alternate` : 'none',
-                    animationDelay: `${(i%6)*0.05}s`
-                  }}
-                />
-              ))}
+              {([6,9,13,8,14,7,12,10,15,9,13,8]).map((h,i)=> {
+                const dur = `${(0.8 + (i%5)*0.12).toFixed(3)}s`;
+                const delay = `${((i%6)*0.05).toFixed(3)}s`;
+                return (
+                  <span
+                    key={i}
+                    className="w-1.5 rounded-t origin-bottom bg-gradient-to-t from-green-600 to-emerald-300"
+                    style={{
+                      height: `${h}px`,
+                      animationName: playing ? 'eqGrow' : 'none',
+                      animationDuration: playing ? dur : undefined,
+                      animationTimingFunction: playing ? 'ease-in-out' : undefined,
+                      animationIterationCount: playing ? 'infinite' : undefined,
+                      animationDirection: playing ? 'alternate' : undefined,
+                      animationDelay: playing ? delay : undefined
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
           <div className="text-center text-white font-semibold text-base sm:text-lg mb-1 line-clamp-1">{title}</div>
