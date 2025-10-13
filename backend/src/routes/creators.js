@@ -3,6 +3,21 @@ import { query } from '../lib/database.js';
 
 const router = Router();
 
+// Helper: resolve an identifier that may be a user id or a username
+async function resolveUserIdentifier(identifier) {
+  // try by id first
+  try {
+    const byId = await query('SELECT id, username FROM users WHERE id = $1', [identifier]);
+    if (byId.rows.length > 0) return byId.rows[0].id;
+  } catch (e) {
+    // ignore - not a valid id format
+  }
+  // fallback to username lookup
+  const byUsername = await query('SELECT id, username FROM users WHERE username = $1', [identifier]);
+  if (byUsername.rows.length > 0) return byUsername.rows[0].id;
+  return null;
+}
+
 // GET /api/creators?q=kwame
 router.get('/', async (req, res, next) => {
   try {
@@ -24,6 +39,7 @@ router.get('/', async (req, res, next) => {
     const result = await query(
       `SELECT u.id as user_id,
               u.first_name, u.last_name, u.profile_image,
+              u.username,
               cp.stage_name,
               COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as display_name,
               -- content counts (best-effort if tables exist)
@@ -55,7 +71,10 @@ router.get('/', async (req, res, next) => {
 // GET /api/creators/:id
 router.get('/:id', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    // resolve rawId which may be either a numeric id or a username
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
     const userRes = await query(
       `SELECT u.id as user_id,
               u.first_name, u.last_name, u.profile_image, u.bio,

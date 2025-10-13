@@ -215,9 +215,9 @@ export default function CreatorDashboard() {
 
   // Share/copy helpers
   const creatorPublicUrl = (() => {
-    const id = user?.id || '';
     const base = window?.location?.origin || '';
-    return id ? `${base}/creators/${encodeURIComponent(id)}` : '';
+    const handle = (user?.username && String(user.username).trim()) ? user.username : (user?.id || '');
+    return handle ? `${base}/creators/${encodeURIComponent(handle)}` : '';
   })();
 
   const handleShareProfile = async () => {
@@ -405,7 +405,7 @@ export default function CreatorDashboard() {
                 return `Welcome back, ${display}!`;
               })()}
             </h1>           
-            <p className="text-sm text-gray-400 mt-2">NOTE: amounts shown under earnings are your net share after the platform's 20% fee.</p>
+            <p className="text-sm text-gray-400 mt-2">NOTE: Amounts shown under Earnings are your net share after the platform’s fee.</p>
 
             {/* Shareable Profile Link */}
             {creatorPublicUrl && (

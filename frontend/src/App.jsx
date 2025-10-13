@@ -47,7 +47,7 @@ export default function App() {
         <Route path="/videos" element={withLayout(Videos, 'Videos')} />
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />
-  <Route path="/creators/:id" element={withLayout(Creator, 'Creator')} />
+  <Route path="/creators/:handle" element={withLayout(Creator, 'Creator')} />
         <Route path="/cart" element={<ProtectedRoute>{withLayout(Cart, 'Cart')}</ProtectedRoute>} />
     <Route path="/checkout" element={<ProtectedRoute>{withLayout(Checkout, 'Checkout')}</ProtectedRoute>} />
     <Route path="/purchase/success" element={withLayout(PurchaseSuccess, 'Purchase Success')} />

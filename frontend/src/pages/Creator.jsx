@@ -7,7 +7,7 @@ import { Song } from '@/entities/Song';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 
 export default function Creator() {
-  const { id } = useParams();
+  const { handle: id } = useParams();
   const [tab, setTab] = useState('songs'); // 'songs' | 'albums' | 'videos'
   const [creator, setCreator] = useState(null);
   const [content, setContent] = useState({ albums: [], videos: [] });

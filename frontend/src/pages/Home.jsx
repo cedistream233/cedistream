@@ -157,7 +157,7 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {results.map((c) => (
-                  <Link key={c.user_id} to={`/creators/${encodeURIComponent(c.user_id)}`} className="block group">
+                  <Link key={c.user_id} to={`/creators/${encodeURIComponent(c.username || c.user_id)}`} className="block group">
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50 border border-purple-900/20 hover:border-purple-500/40 transition cursor-pointer">
                       <img
                         src={c.profile_image || 'https://via.placeholder.com/80?text=%F0%9F%8E%B5'}
