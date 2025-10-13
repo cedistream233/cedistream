@@ -7,6 +7,7 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const { open: openViewer } = useImageViewer();
+  const PLATFORM_SHARE = 0.8; // Creator's share when backend doesn't provide net fields
 
   useEffect(() => {
     if (!itemType || !itemId) return;
@@ -92,6 +93,25 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
     }
   };
 
+  // Compute creator net points from a supporter record; prefer creator/net fields when available
+  const getNetPoints = (supporter) => {
+    try {
+      const gross = Number(supporter?.total_amount ?? supporter?.amount ?? 0) || 0;
+      const candidates = [
+        supporter?.creator_total_amount,
+        supporter?.creator_amount,
+        supporter?.creator_revenue,
+        supporter?.creatorNet,
+      ];
+      const firstDefined = candidates.find(v => typeof v !== 'undefined' && v !== null);
+      const net = Number(firstDefined);
+      if (!isNaN(net)) return net;
+      return gross * PLATFORM_SHARE;
+    } catch {
+      return 0;
+    }
+  };
+
   return (
     <div className={`bg-gradient-to-br from-slate-900/60 to-slate-800/60 border border-purple-900/30 rounded-xl p-4 sm:p-6 backdrop-blur-sm ${className}`}>
       <div className="flex items-center justify-between gap-2 mb-4">
@@ -150,9 +170,13 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
                 {/* Points (no currency) */}
                 <div className="flex-shrink-0 text-right">
                   <p className="text-yellow-400 font-bold text-sm sm:text-base">
-                    {Math.round(Number(supporter.total_amount || 0))} pts
+                    {(() => {
+                      const v = Number(getNetPoints(supporter) || 0);
+                      // Show up to 2 decimals, but do not force rounding up beyond representation
+                      return `${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} pts`;
+                    })()}
                   </p>
-                  <p className="text-xs text-gray-500">total</p>
+                  <p className="text-xs text-gray-500">net</p>
                 </div>
               </div>
             </div>
