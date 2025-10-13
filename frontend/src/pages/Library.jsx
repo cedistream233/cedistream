@@ -7,6 +7,7 @@ import { Song } from "@/entities/Song";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Music, Video as VideoIcon, Download, Play } from "lucide-react";
+import PurchasedSongRow from '@/components/content/PurchasedSongRow';
 import { Button } from "@/components/ui/button";
 
 export default function Library() {
@@ -132,28 +133,9 @@ export default function Library() {
               <p className="text-gray-400 text-lg">No songs purchased yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-3">
               {purchasedItems.songs.map((song) => (
-                <Card key={song.id} className="bg-slate-900/50 border-purple-900/20 overflow-hidden group">
-                  <div className="relative aspect-square">
-                    {song.cover_image ? (
-                      <img src={song.cover_image} alt={song.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
-                        <Music className="w-16 h-16 text-purple-300" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button size="icon" className="bg-white text-black hover:bg-gray-200">
-                        <Play className="w-6 h-6" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-white truncate">{song.title}</h3>
-                    <p className="text-sm text-gray-400 truncate">{song.artist}</p>
-                  </div>
-                </Card>
+                <PurchasedSongRow key={song.id} song={song} />
               ))}
             </div>
           )}

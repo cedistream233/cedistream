@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Purchase } from '@/entities/Purchase';
+import { useAuth } from '@/contexts/AuthContext';
 import { Trophy, Sparkles } from 'lucide-react';
 import { Leaderboard } from '@/utils';
 
 export default function PurchaseSuccess() {
+  const { updateMyUserData } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,8 @@ export default function PurchaseSuccess() {
             const updated = { ...u, cart: nextCart, last_checkout_ref: undefined };
             localStorage.setItem('user', JSON.stringify(updated));
             localStorage.setItem('demo_user', JSON.stringify(updated));
+            // also update context so header/cart icon reacts immediately
+            try { await updateMyUserData({ cart: nextCart, last_checkout_ref: undefined }); } catch {}
           }
         } catch {}
         // try to load top 5 and rank using returned metadata
@@ -63,7 +67,7 @@ export default function PurchaseSuccess() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-white mb-4">Thank you for your support!</h1>
+      <h1 className="text-3xl font-bold text-white mb-4">Thanks for your support!</h1>
       {loading && <p className="text-gray-300">Verifying your payment…</p>}
       {error && (
         <div className="bg-red-900/20 border border-red-700/40 rounded p-4 text-red-100">

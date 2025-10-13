@@ -71,20 +71,10 @@ router.post('/initialize', async (req, res, next) => {
       const ins = await query(
         `INSERT INTO purchases (user_id, item_type, item_id, item_title, amount, currency, payment_status, payment_reference, payment_method, gateway, platform_fee, paystack_fee, platform_net, creator_amount)
          VALUES ($1,$2,$3,$4,$5,$6,'pending',$7, $8, 'paystack', $9, $10, $11, $12)
-         ON CONFLICT ON CONSTRAINT purchases_pkey DO NOTHING
+         ON CONFLICT (user_id, item_type, item_id, payment_reference) DO NOTHING
          RETURNING id`,
         [user_id || null, it.item_type, it.item_id, title, amt, currency, ref, payment_method || null, platformFee, paystackFee, platformNet, creatorAmount]
-      ).catch(async (e) => {
-        // If primary key conflict path isn't valid (since id is UUID), fallback to upsert by unique composite (if present)
-        await query(
-          `INSERT INTO purchases (user_id, item_type, item_id, item_title, amount, currency, payment_status, payment_reference, payment_method, gateway, platform_fee, paystack_fee, platform_net, creator_amount)
-           VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,'paystack',$9,$10,$11,$12)
-           ON CONFLICT (user_id, item_type, item_id, payment_reference) DO NOTHING
-           RETURNING id`,
-          [user_id || null, it.item_type, it.item_id, title, amt, currency, ref, payment_method || null, platformFee, paystackFee, platformNet, creatorAmount]
-        );
-        return { rows: [] };
-      });
+      );
       if (ins?.rows?.[0]?.id) createdIds.push(ins.rows[0].id);
     }
 
