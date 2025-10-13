@@ -20,6 +20,8 @@
   "migrate-add-fee-split": "node ./scripts/migrate-add-fee-split.js",
   "migrate-add-admin-role": "node ./scripts/migrate-add-admin-role.js",
   "migrate-add-withdrawals-audit": "node ./scripts/migrate-add-withdrawals-audit.js",
+  "migrate-add-user-email": "node ./scripts/migrate-add-user-email.js",
+  "mark-stale-purchases": "node ./scripts/mark-stale-purchases.js",
   "seed-admin": "node ./scripts/seed-admin.js"
   },
   "dependencies": {

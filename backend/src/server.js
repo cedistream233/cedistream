@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { closePool } from './lib/database.js'; // Initialize database connection and provide close helper
+import { query, closePool } from './lib/database.js'; // Initialize database connection and provide close helper
 import albumsRouter from './routes/albums.js';
 import videosRouter from './routes/videos.js';
 import purchasesRouter from './routes/purchases.js';
@@ -63,6 +63,38 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// Background job: mark pending purchases older than N minutes as failed
+function scheduleAutoFailPendingPurchases() {
+  const disabled = String(process.env.DISABLE_PENDING_AUTOFAIL || '').toLowerCase() === 'true';
+  if (disabled) {
+    console.log('⏭️  Pending auto-fail job disabled via DISABLE_PENDING_AUTOFAIL=true');
+    return;
+  }
+  const windowMinutes = Number(process.env.PENDING_FAIL_MINUTES || 30);
+  const pollMinutes = Number(process.env.PENDING_FAIL_POLL_MINUTES || 10);
+  const pollMs = Math.max(1, pollMinutes) * 60 * 1000;
+
+  const runOnce = async () => {
+    try {
+      const res = await query(
+        `UPDATE purchases
+         SET payment_status = 'failed', updated_at = NOW()
+         WHERE payment_status = 'pending' AND created_at < NOW() - INTERVAL '${windowMinutes} minutes'
+         RETURNING id`
+      );
+      if (res.rowCount) {
+        console.log(`🟡 Auto-failed ${res.rowCount} stale pending purchase(s)`);
+      }
+    } catch (e) {
+      console.error('Auto-fail pending purchases job error:', e);
+    }
+  };
+
+  // Kick off on startup and then on interval
+  runOnce();
+  setInterval(runOnce, pollMs);
+}
+
 // Start server with graceful fallback if port is in use
 function startServer(port, attemptsLeft = 10) {
   const server = app.listen(port, () => {
@@ -83,6 +115,9 @@ function startServer(port, attemptsLeft = 10) {
 }
 
 startServer(BASE_PORT);
+
+// Start background cleanup job
+scheduleAutoFailPendingPurchases();
 
 // Graceful shutdown
 const shutdown = async (signal) => {

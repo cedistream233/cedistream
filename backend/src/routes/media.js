@@ -5,6 +5,21 @@ import { query } from '../lib/database.js';
 
 const router = express.Router();
 
+// Cache for schema feature detection
+let HAS_PURCHASES_USER_EMAIL = null;
+async function ensurePurchasesEmailColumn() {
+  if (HAS_PURCHASES_USER_EMAIL !== null) return HAS_PURCHASES_USER_EMAIL;
+  try {
+    const r = await query(
+      `SELECT 1 FROM information_schema.columns WHERE table_name = 'purchases' AND column_name = 'user_email' LIMIT 1`
+    );
+    HAS_PURCHASES_USER_EMAIL = r.rows && r.rows.length > 0;
+  } catch {
+    HAS_PURCHASES_USER_EMAIL = false;
+  }
+  return HAS_PURCHASES_USER_EMAIL;
+}
+
 // Helper to parse Supabase storage public URL into { bucket, objectPath }
 function parseStorageUrl(publicUrl) {
   try {
@@ -56,18 +71,23 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
     } catch {}
 
     if (!canAccess) {
-      // Check purchases for song or parent album (by user_id or legacy user_email)
-      const pRes = await query(
-        `SELECT 1 FROM purchases
-         WHERE (user_id = $1 OR ($3 IS NOT NULL AND user_email = $3))
-           AND (payment_status = 'completed' OR payment_status = 'success')
-           AND (
-             (item_type = 'song' AND item_id = $2) OR
-             (item_type = 'album' AND item_id IN (SELECT album_id FROM songs WHERE id = $2))
-           )
-         LIMIT 1`,
-        [userId, id, userEmail]
-      );
+      // Check purchases for song or parent album (by user_id and optionally legacy user_email)
+      const hasEmail = await ensurePurchasesEmailColumn();
+      const params = [userId, id];
+      let sql = `SELECT 1 FROM purchases
+                 WHERE (user_id = $1`;
+      if (hasEmail && userEmail) {
+        params.push(userEmail);
+        sql += ` OR user_email = $3`;
+      }
+      sql += `)
+               AND (payment_status = 'completed' OR payment_status = 'success')
+               AND (
+                 (item_type = 'song' AND item_id = $2) OR
+                 (item_type = 'album' AND item_id IN (SELECT album_id FROM songs WHERE id = $2))
+               )
+               LIMIT 1`;
+      const pRes = await query(sql, params);
       canAccess = pRes.rows.length > 0;
     }
 
@@ -146,14 +166,19 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
     } catch {}
 
     if (!canAccess) {
-      const pRes = await query(
-        `SELECT 1 FROM purchases
-         WHERE (user_id = $1 OR ($3 IS NOT NULL AND user_email = $3))
-           AND (payment_status = 'completed' OR payment_status = 'success')
-           AND item_type = 'video' AND item_id = $2
-         LIMIT 1`,
-        [userId, id, userEmail]
-      );
+      const hasEmail = await ensurePurchasesEmailColumn();
+      const params = [userId, id];
+      let sql = `SELECT 1 FROM purchases
+                 WHERE (user_id = $1`;
+      if (hasEmail && userEmail) {
+        params.push(userEmail);
+        sql += ` OR user_email = $3`;
+      }
+      sql += `)
+               AND (payment_status = 'completed' OR payment_status = 'success')
+               AND item_type = 'video' AND item_id = $2
+               LIMIT 1`;
+      const pRes = await query(sql, params);
       canAccess = pRes.rows.length > 0;
     }
     if (!canAccess) return res.status(403).json({ error: 'Not purchased' });
