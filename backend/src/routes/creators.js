@@ -127,7 +127,9 @@ router.get('/:id', async (req, res, next) => {
 // GET /api/creators/:id/content
 router.get('/:id/content', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
   const [albumsRes, videosRes, songsRes] = await Promise.all([
       query(
         `SELECT a.*, COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as artist
@@ -162,7 +164,9 @@ router.get('/:id/content', async (req, res, next) => {
 // GET /api/creators/:id/analytics
 router.get('/:id/analytics', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
     // support only ?range=7|14 days per product requirement
     let days = parseInt(req.query.range || '14', 10);
     if (![7, 14].includes(days)) days = 14;
@@ -219,7 +223,9 @@ router.get('/:id/analytics', async (req, res, next) => {
 // GET /api/creators/:id/payouts?from=2025-01-01&to=2025-01-31
 router.get('/:id/payouts', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
     const { from, to } = req.query;
     const whereClauses = [`p.payment_status = 'completed'`];
     const params = [id];
@@ -270,7 +276,9 @@ function getPagination(qs) {
 // GET /api/creators/:id/albums?page=&limit=
 router.get('/:id/albums', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
     const { page, limit, offset } = getPagination(req.query);
     const conds = ['a.user_id = $1'];
     const params = [id];
@@ -293,7 +301,9 @@ router.get('/:id/albums', async (req, res, next) => {
 // GET /api/creators/:id/songs?page=&limit=
 router.get('/:id/songs', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
     const { page, limit, offset } = getPagination(req.query);
     const conds = ['s.user_id = $1'];
     const params = [id];
@@ -322,7 +332,9 @@ router.get('/:id/songs', async (req, res, next) => {
 // GET /api/creators/:id/videos?page=&limit=
 router.get('/:id/videos', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveUserIdentifier(rawId);
+    if (!id) return res.status(404).json({ error: 'Creator not found' });
     const { page, limit, offset } = getPagination(req.query);
     const conds = ['v.user_id = $1'];
     const params = [id];
