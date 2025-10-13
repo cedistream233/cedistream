@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useImageViewer } from '@/contexts/ImageViewerContext';
 import { Trophy, Medal, Award } from 'lucide-react';
 
 export default function TopSupporters({ itemType, itemId, className = '' }) {
   const [supporters, setSupporters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const { open: openViewer } = useImageViewer();
 
   useEffect(() => {
     if (!itemType || !itemId) return;
@@ -105,7 +107,11 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
           {supporters.map((supporter, index) => (
             <div
               key={supporter.user_id || index}
-              className={`relative bg-gradient-to-r ${getRankGradient(index)} border rounded-lg p-3 sm:p-4 transition-all hover:scale-[1.02] hover:shadow-lg`}
+              role={supporter.profile_image ? 'button' : undefined}
+              tabIndex={supporter.profile_image ? 0 : undefined}
+              onKeyDown={supporter.profile_image ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openViewer(supporter.profile_image); } } : undefined}
+              onClick={(e) => { e.stopPropagation(); if (supporter.profile_image) openViewer(supporter.profile_image); }}
+              className={`relative bg-gradient-to-r ${getRankGradient(index)} border rounded-lg p-3 sm:p-4 transition-all hover:scale-[1.02] hover:shadow-lg ${supporter.profile_image ? 'cursor-zoom-in' : ''}`}
             >
               <div className="flex items-center gap-3">
                 {/* Rank Icon */}
@@ -119,7 +125,8 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
                     <img
                       src={supporter.profile_image}
                       alt={supporter.name}
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white/10"
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white/10 cursor-zoom-in"
+                      onClick={(e) => { e.stopPropagation(); if (supporter.profile_image) openViewer(supporter.profile_image); }}
                     />
                   ) : (
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-2 border-white/10">

@@ -4,7 +4,7 @@ import { Purchase } from "@/entities/Purchase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CreditCard, Smartphone, AlertCircle, Sparkles, Trophy, Percent } from "lucide-react";
+import { CreditCard, Smartphone, AlertCircle, Sparkles, Percent } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -188,19 +188,7 @@ export default function Checkout() {
             </div>
           </Card>
 
-          {/* Top supporters placeholder */}
-          <Card className="bg-slate-900/40 border-purple-900/20 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-white font-semibold">
-                <Trophy className="w-5 h-5 text-yellow-400" />
-                Top Supporters
-              </div>
-              <span className="text-xs text-gray-400">Coming soon</span>
-            </div>
-            <p className="text-sm text-gray-400">
-              We’ll highlight the top 5 supporters who paid the most for this content. Boost your rank by tipping extra.
-            </p>
-          </Card>
+          {/* Top Supporters removed from checkout per request */}
         </div>
 
         <div>
