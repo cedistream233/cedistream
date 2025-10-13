@@ -14,7 +14,7 @@ export default function AdminLayout({ children, currentPageName, showShortcuts =
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         {/* Top brand + quick links */}
         {showShortcuts && (
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Link to={createPageUrl('Home')} className="flex items-center gap-2">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
@@ -23,9 +23,9 @@ export default function AdminLayout({ children, currentPageName, showShortcuts =
                 <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">CediStream</span>
               </Link>
             </div>
-            <div className="flex items-center gap-2">
-              <Link to="/admin/platform-earnings" className="px-2 py-1 rounded-full bg-indigo-700/80 hover:bg-indigo-700 text-white text-xs shadow-sm">Platform earnings</Link>
-              <Link to="/admin/support-tickets" className="px-2 py-1 rounded-full bg-pink-600/80 hover:bg-pink-600 text-white text-xs shadow-sm">Support Tickets</Link>
+            <div className="mt-3 sm:mt-0 flex items-center gap-2">
+              <Link to="/admin/platform-earnings" className="px-3 py-1 rounded-md bg-indigo-700/80 hover:bg-indigo-700 text-white text-sm">Platform earnings</Link>
+              <Link to="/admin/support-tickets" className="px-3 py-1 rounded-md bg-pink-600/80 hover:bg-pink-600 text-white text-sm">Support Tickets</Link>
             </div>
           </div>
         )}

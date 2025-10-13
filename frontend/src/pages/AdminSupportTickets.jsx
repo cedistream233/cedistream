@@ -48,14 +48,24 @@ export default function AdminSupportTickets() {
             ) : rows.length === 0 ? (
               <Card className="bg-slate-900/60 border-slate-700 p-4">No tickets.</Card>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {rows.map(t => (
-                  <Card key={t.id} className="bg-slate-900/60 border-slate-700 p-0 overflow-hidden">
-                    <div className="p-4">
-                      <div className="font-semibold">{t.subject || '—'}</div>
-                      <div className="text-sm text-indigo-300">{t.name || ''} {t.email ? ` ${t.email}` : ''}</div>
-                      <div className="text-sm text-gray-300 mt-2 whitespace-pre-line">{t.message || ''}</div>
-                      <div className="text-xs text-gray-400 mt-2">Opened: {t.created_at ? new Date(t.created_at).toLocaleString() : '—'}{t.resolved_at ? ` • Resolved: ${new Date(t.resolved_at).toLocaleString()}` : ''}</div>
+                  <Card key={t.id} className="bg-slate-900/60 border-slate-700 p-0 overflow-hidden rounded-md">
+                    <div className="p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="font-semibold">{t.subject || '—'}</div>
+                          <div className="text-sm text-indigo-300">{t.name || ''} {t.email ? ` ${t.email}` : ''}</div>
+                          <div className="text-sm text-gray-300 mt-2 whitespace-pre-line">{t.message || ''}</div>
+                          <div className="text-xs text-gray-400 mt-2">Opened: {t.created_at ? new Date(t.created_at).toLocaleString() : '—'}{t.resolved_at ? ` • Resolved: ${new Date(t.resolved_at).toLocaleString()}` : ''}</div>
+                        </div>
+                        <div className="flex-shrink-0 ml-3 hidden sm:block">
+                          <Button className="rounded-md bg-slate-700 hover:bg-slate-600">Open</Button>
+                        </div>
+                      </div>
+                      <div className="mt-3 sm:hidden flex gap-2">
+                        <Button className="rounded-md flex-1 bg-slate-700 hover:bg-slate-600">Open</Button>
+                      </div>
                     </div>
                   </Card>
                 ))}

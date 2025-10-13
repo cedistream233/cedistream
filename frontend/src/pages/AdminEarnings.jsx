@@ -72,28 +72,35 @@ export default function AdminEarnings() {
     <AdminLayout currentPageName="Platform earnings" showShortcuts>
       <h1 className="text-2xl font-bold mb-4">Platform earnings</h1>
       <Card className="bg-slate-900/60 border-slate-700 p-4 mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex bg-slate-800 rounded p-1">
-            {['daily','monthly','yearly'].map(m => (
-              <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded ${mode===m?'bg-indigo-600 text-white':'text-gray-300 hover:text-white'}`}>{m.charAt(0).toUpperCase()+m.slice(1)}</button>
-            ))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="inline-flex bg-slate-800 rounded p-1">
+              {['daily','monthly','yearly'].map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`px-3 py-1 rounded-md ${mode===m ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                >{m.charAt(0).toUpperCase()+m.slice(1)}</button>
+              ))}
+            </div>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <div className="text-sm bg-slate-800 text-green-300 px-3 py-1 rounded">Total GH₵ {total.toFixed(2)}</div>
+            <div className="text-sm bg-slate-800 text-green-300 px-3 py-1 rounded-md">Total GH₵ {total.toFixed(2)}</div>
           </div>
         </div>
+
         <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-3">
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="block text-xs text-gray-400 mb-1">From</label>
-            <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="p-2 rounded bg-slate-800 border border-slate-700 text-gray-200" />
+            <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="w-full sm:w-auto p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="block text-xs text-gray-400 mb-1">To</label>
-            <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="p-2 rounded bg-slate-800 border border-slate-700 text-gray-200" />
+            <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="w-full sm:w-auto p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
           </div>
-          <div className="flex gap-2">
-            <Button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600">Refresh</Button>
-            <Button variant="secondary" onClick={exportCsv}>Export CSV</Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600 rounded-md w-full sm:w-auto">Refresh</Button>
+            <Button variant="secondary" onClick={exportCsv} className="rounded-md w-full sm:w-auto">Export CSV</Button>
           </div>
         </div>
       </Card>

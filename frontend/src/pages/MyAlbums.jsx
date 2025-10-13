@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Pagination from '@/components/ui/Pagination';
 import { useNavigate } from 'react-router-dom';
 
 export default function MyAlbums() {
@@ -60,10 +61,14 @@ export default function MyAlbums() {
            </Card>
          ))}
       </div>
-      <div className="flex items-center justify-center gap-2 mt-6">
-        <Button disabled={page<=1} onClick={()=>setPage(p=>p-1)} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">Prev</Button>
-        <span className="text-gray-300 text-sm">Page {page} of {pages}</span>
-        <Button disabled={page>=pages} onClick={()=>setPage(p=>p+1)} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">Next</Button>
+      <div className="mt-6">
+        <Pagination
+          page={page}
+          pages={pages}
+          limit={12}
+          // total might not be accurate for filtered results; keep pages-based when provided
+          onChange={(p) => setPage(Math.max(1, Math.min(p, pages||1)))}
+        />
       </div>
     </div>
   );

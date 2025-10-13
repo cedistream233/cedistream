@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/AdminLayout';
+import Pagination from '@/components/ui/Pagination';
 
 export default function AdminHome() {
   const { token } = useAuth();
@@ -81,24 +82,13 @@ export default function AdminHome() {
         )}
         </Card>
 
-        <div className="flex items-center justify-center mt-4">
-          <div className="inline-flex items-center gap-3 bg-transparent p-2 rounded-lg">
-            <button
-              onClick={() => setPage(p => Math.max(1, p-1))}
-              disabled={page <= 1}
-              className={`px-3 py-2 rounded-full ${page <= 1 ? 'bg-slate-800 text-gray-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>
-              Prev
-            </button>
-
-            <div className="px-4 py-2 rounded-full bg-slate-900/60 text-gray-300">Page {page} of {Math.max(1, Math.ceil((total || 0) / limit))}</div>
-
-            <button
-              onClick={() => setPage(p => p + 1)}
-              disabled={page >= Math.max(1, Math.ceil((total || 0) / limit))}
-              className={`px-3 py-2 rounded-full ${page >= Math.max(1, Math.ceil((total || 0) / limit)) ? 'bg-slate-800 text-gray-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>
-              Next
-            </button>
-          </div>
+        <div className="mt-4">
+          <Pagination
+            page={page}
+            total={total}
+            limit={limit}
+            onChange={(p) => setPage(Math.max(1, Math.min(p, Math.max(1, Math.ceil((total||0)/limit))))) }
+          />
         </div>
       
     </AdminLayout>

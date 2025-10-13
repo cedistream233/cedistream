@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Pagination from '@/components/ui/Pagination';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -110,18 +111,19 @@ export default function AdminWithdrawals() {
 
       {/* Filters and Export */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
-        <div>
+        <div className="w-full sm:w-auto">
           <label className="block text-xs text-gray-400 mb-1">From</label>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="p-2 rounded bg-slate-800 border border-slate-700 text-gray-200" />
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-full sm:w-auto p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
         </div>
-        <div>
+        <div className="w-full sm:w-auto">
           <label className="block text-xs text-gray-400 mb-1">To</label>
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="p-2 rounded bg-slate-800 border border-slate-700 text-gray-200" />
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-full sm:w-auto p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => { setPage(1); fetchRows(); }} className="bg-slate-700 hover:bg-slate-600">Apply</Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button onClick={() => { setPage(1); fetchRows(); }} className="bg-indigo-600 hover:bg-indigo-700 rounded-md w-full sm:w-auto px-4 py-2">Apply</Button>
           <Button
             variant="secondary"
+            className="rounded-md w-full sm:w-auto px-4 py-2"
             onClick={async () => {
               const params = new URLSearchParams();
               if (activeTab === 'pending') params.set('status', 'requested');
@@ -259,24 +261,15 @@ export default function AdminWithdrawals() {
         confirmText={confirm.action === 'rejected' ? 'Decline' : 'Confirm'}
       />
 
-      {/* Pagination - centered below requests */}
-      <div className="flex items-center justify-center mb-6">
-        <div className="inline-flex items-center gap-3 bg-transparent p-2 rounded-lg">
-          <button
-            onClick={() => setPage(p => Math.max(1, p-1))}
-            disabled={page <= 1}
-            className={`px-3 py-2 rounded-full ${page <= 1 ? 'bg-slate-800 text-gray-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>
-            Prev
-          </button>
-
-          <div className="px-4 py-2 rounded-full bg-slate-900/60 text-gray-300">Page {page} of {Math.max(1, Math.ceil((total || 0) / limit))}</div>
-
-          <button
-            onClick={() => setPage(p => p + 1)}
-            disabled={page >= Math.max(1, Math.ceil((total || 0) / limit))}
-            className={`px-3 py-2 rounded-full ${page >= Math.max(1, Math.ceil((total || 0) / limit)) ? 'bg-slate-800 text-gray-500 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}>
-            Next
-          </button>
+      {/* Pagination - unified component (moved slightly lower on mobile) */}
+      <div className="mt-8 sm:mt-6 mb-10">
+        <div className="flex justify-center">
+          <Pagination
+            page={page}
+            total={total}
+            limit={limit}
+            onChange={(p) => setPage(Math.max(1, Math.min(p, Math.max(1, Math.ceil((total||0)/limit))))) }
+          />
         </div>
       </div>
     </div>
