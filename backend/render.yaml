@@ -7,7 +7,7 @@
 # NODE_ENV=production
 # DATABASE_URL=your-neon-postgres-url
 # JWT_SECRET=your-secure-jwt-secret
-# FRONTEND_URL=https://your-netlify-app.netlify.app
+# FRONTEND_URL=https://cedistream.netlify.app
 # SUPABASE_URL=your-supabase-url
 # SUPABASE_ANON_KEY=your-supabase-anon-key
 # SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key

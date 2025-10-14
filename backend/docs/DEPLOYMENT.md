@@ -62,7 +62,7 @@ This guide provides step-by-step instructions for deploying CediStream to produc
    PORT=10000
    DATABASE_URL=your-neon-postgres-connection-string
    JWT_SECRET=your-generated-jwt-secret
-   FRONTEND_URL=https://your-app-name.netlify.app
+   FRONTEND_URL=https://cedistream.netlify.app
    SUPABASE_URL=your-supabase-project-url
    SUPABASE_ANON_KEY=your-supabase-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
@@ -83,7 +83,7 @@ This guide provides step-by-step instructions for deploying CediStream to produc
 5. **Deploy and Test**:
    - Click "Deploy"
    - Wait for deployment to complete
-   - Test your API at `https://your-app-name.onrender.com/api/health`
+   - Test your API at `https://cedistream.onrender.com/api/health`
 
 ## 🌐 Step 2: Frontend Deployment (Netlify)
 
@@ -107,13 +107,13 @@ This guide provides step-by-step instructions for deploying CediStream to produc
 
 4. **Configure Environment Variables** in Netlify dashboard:
    ```
-   VITE_BACKEND_URL=https://your-backend-app.onrender.com
+   VITE_BACKEND_URL=https://cedistream.onrender.com
    ```
 
 5. **Deploy and Test**:
    - Click "Deploy site"
    - Wait for deployment to complete
-   - Test your app at `https://your-app-name.netlify.app`
+   - Test your app at `https://cedistream.netlify.app`
 
 ## 📊 Step 3: Monitoring Setup (UptimeRobot)
 
@@ -123,13 +123,13 @@ This guide provides step-by-step instructions for deploying CediStream to produc
 
 2. **Add Backend Monitor**:
    - Monitor Type: HTTP(s)
-   - URL: `https://your-backend-app.onrender.com/api/health`
+   - URL: `https://cedistream.onrender.com/api/health`
    - Monitoring Interval: 5 minutes
    - Alert Contacts: Your email
 
 3. **Add Frontend Monitor**:
    - Monitor Type: HTTP(s)
-   - URL: `https://your-app-name.netlify.app`
+   - URL: `https://cedistream.netlify.app`
    - Monitoring Interval: 5 minutes
    - Alert Contacts: Your email
 

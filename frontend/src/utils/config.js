@@ -2,7 +2,7 @@
 const getBackendUrl = () => {
   // In production (built app), use the VITE_BACKEND_URL or fallback
   if (import.meta.env.PROD) {
-    return import.meta.env.VITE_BACKEND_URL || 'https://your-backend-url.render.com';
+    return import.meta.env.VITE_BACKEND_URL || 'https://cedistream.onrender.com';
   }
   
   // In development, use local backend
