@@ -172,6 +172,13 @@ export default function CreatorDashboard() {
     } catch {}
   };
 
+  // Keep recent sales in sync when page/size change or when tab becomes overview/earnings
+  useEffect(() => {
+    if (!token) return;
+    if (tab === 'overview' || tab === 'earnings') fetchRecentSales().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, salesPage, salesPageSize, tab]);
+
   // Refresh when tab gains focus or page becomes visible
   useEffect(() => {
     const onFocus = () => fetchDashboardData();
