@@ -1,8 +1,9 @@
 # Build settings for Netlify (root-level for monorepo detection)
 [build]
-  base = "frontend"
-  command = "npm run build"
-  publish = "dist"
+  # Build the frontend workspace explicitly regardless of base dir handling
+  command = "npm --prefix frontend install && npm --prefix frontend run build"
+  # Publish the built SPA
+  publish = "frontend/dist"
 
 # Redirect all routes to index.html for SPA
 [[redirects]]
