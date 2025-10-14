@@ -9,7 +9,7 @@ const router = Router();
 // 2) Unauthenticated supporter checkout: allow ?user_email=... with optional payment_status filter
 router.get('/', async (req, res, next) => {
   try {
-    const { user_id, me, user_email, payment_status, item_type, payment_reference } = req.query;
+  const { user_id, me, user_email, payment_status, item_type, payment_reference, from, to } = req.query;
 
     // If user_email is provided, restrict usage for security
     if (user_email) {
@@ -17,13 +17,16 @@ router.get('/', async (req, res, next) => {
       // 1) email + payment_reference (checkout confirmation screens). No auth required, but strictly filtered to the reference.
       // 2) Authenticated user whose token email matches the provided email.
       if (payment_reference) {
-        let sql = 'SELECT * FROM purchases WHERE payment_reference = $1';
-        const params = [String(payment_reference)];
+  let sql = 'SELECT * FROM purchases WHERE payment_reference = $1';
+  const params = [String(payment_reference)];
+  let p = 2;
         // additionally ensure the reference belongs to that email/user mapping when possible
         sql += ' AND EXISTS (SELECT 1 FROM users u WHERE u.id = purchases.user_id AND u.email = $2)';
         params.push(String(user_email));
-        if (payment_status) { sql += ' AND payment_status = $3'; params.push(payment_status); }
-        if (item_type) { sql += payment_status ? ' AND item_type = $4' : ' AND item_type = $3'; params.push(item_type); }
+  if (payment_status) { sql += ` AND payment_status = $${p}`; params.push(payment_status); p++; }
+  if (item_type) { sql += ` AND item_type = $${p}`; params.push(item_type); p++; }
+  if (from) { sql += ` AND created_at >= $${p}`; params.push(from); p++; }
+  if (to) { sql += ` AND created_at <= $${p}`; params.push(to); p++; }
         const result = await query(sql + ' ORDER BY created_at DESC', params);
         return res.json(result.rows);
       }
@@ -46,8 +49,9 @@ router.get('/', async (req, res, next) => {
       return res.json(result.rows);
     }
 
-    // Otherwise, require auth and use token identity
-    let uid = user_id;
+  // Otherwise, require auth and use token identity. Admins may fetch platform-wide purchases.
+  let uid = user_id;
+  let isAdmin = false;
     if (String(me) === 'true') {
       // authenticate
       const authHeader = req.headers['authorization'];
@@ -66,17 +70,36 @@ router.get('/', async (req, res, next) => {
       uid = decoded.id;
     }
 
-    // If no identity could be established, do not return all purchases
-    if (!uid) {
+    // If Authorization header present and token verifies, allow admins to fetch all purchases later
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (token) {
+        const { verifyToken } = await import('../lib/auth.js');
+        const decoded2 = verifyToken(token);
+        if (decoded2) {
+          const r = await query('SELECT role FROM users WHERE id = $1', [decoded2.id]);
+          const role = r.rows[0]?.role || null;
+          if (role === 'admin') isAdmin = true;
+        }
+      }
+    } catch (e) {
+      // ignore token verify errors here; we'll enforce auth below
+    }
+
+    // If no identity could be established and requester is not admin, do not return purchases
+    if (!uid && !isAdmin) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    let sql = 'SELECT * FROM purchases WHERE 1=1';
+  let sql = 'SELECT * FROM purchases WHERE 1=1';
     const params = [];
     let paramIndex = 1;
     if (uid) { sql += ` AND user_id = $${paramIndex}`; params.push(uid); paramIndex++; }
     if (payment_reference) { sql += ` AND payment_reference = $${paramIndex}`; params.push(payment_reference); paramIndex++; }
     if (payment_status) { sql += ` AND payment_status = $${paramIndex}`; params.push(payment_status); paramIndex++; }
     if (item_type) { sql += ` AND item_type = $${paramIndex}`; params.push(item_type); paramIndex++; }
+  if (from) { sql += ` AND created_at >= $${paramIndex}`; params.push(from); paramIndex++; }
+  if (to) { sql += ` AND created_at <= $${paramIndex}`; params.push(to); paramIndex++; }
     sql += ' ORDER BY created_at DESC';
     const result = await query(sql, params);
     return res.json(result.rows);

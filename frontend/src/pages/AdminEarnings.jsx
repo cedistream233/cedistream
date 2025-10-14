@@ -19,7 +19,11 @@ export default function AdminEarnings() {
       setLoading(true);
       setError('');
       // Pull only completed purchases; we only need created_at and platform_net
-      const res = await fetch('/api/purchases?payment_status=completed', {
+      const params = new URLSearchParams();
+      params.set('payment_status', 'completed');
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const res = await fetch(`/api/purchases?${params.toString()}`, {
         headers: { Authorization: token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to load');

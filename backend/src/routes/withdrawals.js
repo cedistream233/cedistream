@@ -83,14 +83,47 @@ router.get('/admin', authenticateToken, requireRole(['admin']), async (req, res,
 // Admin: summary counts by status for dashboard cards
 router.get('/admin/summary', authenticateToken, requireRole(['admin']), async (req, res, next) => {
   try {
+    const { from, to, status, includePlatformNet } = req.query;
+    // Build counts query with optional date and status filter
+    const params = [];
+    let p = 1;
+    let where = 'WHERE 1=1';
+    if (status) {
+      const parts = String(status).split(',').map(s => s.trim().toLowerCase());
+      const allowed = ['requested','processing','paid','rejected','cancelled'];
+      const sts = parts.filter(s => allowed.includes(s));
+      if (sts.length) {
+        const placeholders = sts.map(() => `$${p++}`).join(',');
+        where += ` AND status IN (${placeholders})`;
+        params.push(...sts);
+      }
+    }
+    if (from) { where += ` AND created_at >= $${p++}`; params.push(from); }
+    if (to) { where += ` AND created_at <= $${p++}`; params.push(to); }
+
     const q = await query(`
       SELECT status, COUNT(1)::int AS count
       FROM withdrawals
+      ${where}
       GROUP BY status
-    `);
+    `, params);
     const counts = { requested: 0, processing: 0, paid: 0, rejected: 0, cancelled: 0 };
     for (const r of q.rows) counts[r.status] = r.count;
-    res.json({ counts });
+
+    const out = { counts };
+
+    // Optionally include platform net totals (from purchases) for the same date range
+    if (includePlatformNet === '1' || includePlatformNet === 'true') {
+      const p2 = [];
+      let idx = 1;
+  let cond = "WHERE p.payment_status = 'completed'";
+      if (from) { cond += ` AND p.created_at >= $${idx++}`; p2.push(from); }
+      if (to) { cond += ` AND p.created_at <= $${idx++}`; p2.push(to); }
+      const totRes = await query(`SELECT COALESCE(SUM(p.platform_net),0)::numeric::float8 AS total FROM purchases p ${cond}`, p2);
+      out.platform_net = parseFloat(totRes.rows[0]?.total || 0);
+    }
+
+    res.json(out);
   } catch (e) { next(e); }
 });
 
