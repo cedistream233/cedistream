@@ -97,7 +97,8 @@ app.use(cors({
 app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);
 app.use(express.json());
 
-app.get('/api/health', async (req, res) => {
+// Unified health handler reused across endpoints
+const healthHandler = async (req, res) => {
   try {
     // Test database connection
     await query('SELECT 1');
@@ -117,7 +118,13 @@ app.get('/api/health', async (req, res) => {
       error: 'Database connection failed'
     });
   }
-});
+};
+
+// Primary health endpoint used by Render
+app.get('/api/health', healthHandler);
+// Compatibility endpoints for common monitors and platforms
+app.get('/health', healthHandler);
+app.get('/healthz', healthHandler);
 
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/albums', albumsRouter);
