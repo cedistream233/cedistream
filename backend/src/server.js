@@ -178,6 +178,7 @@ function scheduleAutoFailPendingPurchases() {
   }
   const windowMinutes = Number(process.env.PENDING_FAIL_MINUTES || 30);
   const pollMinutes = Number(process.env.PENDING_FAIL_POLL_MINUTES || 10);
+  const initialDelayMs = Number(process.env.PENDING_FAIL_INITIAL_DELAY_MS || 15000);
   const pollMs = Math.max(1, pollMinutes) * 60 * 1000;
 
   const runOnce = async () => {
@@ -196,8 +197,8 @@ function scheduleAutoFailPendingPurchases() {
     }
   };
 
-  // Kick off on startup and then on interval
-  runOnce();
+  // Defer first run slightly to avoid competing with startup/health checks
+  setTimeout(runOnce, Math.max(0, initialDelayMs));
   setInterval(runOnce, pollMs);
 }
 
