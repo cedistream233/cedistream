@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function PayWhatYouWant({ minPrice = 1, onAdd, className = '' }) {
+export default function PayWhatYouWant({ minPrice = 1, onAdd, className = '', buttonLabel = 'Add to Cart' }) {
   const min = Number(minPrice || 1) || 1;
   return (
     <div className={`bg-slate-900/50 border border-purple-900/20 rounded-lg p-4 sm:p-5 ${className}`}>
@@ -17,7 +17,7 @@ export default function PayWhatYouWant({ minPrice = 1, onAdd, className = '' }) 
             onClick={onAdd}
             className="w-full md:w-auto px-5 md:px-7 py-3 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-medium flex items-center justify-center"
           >
-            <span>Add to Cart</span>
+            <span>{buttonLabel}</span>
           </button>
         </div>
       </div>

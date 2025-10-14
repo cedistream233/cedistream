@@ -228,11 +228,9 @@ export default function AlbumDetails() {
       const uRaw = localStorage.getItem('user');
       const u = uRaw ? JSON.parse(uRaw) : {};
       const cart = Array.isArray(u.cart) ? u.cart : [];
-      const exists = cart.some(i => i.item_id === album.id && i.item_type === 'album');
-      if (!exists) {
-        const nextCart = [...cart, { item_type: 'album', item_id: album.id, title: album.title, price: min, min_price: min, image: album.cover_image }];
-        await updateMyUserData({ cart: nextCart });
-      }
+      // For repeat support, always append a new cart entry with a nonce so users can pay again.
+      const nextCart = [...cart, { item_type: 'album', item_id: album.id, title: album.title, price: min, min_price: min, image: album.cover_image, _support_nonce: Date.now() }];
+      await updateMyUserData({ cart: nextCart });
     } catch {}
     navigate(createPageUrl('Cart'));
   };
@@ -382,7 +380,7 @@ export default function AlbumDetails() {
                       className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
                     >
                       <ShoppingCart className="w-5 h-5 mr-2" />
-                      <span>Add to Cart</span>
+                      <span>{purchased ? 'Support again' : 'Add to Cart'}</span>
                     </Button>
                   )}
         </div>

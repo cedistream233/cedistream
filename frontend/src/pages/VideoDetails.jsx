@@ -138,11 +138,9 @@ export default function VideoDetails() {
       const uRaw = localStorage.getItem('user');
       const u = uRaw ? JSON.parse(uRaw) : {};
       const cart = Array.isArray(u.cart) ? u.cart : [];
-      const exists = cart.some(i => i.item_id === video.id && i.item_type === 'video');
-      if (!exists) {
-        const nextCart = [...cart, { item_type: 'video', item_id: video.id, title: video.title, price: min, min_price: min, image: video.thumbnail }];
-        await updateMyUserData({ cart: nextCart });
-      }
+      // Always append a new cart entry for repeat support with a nonce
+      const nextCart = [...cart, { item_type: 'video', item_id: video.id, title: video.title, price: min, min_price: min, image: video.thumbnail, _support_nonce: Date.now() }];
+      await updateMyUserData({ cart: nextCart });
     } catch {}
     navigate(createPageUrl('Cart'));
   };
@@ -298,16 +296,14 @@ export default function VideoDetails() {
             )}
           </div>
 
-          {!canAccess && (
-            <Button
-              onClick={handleAddToCart}
-              size="lg"
-              className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
-            >
-              <ShoppingCart className="w-5 h-5 mr-2" />
-              <span>Add to Cart</span>
-            </Button>
-          )}
+          <Button
+            onClick={handleAddToCart}
+            size="lg"
+            className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
+          >
+            <ShoppingCart className="w-5 h-5 mr-2" />
+            <span>{canAccess ? 'Support again' : 'Add to Cart'}</span>
+          </Button>
         </div>
       </div>
 

@@ -215,31 +215,33 @@ export default function SongDetails() {
           />
         )}
   {/* Pay What You Want panel for supporters — hide if this user already purchased and is viewing */}
-        {!isOwner && !purchased && (
+        {!isOwner && (
           <div className="w-full mt-4">
             <PayWhatYouWant
               minPrice={Number(song.price || 1)}
+              buttonLabel={purchased ? 'Support again' : 'Add to Cart'}
               onAdd={async () => {
                 const token = localStorage.getItem('token');
                 const min = Number(song.price || 1);
+                // For purchase-repeat, we always add a new cart entry so users can support multiple times.
+                const cartItem = { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image, _support_nonce: Date.now() };
                 if (!token) {
                   setPostAuthIntent({
                     action: 'add-to-cart',
-                    item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
+                    item: cartItem,
                     redirect: '/cart'
                   });
                   window.location.href = '/signup';
                   return;
                 }
                 try {
-                  const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+                  const uRaw = localStorage.getItem('user');
+                  const u = uRaw ? JSON.parse(uRaw) : {};
                   const cart = Array.isArray(u.cart) ? u.cart : [];
-                  const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
-                  if (!exists) {
-                    const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
-                    try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
-                    try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
-                  }
+                  // Always allow adding repeat support entries; don't dedupe by existing purchases.
+                  const nextCart = [...cart, cartItem];
+                  try { localStorage.setItem('user', JSON.stringify({ ...u, cart: nextCart })); } catch {}
+                  try { localStorage.setItem('demo_user', JSON.stringify({ ...u, cart: nextCart })); } catch {}
                 } catch {}
                 window.location.href = '/cart';
               }}
