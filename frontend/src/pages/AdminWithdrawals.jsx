@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Pagination from '@/components/ui/Pagination';
@@ -148,9 +149,25 @@ export default function AdminWithdrawals() {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || 'Action failed');
       }
+      // Optimistically update UI so admin doesn't need to refresh
       closeAction();
       setNotes('');
-      await fetchRows();
+      // Remove the processed row from current list
+      setRows(prev => prev.filter(r => r.id !== id));
+      // Update summary counts locally where possible
+      setSummary(prev => {
+        const next = { ...prev, counts: { ...(prev.counts || {}) } };
+        // decrement requested if it existed
+        if (typeof next.counts.requested === 'number' && next.counts.requested > 0) next.counts.requested = Math.max(0, next.counts.requested - 1);
+        // increment paid or rejected depending on action
+        if (action === 'paid') next.counts.paid = (next.counts.paid || 0) + 1;
+        if (action === 'rejected' || action === 'cancelled') next.counts.rejected = (next.counts.rejected || 0) + 1;
+        return next;
+      });
+      // Clear cached pages so subsequent navigation/refetch gets fresh data
+      cacheRef.current.clear();
+      // Fire a background refresh of the summary to reconcile server state
+      fetchSummary().catch(() => {});
     } catch (e) {
       alert(e.message || 'Failed');
     }
@@ -239,25 +256,35 @@ export default function AdminWithdrawals() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {rows.map(r => (
-                <Card key={r.id} className="bg-slate-900/60 border-slate-700">
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm text-indigo-300">{r.username ? `@${r.username}` : r.email}</div>
-                        <div className="font-semibold text-white">{r.first_name || r.last_name ? `${r.first_name || ''} ${r.last_name || ''}`.trim() : 'Creator'}</div>
-                        <div className="text-green-300 font-semibold mt-1">GH₵ {Number(r.amount).toFixed(2)} <span className="text-xs text-gray-400">net GH₵ {Number(r.amount_to_receive).toFixed(2)}</span></div>
-                        <div className="text-sm text-gray-300 mt-1">Send via {r.destination_type === 'mobile_money' ? 'Mobile Money' : r.destination_type}: {r.destination_account}</div>
-                        <div className="text-xs text-gray-400 mt-1">Mobile: {r.phone || '—'} • Requested: {new Date(r.created_at).toLocaleString()}</div>
+              <AnimatePresence>
+                {rows.map(r => (
+                  <motion.div
+                    key={r.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    <Card className="bg-slate-900/60 border-slate-700">
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="text-sm text-indigo-300">{r.username ? `@${r.username}` : r.email}</div>
+                            <div className="font-semibold text-white">{r.first_name || r.last_name ? `${r.first_name || ''} ${r.last_name || ''}`.trim() : 'Creator'}</div>
+                            <div className="text-green-300 font-semibold mt-1">GH₵ {Number(r.amount).toFixed(2)} <span className="text-xs text-gray-400">net GH₵ {Number(r.amount_to_receive).toFixed(2)}</span></div>
+                            <div className="text-sm text-gray-300 mt-1">Send via {r.destination_type === 'mobile_money' ? 'Mobile Money' : r.destination_type}: {r.destination_account}</div>
+                            <div className="text-xs text-gray-400 mt-1">Mobile: {r.phone || '—'} • Requested: {new Date(r.created_at).toLocaleString()}</div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Sent</Button>
+                            <Button variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Sent</Button>
-                        <Button variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                    </Card>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </TabsContent>

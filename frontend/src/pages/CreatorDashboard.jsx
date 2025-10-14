@@ -723,6 +723,7 @@ export default function CreatorDashboard() {
                   <div>
                     <p className="text-gray-300 text-sm font-medium">Withdrawal History</p>
                     <div className="mt-3 space-y-3">
+                      <p className="text-xs text-gray-400">Note: Amounts shown include a GH₵1 transfer fee; the "amount to be received" reflects this fee.</p>
                       {withdrawHistory.length === 0 ? (
                         <div className="rounded-md border border-slate-800 bg-slate-900/40 p-4">
                           <p className="text-slate-400 text-sm">No withdrawals yet.</p>
