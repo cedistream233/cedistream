@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { query, closePool } from './lib/database.js'; // Initialize database connection and provide close helper
 import albumsRouter from './routes/albums.js';
@@ -18,8 +20,62 @@ import adminEarningsRouter from './routes/adminEarnings.js';
 
 dotenv.config();
 
+// Validate critical environment variables for production
+if (process.env.NODE_ENV === 'production') {
+  const requiredEnvVars = [
+    'DATABASE_URL',
+    'JWT_SECRET',
+    'SUPABASE_URL',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'PAYSTACK_SECRET_KEY'
+  ];
+  
+  const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
+  if (missing.length > 0) {
+    console.error('❌ CRITICAL: Missing required environment variables for production:', missing.join(', '));
+    process.exit(1);
+  }
+}
+
 const app = express();
 const BASE_PORT = Number(process.env.PORT) || 5000;
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'", "https:"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // limit each IP to 100 requests per windowMs in production
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 auth requests per windowMs
+  message: { error: 'Too many authentication attempts, please try again later' },
+  skipSuccessfulRequests: true,
+});
+
+app.use(limiter);
 
 // Allow frontend origin(s) for CORS
 const primaryFrontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
@@ -41,11 +97,29 @@ app.use(cors({
 app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Test database connection
+    await query('SELECT 1');
+    
+    res.json({ 
+      ok: true, 
+      time: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      database: 'connected'
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(503).json({ 
+      ok: false, 
+      time: new Date().toISOString(),
+      error: 'Database connection failed'
+    });
+  }
 });
 
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/albums', albumsRouter);
 app.use('/api/videos', videosRouter);
 app.use('/api/songs', songsRouter);
@@ -62,7 +136,22 @@ app.use('/api/admin', adminEarningsRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  
+  // Don't leak error details in production
+  if (process.env.NODE_ENV === 'production') {
+    res.status(500).json({ error: 'Internal Server Error' });
+  } else {
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      details: err.message,
+      stack: err.stack
+    });
+  }
+});
+
+// Handle 404 routes
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
 // Background job: mark pending purchases older than N minutes as failed

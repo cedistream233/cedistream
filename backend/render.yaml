@@ -1,0 +1,39 @@
+# Render.com deployment configuration
+
+# Build command will run npm install automatically
+# Start command: npm start
+
+# Environment variables to set in Render dashboard:
+# NODE_ENV=production
+# DATABASE_URL=your-neon-postgres-url
+# JWT_SECRET=your-secure-jwt-secret
+# FRONTEND_URL=https://your-netlify-app.netlify.app
+# SUPABASE_URL=your-supabase-url
+# SUPABASE_ANON_KEY=your-supabase-anon-key
+# SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key
+# SUPABASE_BUCKET=profiles
+# SUPABASE_BUCKET_ALBUMS=albums
+# SUPABASE_BUCKET_MEDIA=media
+# SUPABASE_BUCKET_VIDEOS=videos
+# SUPABASE_BUCKET_PREVIEWS=media
+# PAYSTACK_SECRET_KEY=your-paystack-secret
+# PAYSTACK_PUBLIC_KEY=your-paystack-public
+
+# Health check endpoint: /api/health
+
+# Auto-scaling: Minimum 1 instance, maximum 3 instances
+# Health check timeout: 30 seconds
+# Health check interval: 30 seconds
+
+version: 2
+
+services:
+  - type: web
+    name: cedistream-backend
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm ci --only=production
+    startCommand: npm start
+    autoDeploy: true
+    healthCheckPath: /api/health

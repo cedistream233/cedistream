@@ -1,0 +1,14 @@
+{
+  // Disable built-in CSS/SCSS/LESS validation because Tailwind's @tailwind/@apply rules
+  // are not understood by the default CSS language service and cause noisy warnings.
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false,
+  // Keep Tailwind IntelliSense happy if installed
+  "tailwindCSS.includeLanguages": {
+    "javascript": "javascript",
+    "javascriptreact": "javascriptreact",
+    "typescript": "typescript",
+    "typescriptreact": "typescriptreact"
+  }
+}

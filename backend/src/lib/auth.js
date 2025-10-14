@@ -1,8 +1,13 @@
 import jwt from 'jsonwebtoken';
 import { query } from './database.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const RESET_JWT_SECRET = process.env.RESET_JWT_SECRET || JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error('❌ CRITICAL: JWT_SECRET environment variable is not set!');
+  process.exit(1);
+}
 
 export const generateToken = (user) => {
   return jwt.sign(
