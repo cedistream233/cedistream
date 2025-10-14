@@ -38,6 +38,7 @@ import {
 import { Song } from '@/entities/Song';
 
 export default function CreatorDashboard() {
+  const [tab, setTab] = useState('overview');
   const [user, setUser] = useState(null);
   const { token, updateUser } = useAuth();
   const navigate = useNavigate();
@@ -90,88 +91,86 @@ export default function CreatorDashboard() {
   }, [token]);
 
   // Recent sales fetch (separate from full dashboard to avoid re-fetching everything on page change)
-  useEffect(() => {
+  // Extracted fetch for recent sales so it can be called on-demand (tab switches)
+  const fetchRecentSales = async () => {
     if (!token) return;
-    const fetchRecent = async () => {
-      const key = JSON.stringify({ page: salesPage, size: salesPageSize });
+    const key = JSON.stringify({ page: salesPage, size: salesPageSize });
 
-      // serve from cache immediately if present
-      const cached = recentCache.current.get(key);
-      if (cached) {
-        setRecentSales(cached.items);
-        setSalesTotal(cached.total);
-        setSalesHasMore(cached.hasMore);
+    // serve from cache immediately if present
+    const cached = recentCache.current.get(key);
+    if (cached) {
+      setRecentSales(cached.items);
+      setSalesTotal(cached.total);
+      setSalesHasMore(cached.hasMore);
+    }
+
+    // cancel previous request
+    if (recentAbort.current) recentAbort.current.abort();
+    const controller = new AbortController();
+    recentAbort.current = controller;
+
+    try {
+      const offset = (salesPage - 1) * salesPageSize;
+      const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
+        headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+        signal: controller.signal
+      });
+      if (salesRes.ok) {
+        const data = await salesRes.json();
+        const rows = Array.isArray(data?.items) ? data.items : [];
+        const items = rows.map(r => ({
+          id: r.id,
+          item: r.item,
+          type: r.item_type,
+          amount: parseFloat(r.amount || 0), // gross
+          creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
+          date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
+          buyer: r.buyer_name || '—'
+        }));
+        const total = typeof data?.total === 'number' ? data.total : rows.length;
+        const hasMore = rows.length === salesPageSize && rows.length > 0;
+        recentCache.current.set(key, { items, total, hasMore });
+        setRecentSales(items);
+        setSalesTotal(total);
+        setSalesHasMore(hasMore);
+      } else {
+        setRecentSales([]);
+        setSalesHasMore(false);
+        setSalesTotal(0);
       }
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        console.error('Recent sales fetch failed', e);
+        setRecentSales([]);
+        setSalesHasMore(false);
+        setSalesTotal(0);
+      }
+    }
 
-      // cancel previous request
-      if (recentAbort.current) recentAbort.current.abort();
-      const controller = new AbortController();
-      recentAbort.current = controller;
-
-      try {
-        const offset = (salesPage - 1) * salesPageSize;
-        const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-          signal: controller.signal
-        });
-        if (salesRes.ok) {
-          const data = await salesRes.json();
-          const rows = Array.isArray(data?.items) ? data.items : [];
-          const items = rows.map(r => ({
-            id: r.id,
-            item: r.item,
-            type: r.item_type,
-            amount: parseFloat(r.amount || 0), // gross
-            creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
-            date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
-            buyer: r.buyer_name || '—'
+    // Prefetch next page (best-effort)
+    try {
+      const nextPage = salesPage + 1;
+      const nextKey = JSON.stringify({ page: nextPage, size: salesPageSize });
+      if (!recentCache.current.get(nextKey)) {
+        const nextOffset = (nextPage - 1) * salesPageSize;
+        const r = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${nextOffset}`, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
+        if (r && r.ok) {
+          const d = await r.json();
+          const rows2 = Array.isArray(d?.items) ? d.items : [];
+          const items2 = rows2.map(rw => ({
+            id: rw.id,
+            item: rw.item,
+            type: rw.item_type,
+            amount: parseFloat(rw.amount || 0),
+            creatorAmount: typeof rw.creator_amount !== 'undefined' ? parseFloat(rw.creator_amount || 0) : null,
+            date: rw.date ? new Date(rw.date).toISOString().slice(0,10) : '',
+            buyer: rw.buyer_name || '—'
           }));
-          const total = typeof data?.total === 'number' ? data.total : rows.length;
-          const hasMore = rows.length === salesPageSize && rows.length > 0;
-          recentCache.current.set(key, { items, total, hasMore });
-          setRecentSales(items);
-          setSalesTotal(total);
-          setSalesHasMore(hasMore);
-        } else {
-          setRecentSales([]);
-          setSalesHasMore(false);
-          setSalesTotal(0);
-        }
-      } catch (e) {
-        if (e.name !== 'AbortError') {
-          console.error('Recent sales fetch failed', e);
-          setRecentSales([]);
-          setSalesHasMore(false);
-          setSalesTotal(0);
+          recentCache.current.set(nextKey, { items: items2, total: typeof d?.total === 'number' ? d.total : rows2.length, hasMore: rows2.length === salesPageSize });
         }
       }
-
-      // Prefetch next page
-      try {
-        const nextPage = salesPage + 1;
-        const nextKey = JSON.stringify({ page: nextPage, size: salesPageSize });
-        if (!recentCache.current.get(nextKey)) {
-          const nextOffset = (nextPage - 1) * salesPageSize;
-          const r = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${nextOffset}`, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
-          if (r && r.ok) {
-            const d = await r.json();
-            const rows2 = Array.isArray(d?.items) ? d.items : [];
-            const items2 = rows2.map(rw => ({
-              id: rw.id,
-              item: rw.item,
-              type: rw.item_type,
-              amount: parseFloat(rw.amount || 0),
-              creatorAmount: typeof rw.creator_amount !== 'undefined' ? parseFloat(rw.creator_amount || 0) : null,
-              date: rw.date ? new Date(rw.date).toISOString().slice(0,10) : '',
-              buyer: rw.buyer_name || '—'
-            }));
-            recentCache.current.set(nextKey, { items: items2, total: typeof d?.total === 'number' ? d.total : rows2.length, hasMore: rows2.length === salesPageSize });
-          }
-        }
-      } catch {}
-    };
-    fetchRecent();
-  }, [token, salesPage, salesPageSize]);
+    } catch {}
+  };
 
   // Refresh when tab gains focus or page becomes visible
   useEffect(() => {
@@ -293,32 +292,32 @@ export default function CreatorDashboard() {
   };
 
   // Load withdrawal summary (available balance)
-  useEffect(() => {
-    (async () => {
-      try {
-        const tokenLocal = token || localStorage.getItem('token');
-        const res = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
-        if (res.ok) {
-          const json = await res.json();
-          setWithdrawSummary(json);
-        }
-      } catch {}
-    })();
-  }, [token]);
+  const loadWithdrawSummary = async () => {
+    try {
+      const tokenLocal = token || localStorage.getItem('token');
+      const res = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+      if (res.ok) {
+        const json = await res.json();
+        setWithdrawSummary(json);
+      }
+    } catch {}
+  };
+
+  useEffect(() => { loadWithdrawSummary(); }, [token]);
 
   // Load withdrawal history
-  useEffect(() => {
-    (async () => {
-      try {
-        const tokenLocal = token || localStorage.getItem('token');
-        const res = await fetch('/api/withdrawals/me', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
-        if (res.ok) {
-          const json = await res.json();
-          setWithdrawHistory(Array.isArray(json) ? json : []);
-        }
-      } catch (e) { }
-    })();
-  }, [token]);
+  const loadWithdrawHistory = async () => {
+    try {
+      const tokenLocal = token || localStorage.getItem('token');
+      const res = await fetch('/api/withdrawals/me', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+      if (res.ok) {
+        const json = await res.json();
+        setWithdrawHistory(Array.isArray(json) ? json : []);
+      }
+    } catch (e) { }
+  };
+
+  useEffect(() => { loadWithdrawHistory(); }, [token]);
 
   // Share/copy helpers
   const creatorPublicUrl = (() => {
@@ -570,7 +569,12 @@ export default function CreatorDashboard() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={tab} onValueChange={(v) => { setTab(v);
+            // prefetch data when switching tabs
+            if (v === 'overview') fetchRecentSales().catch(()=>{});
+            if (v === 'content') { /* ensure content lists are ready */ setContentLoading(true); setTimeout(()=>setContentLoading(false), 0); }
+            if (v === 'earnings') { fetchRecentSales().catch(()=>{}); loadWithdrawSummary(); }
+          }} defaultValue="overview" className="space-y-6">
           <TabsList className="bg-slate-900/50 border-purple-900/20">
             <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600">Overview</TabsTrigger>
             <TabsTrigger value="content" className="data-[state=active]:bg-purple-600">My Content</TabsTrigger>
@@ -740,10 +744,10 @@ export default function CreatorDashboard() {
                                   <div className="text-xs text-gray-500 mt-1">Requested: {new Date(w.created_at).toLocaleString()}</div>
                                 </div>
                                 <div className="text-sm font-semibold">
-                                  {w.status === 'requested' && <span className="px-2 py-1 rounded-full bg-yellow-600 text-black">Pending</span>}
-                                  {w.status === 'processing' && <span className="px-2 py-1 rounded-full bg-indigo-600">Processing</span>}
-                                  {w.status === 'paid' && <span className="px-2 py-1 rounded-full bg-green-600">Approved</span>}
-                                  {w.status === 'rejected' && <span className="px-2 py-1 rounded-full bg-red-600">Declined</span>}
+                                  {w.status === 'requested' && <span className="px-2 py-1 rounded-md bg-yellow-600 text-black">Pending</span>}
+                                  {w.status === 'processing' && <span className="px-2 py-1 rounded-md bg-indigo-600 text-white">Processing</span>}
+                                  {w.status === 'paid' && <span className="px-2 py-1 rounded-md bg-green-600 text-white">Approved</span>}
+                                  {w.status === 'rejected' && <span className="px-2 py-1 rounded-md bg-red-600 text-white">Declined</span>}
                                 </div>
                               </div>
                             </div>
