@@ -218,7 +218,7 @@ export default function AdminWithdrawals() {
                         <div className="text-xs text-gray-400 mt-1">Mobile: {r.phone || '—'} • Requested: {new Date(r.created_at).toLocaleString()}</div>
                       </div>
                       <div className="flex gap-2">
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Mark as Sent</Button>
+                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Sent</Button>
                         <Button variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
                       </div>
                     </div>
@@ -299,7 +299,13 @@ export default function AdminWithdrawals() {
         title={confirm.action === 'paid' ? 'Mark as Paid' : confirm.action === 'rejected' ? 'Decline Request' : 'Confirm Action'}
         description={confirm.action === 'paid' ? 'Confirm you have manually sent the funds to the creator. This will mark the request as paid.' : confirm.action === 'rejected' ? 'This will decline the request. Are you sure?' : 'Confirm this action.'}
         confirmText={confirm.action === 'rejected' ? 'Decline' : 'Confirm'}
-      />
+      >
+        <div className="px-4 pt-2">
+          <label className="block text-xs text-gray-400 mb-1">Notes (optional)</label>
+          <textarea value={notes} onChange={e=>setNotes(e.target.value)} className="w-full p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" rows={3} placeholder="Reason for decline or notes for this request"></textarea>
+        </div>
+      </ConfirmModal>
+      
 
       {/* Pagination - unified component (moved slightly lower on mobile) */}
       <div className="mt-8 sm:mt-6 mb-10">

@@ -70,6 +70,8 @@ export default function CreatorDashboard() {
   const [momo2, setMomo2] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawSummary, setWithdrawSummary] = useState({ available: 0, minWithdrawal: 10, transferFee: 1.0, currency: 'GHS' });
+  const [withdrawHistory, setWithdrawHistory] = useState([]);
+  const [successModal, setSuccessModal] = useState({ open: false, message: '' });
 
   // hydrate basic user info and trigger an initial fetch without needing a manual refresh
   useEffect(() => {
@@ -301,6 +303,20 @@ export default function CreatorDashboard() {
           setWithdrawSummary(json);
         }
       } catch {}
+    })();
+  }, [token]);
+
+  // Load withdrawal history
+  useEffect(() => {
+    (async () => {
+      try {
+        const tokenLocal = token || localStorage.getItem('token');
+        const res = await fetch('/api/withdrawals/me', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
+        if (res.ok) {
+          const json = await res.json();
+          setWithdrawHistory(Array.isArray(json) ? json : []);
+        }
+      } catch (e) { }
     })();
   }, [token]);
 
@@ -694,7 +710,7 @@ export default function CreatorDashboard() {
                     <p className="text-gray-400 text-sm">Available Balance</p>
                     {/* Short note immediately above the total earnings amount */}
                     <p className="text-xs text-gray-400 mt-1">Shown net of platform fee — you receive 80%</p>
-                    <p className="text-3xl font-bold text-green-400 mt-2">GH₵ {stats.totalEarnings.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-green-400 mt-2">GH₵ {Number(withdrawSummary?.available || 0).toFixed(2)}</p>
                     <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700 w-full" onClick={() => setWithdrawOpen(true)}>
                       Withdraw Funds
                     </Button>
@@ -706,9 +722,33 @@ export default function CreatorDashboard() {
                 <CardContent className="p-6">
                   <div>
                     <p className="text-gray-300 text-sm font-medium">Withdrawal History</p>
-                    <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/40 p-4">
-                      <p className="text-slate-400 text-sm">No withdrawals yet.</p>
-                      <p className="text-slate-500 text-xs mt-1">Your approved withdrawals will appear here.</p>
+                    <div className="mt-3 space-y-3">
+                      {withdrawHistory.length === 0 ? (
+                        <div className="rounded-md border border-slate-800 bg-slate-900/40 p-4">
+                          <p className="text-slate-400 text-sm">No withdrawals yet.</p>
+                          <p className="text-slate-500 text-xs mt-1">Your approved withdrawals will appear here.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {withdrawHistory.map(w => (
+                            <div key={w.id} className={`p-3 rounded-md border ${w.status === 'requested' ? 'border-yellow-600 bg-yellow-900/5' : w.status === 'paid' ? 'border-green-600 bg-green-900/5' : 'border-red-600 bg-red-900/5'}`}>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm text-white font-semibold">GH₵ {Number(w.amount).toFixed(2)}</div>
+                                  <div className="text-xs text-gray-400">{w.destination_type === 'mobile_money' ? 'Mobile Money' : w.destination_type}: {w.destination_account}</div>
+                                  <div className="text-xs text-gray-500 mt-1">Requested: {new Date(w.created_at).toLocaleString()}</div>
+                                </div>
+                                <div className="text-sm font-semibold">
+                                  {w.status === 'requested' && <span className="px-2 py-1 rounded-full bg-yellow-600 text-black">Pending</span>}
+                                  {w.status === 'processing' && <span className="px-2 py-1 rounded-full bg-indigo-600">Processing</span>}
+                                  {w.status === 'paid' && <span className="px-2 py-1 rounded-full bg-green-600">Approved</span>}
+                                  {w.status === 'rejected' && <span className="px-2 py-1 rounded-full bg-red-600">Declined</span>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -716,6 +756,18 @@ export default function CreatorDashboard() {
             </div>
           </TabsContent>
         </Tabs>
+      {/* Success modal after request */}
+      <Dialog open={successModal.open} onOpenChange={() => setSuccessModal({ open: false, message: '' })}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-sm">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-lg font-semibold">Request Submitted</DialogTitle>
+            <DialogDescription className="text-gray-400">{successModal.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setSuccessModal({ open: false, message: '' })} className="bg-emerald-600 hover:bg-emerald-700 text-white">OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
       <ConfirmModal
         isOpen={showRemoveConfirm}
@@ -777,9 +829,15 @@ export default function CreatorDashboard() {
                   // Refresh summary
                   const sumRes = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
                   if (sumRes.ok) setWithdrawSummary(await sumRes.json());
+                  // Append the new request to local history as pending (server returned record)
+                  if (data && data.request) {
+                    setWithdrawHistory(prev => [data.request, ...prev]);
+                    // locally deduct available amount so UI updates immediately
+                    setWithdrawSummary(prev => ({ ...prev, available: Math.max(0, Number(prev.available || 0) - Number(data.request.amount || 0)) }));
+                  }
                   setWithdrawOpen(false);
                   setWithdrawAmount(''); setMomo(''); setMomo2('');
-                  alert('Withdrawal request submitted. You will receive funds within 24 hours.');
+                  setSuccessModal({ open: true, message: 'Withdrawal request submitted. You will receive funds within 24 hours.' });
                 } catch (e) {
                   alert(e.message || 'Withdrawal failed');
                 } finally {

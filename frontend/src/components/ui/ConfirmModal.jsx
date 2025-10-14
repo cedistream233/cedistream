@@ -11,7 +11,7 @@ import {
 import { AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function ConfirmModal({ isOpen, onClose, onConfirm, title = 'Confirm', description, confirmText = 'Confirm', cancelText = 'Cancel' }) {
+export default function ConfirmModal({ isOpen, onClose, onConfirm, title = 'Confirm', description, confirmText = 'Confirm', cancelText = 'Cancel', children = null }) {
   const [loading, setLoading] = useState(false);
 
   const handleConfirm = async () => {
@@ -38,6 +38,9 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title = 'Conf
           <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
           {description && <DialogDescription className="text-gray-400">{description}</DialogDescription>}
         </DialogHeader>
+
+        {/* Allow callers to inject extra content (e.g. notes input) */}
+        {children}
 
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0">
           <Button variant="secondary" onClick={onClose} disabled={loading} className="border-slate-600 hover:bg-slate-800">
