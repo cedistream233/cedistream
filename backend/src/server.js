@@ -97,14 +97,22 @@ app.use(cors({
 app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);
 app.use(express.json());
 
-// Unified health handler reused across endpoints
-const healthHandler = async (req, res) => {
+// Shallow health check (no DB) for platform probes like Render/UptimeRobot
+const shallowHealthHandler = (req, res) => {
+  res.json({
+    ok: true,
+    time: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+};
+
+// Deep health check (includes DB) for internal diagnostics
+const deepHealthHandler = async (req, res) => {
   try {
-    // Test database connection
     await query('SELECT 1');
-    
-    res.json({ 
-      ok: true, 
+    res.json({
+      ok: true,
       time: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
       environment: process.env.NODE_ENV || 'development',
@@ -112,19 +120,19 @@ const healthHandler = async (req, res) => {
     });
   } catch (error) {
     console.error('Health check failed:', error);
-    res.status(503).json({ 
-      ok: false, 
+    res.status(503).json({
+      ok: false,
       time: new Date().toISOString(),
       error: 'Database connection failed'
     });
   }
 };
 
-// Primary health endpoint used by Render
-app.get('/api/health', healthHandler);
-// Compatibility endpoints for common monitors and platforms
-app.get('/health', healthHandler);
-app.get('/healthz', healthHandler);
+// Deep health for manual checks
+app.get('/api/health', deepHealthHandler);
+// Shallow health for platform probes
+app.get('/health', shallowHealthHandler);
+app.get('/healthz', shallowHealthHandler);
 
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/albums', albumsRouter);

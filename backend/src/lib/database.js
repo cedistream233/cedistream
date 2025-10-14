@@ -10,10 +10,12 @@ let pool = null;
 if (process.env.DATABASE_URL) {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    // Managed Postgres (Render/Neon/Supabase) generally requires SSL in serverless contexts
     ssl: { rejectUnauthorized: false },
     keepAlive: true,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
+    // Give more time for cold starts or congested networks
+    connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 15000),
+    idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
     max: Number(process.env.PGPOOL_MAX || 10),
     application_name: 'cedistream-backend'
   });
@@ -31,6 +33,11 @@ export const query = async (text, params) => {
   }
   const client = await pool.connect();
   try {
+    // Set a sane statement timeout to prevent hung queries from stalling health checks/jobs
+    const statementTimeoutMs = Number(process.env.PG_STATEMENT_TIMEOUT_MS || 15000);
+    if (Number.isFinite(statementTimeoutMs) && statementTimeoutMs > 0) {
+      await client.query(`SET statement_timeout = ${statementTimeoutMs}`);
+    }
     const result = await client.query(text, params);
     return result;
   } catch (error) {
