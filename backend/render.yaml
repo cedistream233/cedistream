@@ -33,7 +33,7 @@ services:
     env: node
     region: oregon
     plan: starter
-    buildCommand: npm ci --only=production
+  buildCommand: npm install --omit=dev
     startCommand: npm start
     autoDeploy: true
     healthCheckPath: /api/health
