@@ -14,6 +14,14 @@ export default function AdminEarnings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Convert a date string (YYYY-MM-DD) to an inclusive end-of-day ISO timestamp
+  function toInclusiveEndOfDay(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    d.setHours(23, 59, 59, 999);
+    return d.toISOString();
+  }
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -21,8 +29,8 @@ export default function AdminEarnings() {
       // Pull only completed purchases; we only need created_at and platform_net
       const params = new URLSearchParams();
       params.set('payment_status', 'completed');
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
+  if (from) params.set('from', from);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
       const res = await fetch(`/api/purchases?${params.toString()}`, {
         headers: { Authorization: token ? `Bearer ${token}` : '' }
       });
@@ -39,7 +47,7 @@ export default function AdminEarnings() {
   const filtered = useMemo(() => {
     let list = rows;
     if (from) list = list.filter(r => new Date(r.created_at) >= new Date(from));
-    if (to) list = list.filter(r => new Date(r.created_at) <= new Date(to));
+    if (to) list = list.filter(r => new Date(r.created_at) <= new Date(toInclusiveEndOfDay(to)));
     return list;
   }, [rows, from, to]);
 

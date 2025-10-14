@@ -7,6 +7,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import AdminLayout from '@/AdminLayout';
 
+// Convert a date string (YYYY-MM-DD) to an inclusive end-of-day ISO timestamp
+function toInclusiveEndOfDay(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
+
 export default function AdminWithdrawals() {
   const { token } = useAuth();
   const [rows, setRows] = useState([]);
@@ -23,16 +31,19 @@ export default function AdminWithdrawals() {
   const [total, setTotal] = useState(0);
   const cacheRef = useRef(new Map()); // key -> { items, total }
   const abortRef = useRef(null);
+  const requestIdRef = useRef(0);
 
   const fetchRows = async () => {
+    let myReq = null;
     try {
       setLoading(true);
+      myReq = ++requestIdRef.current;
       const params = new URLSearchParams();
-  if (activeTab === 'pending') params.set('status', 'requested');
+      if (activeTab === 'pending') params.set('status', 'requested');
       if (activeTab === 'paid') params.set('status', 'paid');
       if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
+  if (from) params.set('from', from);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
       params.set('page', String(page));
       params.set('limit', String(limit));
       const key = `${activeTab}|${from}|${to}|${page}|${limit}`;
@@ -41,6 +52,8 @@ export default function AdminWithdrawals() {
         setRows(cached.items);
         setTotal(cached.total);
         setLoading(false);
+        // we already have cached data for this key; don't issue a network request
+        return;
       }
       // cancel previous
       if (abortRef.current) abortRef.current.abort();
@@ -52,26 +65,46 @@ export default function AdminWithdrawals() {
       });
       if (!res.ok) throw new Error('Failed to load withdrawals');
       const data = await res.json();
+      // only apply results if this is still the latest request
+      if (myReq !== requestIdRef.current) return;
       const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
       setRows(items);
       if (typeof data?.total === 'number') setTotal(data.total);
       cacheRef.current.set(key, { items, total: typeof data?.total === 'number' ? data.total : (items.length || 0) });
       setError('');
     } catch (e) {
-      setError(e.message || 'Failed to load');
+      if (e && (e.name === 'AbortError' || String(e.message || '').toLowerCase().includes('aborted'))) {
+        // Ignore aborted requests quietly
+        return;
+      }
+      // only set error if this is the latest request
+      if (myReq === requestIdRef.current) setError(e.message || 'Failed to load');
     } finally {
-      setLoading(false);
+      // clear loading only if this is the latest request
+      if (myReq === requestIdRef.current) setLoading(false);
     }
   };
 
   const fetchSummary = async () => {
     try {
-      const res = await fetch('/api/withdrawals/admin/summary', { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+      const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
+      const res = await fetch(`/api/withdrawals/admin/summary?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
       if (res.ok) setSummary(await res.json());
     } catch {}
   };
 
-  useEffect(() => { fetchRows(); fetchSummary(); /* eslint-disable-next-line */ }, [token, activeTab, page, limit]);
+  useEffect(() => { fetchRows(); fetchSummary(); /* eslint-disable-next-line */ }, [token, activeTab, page, limit, from, to]);
+
+  // Abort any in-flight request when unmounting
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        try { abortRef.current.abort(); } catch {}
+      }
+    };
+  }, []);
 
   // Prefetch next page when inputs change
   useEffect(() => {
@@ -82,8 +115,8 @@ export default function AdminWithdrawals() {
         if (activeTab === 'pending') params.set('status', 'requested');
         if (activeTab === 'paid') params.set('status', 'paid');
         if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
-        if (from) params.set('from', from);
-        if (to) params.set('to', to);
+  if (from) params.set('from', from);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
         params.set('page', String(nextPage));
         params.set('limit', String(limit));
         const key = `${activeTab}|${from}|${to}|${nextPage}|${limit}`;
@@ -170,7 +203,7 @@ export default function AdminWithdrawals() {
               if (activeTab === 'paid') params.set('status', 'paid');
               if (activeTab === 'rejected') params.set('status', 'rejected,cancelled');
               if (from) params.set('from', from);
-              if (to) params.set('to', to);
+              if (to) params.set('to', toInclusiveEndOfDay(to));
               params.set('page', String(page));
               params.set('limit', String(limit));
               const res = await fetch(`/api/withdrawals/admin/export?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });

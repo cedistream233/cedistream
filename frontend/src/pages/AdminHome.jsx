@@ -4,6 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/AdminLayout';
 import Pagination from '@/components/ui/Pagination';
 
+// Convert a date string (YYYY-MM-DD) to an inclusive end-of-day ISO timestamp
+function toInclusiveEndOfDay(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
+
 export default function AdminHome() {
   const { token } = useAuth();
   const [summary, setSummary] = useState({ counts: { requested: 0, paid: 0, rejected: 0, cancelled: 0 } });
@@ -20,9 +28,9 @@ export default function AdminHome() {
   useEffect(() => {
     (async () => {
       try {
-        const params = new URLSearchParams();
-        if (from) params.set('from', from);
-        if (to) params.set('to', to);
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
         params.set('includePlatformNet', '1');
         const s = await fetch(`/api/withdrawals/admin/summary?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
         if (s.ok) setSummary(await s.json());
@@ -48,7 +56,7 @@ export default function AdminHome() {
   params.set('page', String(page));
   params.set('limit', String(limit));
   if (from) params.set('from', from);
-  if (to) params.set('to', to);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
   const r = await fetch(`/api/withdrawals/admin?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
         if (r.ok) {
           const data = await r.json();
@@ -73,7 +81,7 @@ export default function AdminHome() {
   params.set('page', String(nextPage));
   params.set('limit', String(limit));
   if (from) params.set('from', from);
-  if (to) params.set('to', to);
+  if (to) params.set('to', toInclusiveEndOfDay(to));
   const r = await fetch(`/api/withdrawals/admin?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } }).catch(() => null);
       if (r && r.ok) {
         const data = await r.json();

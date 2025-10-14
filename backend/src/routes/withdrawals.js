@@ -237,12 +237,12 @@ router.patch('/:id', authenticateToken, requireRole(['admin']), async (req, res,
 
     const result = await query(
       `UPDATE withdrawals 
-       SET status = $2,
-           notes = COALESCE($3, notes),
-           reference = COALESCE($4, reference),
-           processed_at = CASE WHEN $2 IN ('paid','rejected','cancelled') THEN NOW() ELSE processed_at END,
+       SET status = $2::varchar,
+           notes = COALESCE($3::text, notes),
+           reference = COALESCE($4::text, reference),
+           processed_at = CASE WHEN ($2::varchar = ANY(ARRAY['paid','rejected','cancelled']::varchar[])) THEN NOW() ELSE processed_at END,
            updated_at = NOW()
-       WHERE id = $1 RETURNING *`,
+       WHERE id = $1::uuid RETURNING *`,
       [id, status, notes || null, reference || null]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Withdrawal not found' });
