@@ -305,8 +305,25 @@ router.get('/sales-export', authenticateToken, requireRole(['creator']), async (
     };
 
     stream.on('data', row => {
-      // export creator_amount (net) as Amount for creator-focused CSV
-      const line = [row.date, row.item_type, row.item, row.creator_amount, row.buyer_name, row.payment_status]
+      // Determine amount to export (creator net preferred). Fallback to gross amount or compute 80% if creator_amount missing.
+      const hasCreator = row.creator_amount !== null && row.creator_amount !== undefined;
+      const hasGross = row.amount !== null && row.amount !== undefined;
+      let amountToExport = 0;
+      if (hasCreator) {
+        amountToExport = Number(row.creator_amount);
+      } else if (hasGross) {
+        // If creator_amount missing, use gross as fallback for transparency
+        amountToExport = Number(row.amount);
+      } else if (hasGross === false && row.creator_amount === null) {
+        amountToExport = 0;
+      }
+      // If creator_amount missing but gross exists and we prefer net, compute 80% as a best-effort fallback
+      if (!hasCreator && hasGross) {
+        // prefer showing net when creator_amount not stored, compute 80%
+        amountToExport = +(Number(row.amount) * 0.8).toFixed(2);
+      }
+
+      const line = [row.date, row.item_type, row.item, amountToExport.toFixed(2), row.buyer_name, row.payment_status]
         .map(esc).join(',') + '\n';
       const ok = res.write(line);
       if (!ok) {

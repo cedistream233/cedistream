@@ -14,6 +14,7 @@ import songsRouter from './routes/songs.js';
 import withdrawalsRouter from './routes/withdrawals.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import supportRouter, { listTicketsHandler } from './routes/support.js';
+import adminEarningsRouter from './routes/adminEarnings.js';
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ app.use('/api/uploads', uploadsRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/support', supportRouter);
 app.get('/api/support-tickets', listTicketsHandler); // alias for admin listing
+app.use('/api/admin', adminEarningsRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

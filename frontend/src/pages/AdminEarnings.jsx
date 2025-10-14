@@ -58,20 +58,61 @@ export default function AdminEarnings() {
       let key = d.toISOString().slice(0,10);
       if (mode === 'monthly') key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       if (mode === 'yearly') key = `${d.getFullYear()}`;
-      const v = Number(r.platform_net || 0);
-      map.set(key, +(Number(map.get(key) || 0) + v).toFixed(2));
+
+      const gross = Number(r.amount || 0);
+      const platform_fee = Number(r.platform_fee || 0);
+      const paystack_fee = Number(r.paystack_fee || 0);
+      const platform_net = Number(r.platform_net || 0);
+      const creator_amount = Number(r.creator_amount || 0);
+
+      const cur = map.get(key) || { gross:0, platform_fee:0, paystack_fee:0, platform_net:0, creator_amount:0 };
+      cur.gross = +(cur.gross + gross).toFixed(2);
+      cur.platform_fee = +(cur.platform_fee + platform_fee).toFixed(2);
+      cur.paystack_fee = +(cur.paystack_fee + paystack_fee).toFixed(2);
+      cur.platform_net = +(cur.platform_net + platform_net).toFixed(2);
+      cur.creator_amount = +(cur.creator_amount + creator_amount).toFixed(2);
+      map.set(key, cur);
     }
-    const arr = Array.from(map.entries()).map(([k,v]) => ({ key:k, amount:v }));
+    const arr = Array.from(map.entries()).map(([k,v]) => ({ key:k, ...v }));
     arr.sort((a,b) => a.key.localeCompare(b.key));
     return arr;
   }, [filtered, mode]);
 
-  const total = grouped.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const totals = grouped.reduce((acc, r) => {
+    acc.gross += Number(r.gross || 0);
+    acc.platform_fee += Number(r.platform_fee || 0);
+    acc.paystack_fee += Number(r.paystack_fee || 0);
+    acc.platform_net += Number(r.platform_net || 0);
+    acc.creator_amount += Number(r.creator_amount || 0);
+    return acc;
+  }, { gross:0, platform_fee:0, paystack_fee:0, platform_net:0, creator_amount:0 });
 
-  const exportCsv = () => {
-    const header = ['Period','Platform net (GHS)'];
+  const exportCsv = async () => {
+    // Try server-side export first (admin endpoint). If it fails, fallback to client-side CSV.
+    try {
+      const params = new URLSearchParams();
+      if (mode) params.set('mode', mode);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const res = await fetch(`/api/admin/earnings-export?${params.toString()}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `platform-earnings-${mode}.csv`; a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    // Fallback: client-side CSV
+    const header = ['Period','Gross (GHS)','Platform fee (GHS)','Paystack fee (GHS)','Platform net (GHS)','Creator amount (GHS)'];
     const lines = [header.join(',')];
-    for (const r of grouped) lines.push(`${r.key},${r.amount}`);
+    for (const r of grouped) lines.push([r.key, r.gross.toFixed(2), r.platform_fee.toFixed(2), r.paystack_fee.toFixed(2), r.platform_net.toFixed(2), r.creator_amount.toFixed(2)].join(','));
+    // add totals row
+    lines.push(['TOTAL', totals.gross.toFixed(2), totals.platform_fee.toFixed(2), totals.paystack_fee.toFixed(2), totals.platform_net.toFixed(2), totals.creator_amount.toFixed(2)].join(','));
     const csv = lines.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -97,7 +138,8 @@ export default function AdminEarnings() {
             </div>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <div className="text-sm bg-slate-800 text-green-300 px-3 py-1 rounded-md">Total GH₵ {total.toFixed(2)}</div>
+            <div className="text-sm bg-slate-800 text-green-300 px-3 py-1 rounded-md">Total Gross GH₵ {totals.gross.toFixed(2)}</div>
+            <div className="text-sm bg-slate-800 text-yellow-300 px-3 py-1 rounded-md">Platform net GH₵ {totals.platform_net.toFixed(2)}</div>
           </div>
         </div>
 
@@ -128,16 +170,32 @@ export default function AdminEarnings() {
               <thead className="text-left text-gray-400">
                 <tr>
                   <th className="px-4 py-2">{mode === 'daily' ? 'Day' : mode === 'monthly' ? 'Month' : 'Year'}</th>
+                  <th className="px-4 py-2">Gross (GHS)</th>
+                  <th className="px-4 py-2">Platform fee (GHS)</th>
+                  <th className="px-4 py-2">Paystack fee (GHS)</th>
                   <th className="px-4 py-2">Platform net (GHS)</th>
+                  <th className="px-4 py-2">Creator amount (GHS)</th>
                 </tr>
               </thead>
               <tbody className="text-gray-200">
                 {grouped.map(r => (
                   <tr key={r.key} className="border-t border-slate-800">
                     <td className="px-4 py-2">{r.key}</td>
-                    <td className="px-4 py-2">{Number(r.amount).toFixed(2)}</td>
+                    <td className="px-4 py-2">{Number(r.gross).toFixed(2)}</td>
+                    <td className="px-4 py-2">{Number(r.platform_fee).toFixed(2)}</td>
+                    <td className="px-4 py-2">{Number(r.paystack_fee).toFixed(2)}</td>
+                    <td className="px-4 py-2">{Number(r.platform_net).toFixed(2)}</td>
+                    <td className="px-4 py-2">{Number(r.creator_amount).toFixed(2)}</td>
                   </tr>
                 ))}
+                <tr className="border-t border-slate-800 font-semibold">
+                  <td className="px-4 py-2">TOTAL</td>
+                  <td className="px-4 py-2">{totals.gross.toFixed(2)}</td>
+                  <td className="px-4 py-2">{totals.platform_fee.toFixed(2)}</td>
+                  <td className="px-4 py-2">{totals.paystack_fee.toFixed(2)}</td>
+                  <td className="px-4 py-2">{totals.platform_net.toFixed(2)}</td>
+                  <td className="px-4 py-2">{totals.creator_amount.toFixed(2)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
