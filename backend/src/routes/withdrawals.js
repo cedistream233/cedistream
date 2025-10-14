@@ -53,13 +53,14 @@ router.get('/admin', authenticateToken, requireRole(['admin']), async (req, res,
       statuses = parts.filter(s => allowed.includes(s));
       if (!statuses.length) statuses = ['requested','processing'];
     }
-    const params = [];
-    let p = 1;
-    const placeholders = statuses.map(() => `$${p++}`).join(',');
-    params.push(...statuses);
-    let dateCond = '';
-    if (from) { dateCond += ` AND w.created_at >= $${p++}`; params.push(from); }
-    if (to) { dateCond += ` AND w.created_at <= $${p++}`; params.push(to); }
+  const params = [];
+  let p = 1;
+  // build status placeholders with explicit varchar casts
+  const placeholders = statuses.map(() => `$${p++}::varchar`).join(',');
+  params.push(...statuses);
+  let dateCond = '';
+  if (from) { dateCond += ` AND w.created_at >= $${p++}::timestamptz`; params.push(from); }
+  if (to) { dateCond += ` AND w.created_at <= $${p++}::timestamptz`; params.push(to); }
     // pagination
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const pageSize = Math.min(200, Math.max(1, parseInt(limit, 10) || 25));
@@ -93,13 +94,13 @@ router.get('/admin/summary', authenticateToken, requireRole(['admin']), async (r
       const allowed = ['requested','processing','paid','rejected','cancelled'];
       const sts = parts.filter(s => allowed.includes(s));
       if (sts.length) {
-        const placeholders = sts.map(() => `$${p++}`).join(',');
+        const placeholders = sts.map(() => `$${p++}::varchar`).join(',');
         where += ` AND status IN (${placeholders})`;
         params.push(...sts);
       }
     }
-    if (from) { where += ` AND created_at >= $${p++}`; params.push(from); }
-    if (to) { where += ` AND created_at <= $${p++}`; params.push(to); }
+    if (from) { where += ` AND created_at >= $${p++}::timestamptz`; params.push(from); }
+    if (to) { where += ` AND created_at <= $${p++}::timestamptz`; params.push(to); }
 
     const q = await query(`
       SELECT status, COUNT(1)::int AS count
@@ -114,12 +115,12 @@ router.get('/admin/summary', authenticateToken, requireRole(['admin']), async (r
 
     // Optionally include platform net totals (from purchases) for the same date range
     if (includePlatformNet === '1' || includePlatformNet === 'true') {
-      const p2 = [];
-      let idx = 1;
-  let cond = "WHERE p.payment_status = 'completed'";
-      if (from) { cond += ` AND p.created_at >= $${idx++}`; p2.push(from); }
-      if (to) { cond += ` AND p.created_at <= $${idx++}`; p2.push(to); }
-      const totRes = await query(`SELECT COALESCE(SUM(p.platform_net),0)::numeric::float8 AS total FROM purchases p ${cond}`, p2);
+    const p2 = [];
+    let idx = 1;
+    let cond = "WHERE p.payment_status = 'completed'";
+    if (from) { cond += ` AND p.created_at >= $${idx++}::timestamptz`; p2.push(from); }
+    if (to) { cond += ` AND p.created_at <= $${idx++}::timestamptz`; p2.push(to); }
+    const totRes = await query(`SELECT COALESCE(SUM(p.platform_net),0)::numeric::float8 AS total FROM purchases p ${cond}`, p2);
       out.platform_net = parseFloat(totRes.rows[0]?.total || 0);
     }
 
@@ -248,7 +249,7 @@ router.patch('/:id', authenticateToken, requireRole(['admin']), async (req, res,
     // Insert audit record
     await query(
       `INSERT INTO withdrawals_audit (withdrawal_id, admin_id, previous_status, new_status, notes, reference)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1::uuid, $2::uuid, $3::varchar, $4::varchar, $5::text, $6::text)`,
       [id, req.user.id, from, status, notes || null, reference || null]
     );
     res.json(result.rows[0]);
