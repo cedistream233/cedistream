@@ -41,6 +41,10 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 const BASE_PORT = Number(process.env.PORT) || 5000;
 
+// Behind Render's proxy: trust first proxy so req.ip and rate limiters work correctly
+// https://render.com/docs/configure-ssl#using-x-forwarded-proto
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -83,6 +87,8 @@ const allowedOrigins = new Set([
   primaryFrontend,
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  // Production Netlify site (explicitly allowed in case FRONTEND_URL is not set)
+  'https://cedistream.netlify.app',
 ]);
 app.use(cors({
   origin: (origin, cb) => {
