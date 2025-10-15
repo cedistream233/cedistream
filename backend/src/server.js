@@ -17,6 +17,8 @@ import withdrawalsRouter from './routes/withdrawals.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import supportRouter, { listTicketsHandler } from './routes/support.js';
 import adminEarningsRouter from './routes/adminEarnings.js';
+import promotionsRouter from './routes/promotions.js';
+import promotionsAdminRouter from './routes/promotionsAdmin.js';
 
 dotenv.config();
 
@@ -154,6 +156,10 @@ app.use('/api/media', mediaRouter);
 app.use('/api/support', supportRouter);
 app.get('/api/support-tickets', listTicketsHandler); // alias for admin listing
 app.use('/api/admin', adminEarningsRouter);
+// Promotions public endpoint (read-only)
+app.use('/api/promotions', promotionsRouter);
+// Admin CRUD for promotions mounted under /api/admin/promotions
+app.use('/api/admin/promotions', promotionsAdminRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

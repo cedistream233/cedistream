@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import LogoutConfirmModal from "@/components/ui/LogoutConfirmModal";
 import ContactSupportModal from "@/components/ui/ContactSupportModal";
 import BackToTop from "@/components/ui/BackToTop.jsx";
+import PromotionsBanner from "@/components/promotions/PromotionsBanner";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -202,6 +203,8 @@ export default function Layout({ children, currentPageName }) {
 					</div>
 				</div>
 			</header>
+
+			<PromotionsBanner />
 
 			{/* Mobile Navigation */}
 			<nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-lg border-t border-purple-900/20">
