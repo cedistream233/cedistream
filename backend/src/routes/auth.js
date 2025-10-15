@@ -35,14 +35,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Role must be either creator or supporter' });
     }
 
-    // Check if user already exists
-    const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+    // Check if user already exists (case-insensitive)
+    const existingUser = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     // Check if username exists
-    const existingUsername = await query('SELECT id FROM users WHERE username = $1', [username]);
+    const existingUsername = await query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
     if (existingUsername.rows.length > 0) {
       return res.status(400).json({ error: 'Username is already taken' });
     }
@@ -113,13 +113,15 @@ router.post('/login', async (req, res) => {
     // Determine if identifier looks like an email
     const looksLikeEmail = /.+@.+\..+/.test(identifier);
     if (looksLikeEmail) {
+      // Case-insensitive email lookup
       result = await query(
-        'SELECT id, email, username, password_hash, first_name, last_name, role, is_active FROM users WHERE email = $1',
+        'SELECT id, email, username, password_hash, first_name, last_name, role, is_active FROM users WHERE LOWER(email) = LOWER($1)',
         [identifier]
       );
     } else {
+      // Case-insensitive username lookup
       result = await query(
-        'SELECT id, email, username, password_hash, first_name, last_name, role, is_active FROM users WHERE username = $1',
+        'SELECT id, email, username, password_hash, first_name, last_name, role, is_active FROM users WHERE LOWER(username) = LOWER($1)',
         [identifier]
       );
     }

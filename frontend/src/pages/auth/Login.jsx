@@ -33,12 +33,17 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // Normalize identifier (email or username) to lowercase to allow case-insensitive login
+      const identifier = String(formData.identifier || '').trim();
+      const normalizedIdentifier = identifier.toLowerCase();
+      const payload = { identifier: normalizedIdentifier, password: formData.password };
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();

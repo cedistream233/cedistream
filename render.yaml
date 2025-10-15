@@ -10,9 +10,13 @@ services:
     buildCommand: "npm install && npm run build"
     publishPath: dist
     env:
+      VITE_BACKEND_URL:
+        type: env
+        value: "https://cedistreambackend.onrender.com" # backend URL used by frontend (VITE_BACKEND_URL)
+      # legacy alias (safe to keep)
       VITE_API_BASE:
         type: env
-        value: "https://cedistreambackend.onrender.com" # backend URL (changed to cedistreambackend.onrender.com)
+        value: "https://cedistreambackend.onrender.com"
 
   - type: web_service
     name: cedistream-backend
