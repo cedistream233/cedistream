@@ -1,11 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 export default function AdminPromotions() {
   const { user, token, isAdmin } = useAuth();
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ title: '', url: '', description: '', image: '', priority: 0, published: true, startsAt: '', endsAt: '' });
+  const [form, setForm] = useState({ title: '', url: '', description: '', image: '', startsAt: '', endsAt: '' });
   const [error, setError] = useState(null);
+  const [openConfirm, setOpenConfirm] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -48,8 +60,8 @@ export default function AdminPromotions() {
       });
       if (!res.ok) throw new Error('Save failed');
       const json = await res.json();
-      setItems((s) => [json, ...s]);
-      setForm({ title: '', url: '', description: '', image: '' });
+  setItems((s) => [json, ...s]);
+  setForm({ title: '', url: '', description: '', image: '', startsAt: '', endsAt: '' });
     } catch (e) {
       console.error(e);
     }
@@ -75,19 +87,48 @@ export default function AdminPromotions() {
         <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="https://..." value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
         <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="Image URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
         <textarea className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="Short description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        <div className="flex gap-2 items-center">
-          <label className="text-sm text-gray-300">Priority</label>
-          <input type="number" className="w-24 p-2 rounded bg-slate-800 border border-slate-700" value={form.priority} onChange={(e) => setForm({ ...form, priority: Number(e.target.value || 0) })} />
-          <label className="ml-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} /> Published</label>
-        </div>
-        <div className="flex gap-2 items-center">
-          <label className="text-sm text-gray-300">Starts</label>
-          <input type="datetime-local" className="p-2 rounded bg-slate-800 border border-slate-700" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
-          <label className="text-sm text-gray-300">Ends</label>
-          <input type="datetime-local" className="p-2 rounded bg-slate-800 border border-slate-700" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} />
+        {/* promotions are visible to everyone immediately after creation; priority/published removed */}
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+            <label className="text-sm text-gray-300">Starts</label>
+            <input
+              type="datetime-local"
+              className="p-2 rounded bg-slate-800 border border-slate-700 flex-1 min-w-0"
+              value={form.startsAt}
+              onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+            <label className="text-sm text-gray-300">Ends</label>
+            <input
+              type="datetime-local"
+              className="p-2 rounded bg-slate-800 border border-slate-700 flex-1 min-w-0"
+              value={form.endsAt}
+              onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+            />
+          </div>
         </div>
         <div>
-          <button onClick={save} className="btn btn-primary px-3 py-1">Create</button>
+          <Dialog open={openConfirm} onOpenChange={setOpenConfirm}>
+            <DialogTrigger asChild>
+              <Button variant="primary" size="sm" onClick={() => { setError(null); setOpenConfirm(true); }}>Create</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm creation</DialogTitle>
+                <DialogDescription>You're about to create a promotion. Confirm to proceed.</DialogDescription>
+              </DialogHeader>
+              <CardContent className="py-2">
+                <div className="text-sm text-gray-300 mb-2"><strong>{form.title}</strong></div>
+                <div className="text-xs text-gray-400">{form.description}</div>
+                <div className="text-xs text-gray-400 mt-2">URL: {form.url}</div>
+              </CardContent>
+              <DialogFooter>
+                <Button variant="ghost" size="sm" onClick={() => setOpenConfirm(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={async () => { setOpenConfirm(false); await save(); }}>Confirm</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -99,17 +140,19 @@ export default function AdminPromotions() {
           <div className="text-gray-400">No promotions yet. Create one using the form above.</div>
         )}
             {Array.isArray(items) && items.map((it) => (
-              <div key={it.id} className="p-3 bg-slate-800 rounded flex items-start justify-between">
-                <div>
-                  <div className="font-semibold">{it.title} <span className="text-xs text-gray-400 ml-2">{it.published ? '• Published' : '• Draft'}</span></div>
-                  <div className="text-xs text-gray-300">{it.url}</div>
-                  <div className="text-xs text-gray-400">{it.description}</div>
-                  <div className="text-xs text-gray-500 mt-1">Priority: {it.priority || 0} • Starts: {it.starts_at ? new Date(it.starts_at).toLocaleString() : '—'} • Ends: {it.ends_at ? new Date(it.ends_at).toLocaleString() : '—'}</div>
+              <Card key={it.id} className="p-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="font-semibold text-white">{it.title}</div>
+                    <div className="text-xs text-gray-300">{it.url}</div>
+                    <div className="text-xs text-gray-400">{it.description}</div>
+                    <div className="text-xs text-gray-500 mt-1">Starts: {it.starts_at ? new Date(it.starts_at).toLocaleString() : '—'} • Ends: {it.ends_at ? new Date(it.ends_at).toLocaleString() : '—'}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => remove(it.id)} className="text-red-400">Delete</Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => remove(it.id)} className="text-red-400 text-sm px-2 py-1 border border-red-600 rounded">Delete</button>
-                </div>
-              </div>
+              </Card>
             ))}
       </div>
     </div>
