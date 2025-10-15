@@ -27,6 +27,7 @@ export default function AdminPromotions() {
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressInfo, setProgressInfo] = useState('');
   const [error, setError] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
   const [openConfirm, setOpenConfirm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -66,6 +67,22 @@ export default function AdminPromotions() {
 
   const save = async () => {
     try {
+      // final client-side validation before sending
+      const errs = {};
+      if (!form.title || String(form.title).trim() === '') errs.title = 'Title is required';
+      if (!form.url || String(form.url).trim() === '') errs.url = 'URL is required';
+      const s = Date.parse(form.startsAt);
+      const e = Date.parse(form.endsAt);
+      if (!form.startsAt || String(form.startsAt).trim() === '') errs.startsAt = 'Start date is required';
+      if (!form.endsAt || String(form.endsAt).trim() === '') errs.endsAt = 'End date is required';
+      if (form.startsAt && Number.isNaN(s)) errs.startsAt = 'Invalid start date';
+      if (form.endsAt && Number.isNaN(e)) errs.endsAt = 'Invalid end date';
+      if (!Number.isNaN(s) && !Number.isNaN(e) && e <= s) errs.endsAt = 'End must be after start';
+      setFormErrors(errs);
+      if (Object.keys(errs).length > 0) {
+        setError('Please fix the form errors before creating the promotion');
+        return;
+      }
       const res = await fetch('/api/admin/promotions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -111,7 +128,9 @@ export default function AdminPromotions() {
       <div className="mb-4 grid grid-cols-1 gap-2">
         {error && <div className="text-sm text-red-300">{error}</div>}
         <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+  {formErrors.title && <div className="text-xs text-red-400 mt-1">{formErrors.title}</div>}
         <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="https://..." value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+  {formErrors.url && <div className="text-xs text-red-400 mt-1">{formErrors.url}</div>}
         <div className="flex gap-2 items-center">
           <input className="p-2 rounded bg-slate-800 border border-slate-700 flex-1" placeholder="Image URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
           <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
@@ -194,6 +213,7 @@ export default function AdminPromotions() {
               value={form.startsAt}
               onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
             />
+            {formErrors.startsAt && <div className="text-xs text-red-400 mt-1">{formErrors.startsAt}</div>}
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
             <label className="text-sm text-gray-300">Ends</label>
@@ -203,13 +223,31 @@ export default function AdminPromotions() {
               value={form.endsAt}
               onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
             />
+            {formErrors.endsAt && <div className="text-xs text-red-400 mt-1">{formErrors.endsAt}</div>}
           </div>
         </div>
         <div>
+          <Button variant="primary" size="sm" onClick={() => {
+            // run quick validation before opening confirm
+            const errs = {};
+            if (!form.title || String(form.title).trim() === '') errs.title = 'Title is required';
+            if (!form.url || String(form.url).trim() === '') errs.url = 'URL is required';
+            const s = Date.parse(form.startsAt);
+            const e = Date.parse(form.endsAt);
+            if (!form.startsAt || String(form.startsAt).trim() === '') errs.startsAt = 'Start date is required';
+            if (!form.endsAt || String(form.endsAt).trim() === '') errs.endsAt = 'End date is required';
+            if (form.startsAt && Number.isNaN(s)) errs.startsAt = 'Invalid start date';
+            if (form.endsAt && Number.isNaN(e)) errs.endsAt = 'Invalid end date';
+            if (!Number.isNaN(s) && !Number.isNaN(e) && e <= s) errs.endsAt = 'End must be after start';
+            setFormErrors(errs);
+            if (Object.keys(errs).length === 0) {
+              setError(null);
+              setOpenConfirm(true);
+            } else {
+              setError('Please fix the form errors before creating the promotion');
+            }
+          }}>Create</Button>
           <Dialog open={openConfirm} onOpenChange={setOpenConfirm}>
-            <DialogTrigger asChild>
-              <Button variant="primary" size="sm" onClick={() => { setError(null); setOpenConfirm(true); }}>Create</Button>
-            </DialogTrigger>
             <DialogContent className="w-full max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Confirm creation</DialogTitle>

@@ -19,8 +19,18 @@ router.get('/', authenticateToken, requireRole(['admin']), async (req, res) => {
 // Create promotion
 router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { title, url, description = null, image = null, storagePath = null, priority = 0, published = true, startsAt = null, endsAt = null } = req.body || {};
+  let { title, url, description = null, image = null, storagePath = null, priority = 0, published = true, startsAt = null, endsAt = null } = req.body || {};
     if (!title || !url) return res.status(400).json({ error: 'title and url are required' });
+    // Require start and end dates for promotions
+    if (startsAt == null || endsAt == null) return res.status(400).json({ error: 'startsAt and endsAt are required' });
+    // coerce empty strings to null then validate
+    if (typeof startsAt === 'string' && startsAt.trim() === '') startsAt = null;
+    if (typeof endsAt === 'string' && endsAt.trim() === '') endsAt = null;
+    if (startsAt == null || endsAt == null) return res.status(400).json({ error: 'startsAt and endsAt cannot be empty' });
+    const sMs = Date.parse(startsAt);
+    const eMs = Date.parse(endsAt);
+    if (Number.isNaN(sMs) || Number.isNaN(eMs)) return res.status(400).json({ error: 'startsAt and endsAt must be valid ISO timestamps' });
+    if (eMs <= sMs) return res.status(400).json({ error: 'endsAt must be after startsAt' });
     // Basic url validation
     if (!(String(url).startsWith('http://') || String(url).startsWith('https://'))) {
       return res.status(400).json({ error: 'url must start with http:// or https://' });
@@ -31,7 +41,7 @@ router.post('/', authenticateToken, requireRole(['admin']), async (req, res) => 
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
     `;
-    const params = [title, url, description, image, storagePath, priority, published, startsAt, endsAt];
+  const params = [title, url, description, image, storagePath, priority, published, new Date(sMs).toISOString(), new Date(eMs).toISOString()];
     const result = await query(q, params);
     res.status(201).json(result.rows[0]);
   } catch (e) {
@@ -54,7 +64,10 @@ router.put('/:id', authenticateToken, requireRole(['admin']), async (req, res) =
         // Map camelCase to snake_case for startsAt/endsAt
   const column = k === 'startsAt' ? 'starts_at' : (k === 'endsAt' ? 'ends_at' : (k === 'storagePath' ? 'storage_path' : k));
         fields.push(`${column} = $${idx}`);
-        params.push(req.body[k]);
+        // coerce empty strings for timestamp fields to null
+        let val = req.body[k];
+        if ((k === 'startsAt' || k === 'endsAt') && typeof val === 'string' && val.trim() === '') val = null;
+        params.push(val);
         idx++;
       }
     }
