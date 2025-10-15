@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../lib/database.js';
 import { authenticateToken, requireRole } from '../lib/auth.js';
+import { supabase } from '../lib/supabase.js';
 
 const router = express.Router();
 
@@ -74,6 +75,35 @@ router.delete('/:id', authenticateToken, requireRole(['admin']), async (req, res
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
+    // Fetch promotion to get image URL before deleting
+    const r = await query('SELECT image FROM promotions WHERE id = $1', [id]);
+    if (!r || r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const imageUrl = r.rows[0].image;
+    // Attempt to remove image from storage if configured
+    if (imageUrl && supabase) {
+      try {
+        // Try to derive path from public URL
+        const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+        let path = null;
+        // Supabase public URL pattern contains '/storage/v1/object/public/<bucket>/'
+        const marker = `/storage/v1/object/public/${bucket}/`;
+        const idx = imageUrl.indexOf(marker);
+        if (idx !== -1) {
+          path = imageUrl.slice(idx + marker.length);
+        } else {
+          // fallback: find '/<bucket>/' and take remainder
+          const alt = `/${bucket}/`;
+          const idx2 = imageUrl.indexOf(alt);
+          if (idx2 !== -1) path = imageUrl.slice(idx2 + alt.length);
+        }
+        if (path) {
+          await supabase.storage.from(bucket).remove([path]);
+        }
+      } catch (e) {
+        console.warn('Failed to remove promotion image from storage:', e.message || e);
+      }
+    }
+
     await query('DELETE FROM promotions WHERE id = $1', [id]);
     res.status(204).send();
   } catch (e) {

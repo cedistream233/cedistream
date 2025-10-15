@@ -256,6 +256,23 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
   }
 });
 
+// Upload a single image for promotions (admin only)
+router.post('/promotions-image', authenticateToken, requireRole(['admin']), upload.single('image'), async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'image file is required' });
+    const ext = (file.originalname.split('.').pop() || 'jpg').toLowerCase();
+    const path = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+    const publicUrl = await uploadToStorage(bucket, path, file.buffer, file.mimetype || 'image/jpeg');
+    return res.json({ url: publicUrl });
+  } catch (err) {
+    console.error('Promotions image upload error:', err);
+    return res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
 // Stream CSV export for all sales for a creator. Uses server-side streaming to avoid loading all rows into memory.
 router.get('/sales-export', authenticateToken, requireRole(['creator']), async (req, res) => {
   let client;

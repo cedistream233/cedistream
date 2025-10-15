@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import ImagePreviewModal from '@/components/ui/ImagePreviewModal';
+import UploadProgressModal from '@/components/ui/UploadProgressModal';
 import {
   Dialog,
   DialogTrigger,
@@ -16,6 +18,13 @@ export default function AdminPromotions() {
   const { user, token, isAdmin } = useAuth();
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({ title: '', url: '', description: '', image: '', startsAt: '', endsAt: '' });
+  const [uploading, setUploading] = useState(false);
+  const imageRef = React.useRef();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressInfo, setProgressInfo] = useState('');
   const [error, setError] = useState(null);
   const [openConfirm, setOpenConfirm] = useState(false);
 
@@ -85,7 +94,72 @@ export default function AdminPromotions() {
         {error && <div className="text-sm text-red-300">{error}</div>}
         <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="https://..." value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
-        <input className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="Image URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
+        <div className="flex gap-2 items-center">
+          <input className="p-2 rounded bg-slate-800 border border-slate-700 flex-1" placeholder="Image URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
+          <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            // open preview modal; on confirm we'll upload
+            setPreviewFile(f);
+            setPreviewOpen(true);
+          }} />
+          <Button size="sm" variant="outline" onClick={() => imageRef.current?.click()} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</Button>
+        </div>
+        {form.image && (
+          <div className="mt-2">
+            <img src={form.image} alt="preview" className="h-20 rounded object-cover border border-slate-700" />
+          </div>
+        )}
+        <ImagePreviewModal
+          isOpen={previewOpen}
+          onClose={() => { setPreviewOpen(false); setPreviewFile(null); }}
+          file={previewFile}
+          imageUrl={null}
+          onConfirm={async (file) => {
+            // upload with progress via XHR
+            try {
+              setUploading(true);
+              setProgressOpen(true);
+              setProgressPercent(0);
+              setProgressInfo('Preparing…');
+              const fd = new FormData();
+              fd.append('image', file);
+              await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/uploads/promotions-image');
+                xhr.setRequestHeader('Authorization', token ? `Bearer ${token}` : '');
+                xhr.upload.onprogress = (e) => {
+                  if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    setProgressPercent(pct);
+                    setProgressInfo(`${(e.loaded/1024).toFixed(0)} KB uploaded`);
+                  }
+                };
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      const j = JSON.parse(xhr.responseText);
+                      setForm((s) => ({ ...s, image: j.url }));
+                      resolve(j.url);
+                    } catch (e) { reject(e); }
+                  } else {
+                    reject(new Error(`Upload failed: ${xhr.status}`));
+                  }
+                };
+                xhr.onerror = () => reject(new Error('Network error'));
+                xhr.send(fd);
+              });
+            } catch (err) {
+              console.error('Image upload error', err);
+            } finally {
+              setUploading(false);
+              setProgressOpen(false);
+              setProgressPercent(0);
+              setProgressInfo('');
+            }
+          }}
+        />
+        <UploadProgressModal open={progressOpen} title="Uploading image" description="Uploading promotion image to storage" percent={progressPercent} info={progressInfo} />
         <textarea className="p-2 rounded bg-slate-800 border border-slate-700" placeholder="Short description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         {/* promotions are visible to everyone immediately after creation; priority/published removed */}
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">

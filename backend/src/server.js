@@ -238,6 +238,62 @@ startServer(BASE_PORT);
 // Start background cleanup job
 scheduleAutoFailPendingPurchases();
 
+// Background job: cleanup expired promotions and their storage objects
+function scheduleExpiredPromotionsCleanup() {
+  const disabled = String(process.env.DISABLE_PROMO_CLEANUP || '').toLowerCase() === 'true';
+  if (disabled) {
+    console.log('⏭️  Promotions cleanup job disabled via DISABLE_PROMO_CLEANUP=true');
+    return;
+  }
+  const pollMinutes = Number(process.env.PROMO_CLEANUP_POLL_MINUTES || 60); // default hourly
+  const initialDelayMs = Number(process.env.PROMO_CLEANUP_INITIAL_DELAY_MS || 30000);
+  const pollMs = Math.max(1, pollMinutes) * 60 * 1000;
+
+  const runOnce = async () => {
+    try {
+      // Find expired promotions
+      const res = await query(`SELECT id, image FROM promotions WHERE ends_at IS NOT NULL AND ends_at < NOW()`);
+      if (!res || res.rowCount === 0) return;
+      const rows = res.rows;
+      for (const p of rows) {
+        // Attempt to remove image from storage if available
+        try {
+          if (p.image && process.env.SUPABASE_URL) {
+            // derive bucket and path similar to delete handler
+            const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+            const marker = `/storage/v1/object/public/${bucket}/`;
+            let path = null;
+            const idx = p.image.indexOf(marker);
+            if (idx !== -1) path = p.image.slice(idx + marker.length);
+            else {
+              const alt = `/${bucket}/`;
+              const idx2 = p.image.indexOf(alt);
+              if (idx2 !== -1) path = p.image.slice(idx2 + alt.length);
+            }
+            if (path) {
+              // lazy import supabase to avoid startup dependency
+              const { supabase } = await import('./lib/supabase.js');
+              if (supabase) await supabase.storage.from(bucket).remove([path]);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to remove expired promotion image:', e.message || e);
+        }
+        // delete promotion row
+        try { await query('DELETE FROM promotions WHERE id = $1', [p.id]); } catch (e) { console.warn('Failed to delete expired promotion row', e); }
+      }
+      console.log(`🧹 Cleaned up ${rows.length} expired promotion(s)`);
+    } catch (e) {
+      console.error('Expired promotions cleanup job error:', e);
+    }
+  };
+
+  setTimeout(runOnce, Math.max(0, initialDelayMs));
+  setInterval(runOnce, pollMs);
+}
+
+scheduleExpiredPromotionsCleanup();
+
 // Graceful shutdown
 const shutdown = async (signal) => {
   try {
