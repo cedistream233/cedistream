@@ -20,6 +20,7 @@ import AdminProtectedRoute from './components/AdminProtectedRoute.jsx';
 import AdminHome from './pages/AdminHome.jsx';
 import AdminEarnings from './pages/AdminEarnings.jsx';
 import AdminSupportTickets from './pages/AdminSupportTickets.jsx';
+import AdminPromotions from './pages/AdminPromotions.jsx';
 import Login from './pages/auth/Login.jsx';
 import Signup from './pages/auth/Signup.jsx';
 import ForgotPassword from './pages/auth/ForgotPassword.jsx';
@@ -61,6 +62,7 @@ export default function App() {
   <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
   <Route path="/admin/platform-earnings" element={<AdminProtectedRoute><AdminEarnings /></AdminProtectedRoute>} />
   <Route path="/admin/support-tickets" element={<AdminProtectedRoute><AdminSupportTickets /></AdminProtectedRoute>} />
+  <Route path="/admin/promotions" element={<AdminProtectedRoute><AdminPromotions /></AdminProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute>{withLayout(CreatorDashboard, 'Dashboard')}</ProtectedRoute>} />
   <Route path="/my/albums" element={<ProtectedRoute>{withLayout(MyAlbums, 'My Albums')}</ProtectedRoute>} />
   <Route path="/my/songs" element={<ProtectedRoute>{withLayout(MySongs, 'My Songs')}</ProtectedRoute>} />

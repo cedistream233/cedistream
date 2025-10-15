@@ -7,6 +7,7 @@ export default function AdminLayout({ children, currentPageName, showShortcuts =
   const location = useLocation();
   const nav = [
     { label: 'Withdrawals', to: '/admin/withdrawals', icon: CheckCircle2 },
+    { label: 'Promotions', to: '/admin/promotions', icon: Music },
     // Future: Users, Reports
   ];
   return (
@@ -23,9 +24,10 @@ export default function AdminLayout({ children, currentPageName, showShortcuts =
                 <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">CediStream</span>
               </Link>
             </div>
-            <div className="mt-3 sm:mt-0 flex items-center gap-2">
-              <Link to="/admin/platform-earnings" className="px-3 py-1 rounded-md bg-indigo-700/80 hover:bg-indigo-700 text-white text-sm">Platform earnings</Link>
-              <Link to="/admin/support-tickets" className="px-3 py-1 rounded-md bg-pink-600/80 hover:bg-pink-600 text-white text-sm">Support Tickets</Link>
+            <div className="mt-3 sm:mt-0 flex items-center gap-2 flex-wrap">
+              <Link to="/admin/platform-earnings" className="px-3 py-1 rounded-md bg-indigo-700/80 hover:bg-indigo-700 text-white text-sm flex-shrink-0">Platform earnings</Link>
+              <Link to="/admin/support-tickets" className="px-3 py-1 rounded-md bg-pink-600/80 hover:bg-pink-600 text-white text-sm flex-shrink-0">Support Tickets</Link>
+              <Link to="/admin/promotions" className="px-3 py-1 rounded-md bg-emerald-600/80 hover:bg-emerald-600 text-white text-sm flex-shrink-0">Promotions</Link>
             </div>
           </div>
         )}

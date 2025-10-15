@@ -108,7 +108,7 @@ export default function AdminHome() {
           <Card key={c.label} className={`bg-slate-900/50 border-slate-700 p-4 flex items-center justify-between ${c.ring}`}>
             <div>
               <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${c.color}`}>{c.label}</div>
-              <div className="mt-2 text-2xl font-bold text-white">{c.value || 0}</div>
+              <div className="mt-2 text-xl font-bold text-white">{c.value || 0}</div>
             </div>
             <div className="text-sm text-gray-400">&nbsp;</div>
           </Card>
