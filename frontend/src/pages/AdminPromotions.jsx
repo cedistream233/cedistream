@@ -17,7 +17,7 @@ import {
 export default function AdminPromotions() {
   const { user, token, isAdmin } = useAuth();
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ title: '', url: '', description: '', image: '', startsAt: '', endsAt: '' });
+  const [form, setForm] = useState({ title: '', url: '', description: '', image: '', storagePath: null, startsAt: '', endsAt: '' });
   const [uploading, setUploading] = useState(false);
   const imageRef = React.useRef();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -69,8 +69,8 @@ export default function AdminPromotions() {
       });
       if (!res.ok) throw new Error('Save failed');
       const json = await res.json();
-  setItems((s) => [json, ...s]);
-  setForm({ title: '', url: '', description: '', image: '', startsAt: '', endsAt: '' });
+    setItems((s) => [json, ...s]);
+    setForm({ title: '', url: '', description: '', image: '', storagePath: null, startsAt: '', endsAt: '' });
     } catch (e) {
       console.error(e);
     }
@@ -139,7 +139,7 @@ export default function AdminPromotions() {
                   if (xhr.status >= 200 && xhr.status < 300) {
                     try {
                       const j = JSON.parse(xhr.responseText);
-                      setForm((s) => ({ ...s, image: j.url }));
+                      setForm((s) => ({ ...s, image: j.url, storagePath: j.storagePath || null }));
                       resolve(j.url);
                     } catch (e) { reject(e); }
                   } else {

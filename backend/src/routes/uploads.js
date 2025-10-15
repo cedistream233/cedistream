@@ -262,11 +262,18 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'image file is required' });
-    const ext = (file.originalname.split('.').pop() || 'jpg').toLowerCase();
-    const path = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    // server-side resize using sharp
+    const sharp = (await import('sharp')).default;
+    const maxDim = Number(process.env.PROMO_IMAGE_MAX_DIM || 1200);
+    const buffer = await sharp(file.buffer).resize({ width: maxDim, height: maxDim, fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+    const ext = 'jpg';
+    const storagePath = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-    const publicUrl = await uploadToStorage(bucket, path, file.buffer, file.mimetype || 'image/jpeg');
-    return res.json({ url: publicUrl });
+    const { error } = await supabase.storage.from(bucket).upload(storagePath, buffer, { upsert: true, contentType: 'image/jpeg' });
+    if (error) throw error;
+    const { data } = await supabase.storage.from(bucket).getPublicUrl(storagePath);
+    const publicUrl = data?.publicUrl;
+    return res.json({ url: publicUrl, storagePath });
   } catch (err) {
     console.error('Promotions image upload error:', err);
     return res.status(500).json({ error: 'Failed to upload image' });
