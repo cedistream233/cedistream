@@ -26,12 +26,18 @@ export default function AudioPlayer({
   const [current, setCurrent] = useState(0);
   const [seeking, setSeeking] = useState(false);
   const capRef = useRef(null);
+  const loopRef = useRef(loopMode);
+  const onNextRef = useRef(onNext);
 
   // keep a live ref of the effective preview cap
   useEffect(() => {
     const cap = (showPreviewBadge && Number.isFinite(previewCapSeconds)) ? Math.max(0, Number(previewCapSeconds)) : null;
     capRef.current = cap;
   }, [showPreviewBadge, previewCapSeconds]);
+
+  // keep refs up-to-date for handlers created inside the audio element effect
+  useEffect(() => { loopRef.current = loopMode; }, [loopMode]);
+  useEffect(() => { onNextRef.current = onNext; }, [onNext]);
 
   useEffect(() => {
     const el = new Audio();
@@ -46,7 +52,14 @@ export default function AudioPlayer({
           try { el.pause(); } catch {}
           setPlaying(false);
           setCurrent(cap);
-          if (onEnded) onEnded();
+          // If in 'all' loop mode and a next handler is provided, auto-advance
+          if (loopRef.current === 'all' && typeof onNextRef.current === 'function') {
+            try { onNextRef.current(); } catch {};
+          } else if (loopRef.current === 'one') {
+            // 'one' should repeat current track; do nothing (audio element will handle loop)
+          } else {
+            // 'off' - do not auto-replay; do not call parent onEnded to avoid unexpected restarts
+          }
           return;
         }
         setCurrent(Math.min(el.currentTime || 0, cap));
@@ -54,7 +67,19 @@ export default function AudioPlayer({
         setCurrent(el.currentTime || 0);
       }
     };
-    const onEnd = () => { setPlaying(false); setCurrent(0); onEnded && onEnded(); };
+    const onEnd = () => {
+      setPlaying(false);
+      setCurrent(0);
+      if (loopRef.current === 'one') {
+        // element is expected to handle repeating; do nothing here
+        return;
+      }
+      if (loopRef.current === 'all' && typeof onNextRef.current === 'function') {
+        try { onNextRef.current(); } catch {}
+        return;
+      }
+      // loopMode === 'off' -> don't auto-replay; do not call parent onEnded to avoid unexpected restarts
+    };
     el.addEventListener('loadedmetadata', onLoaded);
     el.addEventListener('timeupdate', onTime);
     el.addEventListener('ended', onEnd);
@@ -83,11 +108,25 @@ export default function AudioPlayer({
     audioRef.current.loop = loopMode === 'one';
     // If the audio was already playing, continue playing the new src.
     // Otherwise, if parent requests autoPlay, attempt to start playback.
+    let triedCanPlay = false;
+    const tryPlay = () => {
+      const el = audioRef.current;
+      if (!el || !src) return;
+      el.play().then(() => setPlaying(true)).catch(() => {
+        // If play is blocked, wait for canplay event once and try again
+        if (!triedCanPlay) {
+          triedCanPlay = true;
+          const onCan = () => { try { el.play().then(() => setPlaying(true)).catch(()=>{}); } catch {} finally { el.removeEventListener('canplay', onCan); } };
+          el.addEventListener('canplay', onCan);
+        }
+      });
+    };
+
     if (wasPlaying && src) {
-      audioRef.current.play().then(() => setPlaying(true)).catch(()=>{});
+      tryPlay();
     } else if (src && autoPlay) {
       // attempt to start playback when the new src is loaded
-      audioRef.current.play().then(() => setPlaying(true)).catch(()=>{});
+      tryPlay();
     } else {
       setPlaying(false);
       setCurrent(0);
