@@ -115,7 +115,7 @@ export default function AdminPromotions() {
           onClose={() => { setPreviewOpen(false); setPreviewFile(null); }}
           file={previewFile}
           imageUrl={null}
-          onConfirm={async (file) => {
+          onConfirm={async (file, transformParams) => {
             // upload with progress via XHR
             try {
               setUploading(true);
@@ -124,6 +124,9 @@ export default function AdminPromotions() {
               setProgressInfo('Preparing…');
               const fd = new FormData();
               fd.append('image', file);
+              if (transformParams) {
+                fd.append('transform', JSON.stringify(transformParams));
+              }
               await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/api/uploads/promotions-image');

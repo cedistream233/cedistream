@@ -262,10 +262,60 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'image file is required' });
-    // server-side resize using sharp
+    // server-side processing using sharp. Accept optional transform params from multipart form field 'transform'
     const sharp = (await import('sharp')).default;
-    const maxDim = Number(process.env.PROMO_IMAGE_MAX_DIM || 1200);
-    const buffer = await sharp(file.buffer).resize({ width: maxDim, height: maxDim, fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+    const transformRaw = req.body && req.body.transform ? req.body.transform : null;
+    let buffer;
+    if (transformRaw) {
+      let transform;
+      try { transform = JSON.parse(transformRaw); } catch (e) { transform = null; }
+      if (transform && typeof transform.zoom === 'number' && transform.offset && typeof transform.offset.x === 'number') {
+        // Compute crop rectangle based on original image dimensions
+        const imgMeta = await sharp(file.buffer).metadata();
+        const origW = imgMeta.width || 1;
+        const origH = imgMeta.height || 1;
+
+        // The preview container is 272x272 (w-72 h-72) in CSS; but we used a 56(=w-56) crop overlay in modal.
+        // Instead of relying on CSS pixels, transform.offset is provided in pixels relative to preview container center.
+        // We treat zoom as scale applied to the image relative to original size.
+        const zoom = Number(transform.zoom) || 1;
+        const outputSize = Number(transform.outputSize || Number(process.env.PROMO_IMAGE_MAX_DIM || 600));
+        // offset given in px relative to preview center; convert to image coordinate system
+        const offsetX = Number(transform.offset.x || 0);
+        const offsetY = Number(transform.offset.y || 0);
+
+        // Determine scaled image display size in preview: displayW = origW * zoom, displayH = origH * zoom
+        const displayW = origW * zoom;
+        const displayH = origH * zoom;
+
+        // The crop is centered at preview center + offset; preview center corresponds to center of display
+        // So compute center point in display coords: centerDisplayX = displayW/2 + offsetX
+        const centerDisplayX = displayW / 2 + offsetX;
+        const centerDisplayY = displayH / 2 + offsetY;
+
+        // We want to extract a square of size outputSize from the display space, mapped back to original image pixels
+        const halfOut = outputSize / 2;
+        // Map display coords back to original image coords by dividing by zoom
+        const extractLeft = Math.round((centerDisplayX - halfOut) / zoom);
+        const extractTop = Math.round((centerDisplayY - halfOut) / zoom);
+        const extractSize = Math.round(outputSize / zoom);
+
+        // Clamp values
+        const left = Math.max(0, Math.min(extractLeft, origW - 1));
+        const top = Math.max(0, Math.min(extractTop, origH - 1));
+        const size = Math.max(1, Math.min(extractSize, Math.max(origW, origH)));
+
+        // Use extract and resize to get exact output
+        buffer = await sharp(file.buffer).extract({ left, top, width: size, height: size }).resize(outputSize, outputSize).jpeg({ quality: 90 }).toBuffer();
+      } else {
+        // fallback resize cover
+        const maxDim = Number(process.env.PROMO_IMAGE_MAX_DIM || 1200);
+        buffer = await sharp(file.buffer).resize({ width: maxDim, height: maxDim, fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+      }
+    } else {
+      const maxDim = Number(process.env.PROMO_IMAGE_MAX_DIM || 1200);
+      buffer = await sharp(file.buffer).resize({ width: maxDim, height: maxDim, fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+    }
     const ext = 'jpg';
     const storagePath = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';

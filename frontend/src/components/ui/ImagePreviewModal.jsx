@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { motion } from 'framer-motion';
 
-export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onConfirm, title = 'Preview Image' }) {
+export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onConfirm, title = 'Preview Image', outputSize = 600 }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const imgWrapRef = useRef(null);
   const imgRef = useRef(null);
@@ -41,44 +41,13 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
 
   const handleConfirm = async () => {
     if (!onConfirm) return onClose();
-    // If user has transformed image (zoom/offset), render a canvas to produce a new Blob to upload
-    if (imgRef.current && (zoom !== 1 || offset.x !== 0 || offset.y !== 0)) {
-      try {
-        const img = imgRef.current;
-        const size = 600; // output square dimension for promotions preview
-        const canvas = document.createElement('canvas');
-        canvas.width = size; canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#111827'; ctx.fillRect(0,0,size,size);
-
-        const naturalW = img.naturalWidth;
-        const naturalH = img.naturalHeight;
-
-        // compute draw dimensions with zoom
-        const drawW = naturalW * zoom;
-        const drawH = naturalH * zoom;
-
-        // center point adjustments
-        const centerX = (size/2) + offset.x;
-        const centerY = (size/2) + offset.y;
-
-        // draw image so that its center aligns with centerX/centerY
-        const dx = centerX - drawW/2;
-        const dy = centerY - drawH/2;
-
-        ctx.drawImage(img, dx, dy, drawW, drawH);
-
-        // convert to blob and pass to onConfirm
-        const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.9));
-        const newFile = new File([blob], (file && file.name) ? file.name : 'promotion.jpg', { type: 'image/jpeg' });
-        await onConfirm(newFile);
-      } catch (e) {
-        console.error('Failed to generate transformed image:', e);
-        await onConfirm(file);
-      }
-    } else {
-      await onConfirm(file);
-    }
+    // Compute transform params in pixels relative to preview container center
+    // preview container size in DOM
+    const wrap = imgWrapRef.current;
+    const rect = wrap ? wrap.getBoundingClientRect() : { width: 280, height: 280 };
+    // offset.x/y already represent pixels moved via dragging in the preview coordinates used
+    const params = { zoom, offset: { x: offset.x, y: offset.y }, outputSize };
+    await onConfirm(file, params);
     onClose();
   };
 
@@ -95,6 +64,14 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
     const dy = cy - lastPos.current.y;
     lastPos.current = { x: cx, y: cy };
     setOffset(o => ({ x: o.x + dx, y: o.y + dy }));
+  };
+
+  const resetTransform = () => {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+    dragging.current = false;
+    lastPos.current = { x: 0, y: 0 };
+    // trigger a reflow by briefly toggling previewUrl if needed (not necessary normally)
   };
 
   return (
@@ -114,28 +91,31 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
         </DialogHeader>
 
         <div className="my-4 flex flex-col sm:flex-row items-start gap-4">
-          <div
-            ref={imgWrapRef}
-            onMouseDown={startDrag}
-            onMouseMove={onMove}
-            onMouseUp={endDrag}
-            onMouseLeave={endDrag}
-            onTouchStart={startDrag}
-            onTouchMove={onMove}
-            onTouchEnd={endDrag}
-            className="w-72 h-72 rounded overflow-hidden border border-slate-700 bg-slate-800 flex items-center justify-center"
-          >
-            {previewUrl ? (
-              <img
-                ref={imgRef}
-                src={previewUrl}
-                alt="Preview"
-                style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`, touchAction: 'none' }}
-                className="min-w-full min-h-full object-cover select-none pointer-events-none"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
-            )}
+          <div className="flex items-center justify-center">
+            {/* The square crop is now the main frame */}
+            <div
+              ref={imgWrapRef}
+              onMouseDown={startDrag}
+              onMouseMove={onMove}
+              onMouseUp={endDrag}
+              onMouseLeave={endDrag}
+              onTouchStart={startDrag}
+              onTouchMove={onMove}
+              onTouchEnd={endDrag}
+              className="w-72 h-72 rounded overflow-hidden border border-slate-700 bg-slate-800 relative"
+            >
+              {previewUrl ? (
+                <img
+                  ref={imgRef}
+                  src={previewUrl}
+                  alt="Preview"
+                  style={{ position: 'absolute', left: '50%', top: '50%', transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${zoom})`, touchAction: 'none' }}
+                  className="block select-none pointer-events-none"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
+              )}
+            </div>
           </div>
 
           <div className="flex-1">
@@ -143,7 +123,7 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
             <input type="range" min="0.5" max="3" step="0.01" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full" />
             <div className="mt-2 mb-4 text-sm text-gray-300">Position (drag image to move)</div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setOffset({ x: 0, y: 0 })}>Reset</Button>
+              <Button size="sm" variant="outline" onClick={resetTransform}>Reset</Button>
               <div className="text-sm text-gray-400 mt-2">Use mouse/touch to reposition the image in the frame</div>
             </div>
           </div>
