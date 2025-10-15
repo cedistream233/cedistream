@@ -30,10 +30,7 @@ export default function AdminPromotions() {
   const [openConfirm, setOpenConfirm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [rerunOpen, setRerunOpen] = useState(false);
-  const [rerunItem, setRerunItem] = useState(null);
-  const [rerunStarts, setRerunStarts] = useState('');
-  const [rerunEnds, setRerunEnds] = useState('');
+  
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -104,42 +101,7 @@ export default function AdminPromotions() {
     setShowDeleteConfirm(false);
   };
 
-  const openRerun = (item) => {
-    setRerunItem(item);
-    // default to now..now+7d
-    const now = new Date();
-    const plus7 = new Date(Date.now() + 7*24*60*60*1000);
-    setRerunStarts(new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16));
-    setRerunEnds(new Date(plus7.getTime() - plus7.getTimezoneOffset()*60000).toISOString().slice(0,16));
-    setRerunOpen(true);
-  };
-
-  const doRerun = async () => {
-    if (!rerunItem) return;
-    const body = {
-      title: rerunItem.title,
-      url: rerunItem.url,
-      description: rerunItem.description,
-      image: rerunItem.image,
-      storagePath: rerunItem.storage_path || rerunItem.storagePath || null,
-      startsAt: rerunStarts,
-      endsAt: rerunEnds,
-    };
-    try {
-      const res = await fetch('/api/admin/promotions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error('Rerun failed');
-      const json = await res.json();
-      setItems((s) => [json, ...s]);
-      setRerunOpen(false);
-      setRerunItem(null);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  
 
   if (!isAdmin) return <div className="p-4">Access denied</div>;
 
@@ -284,7 +246,6 @@ export default function AdminPromotions() {
                     <div className="text-xs text-gray-500 mt-1">Starts: {it.starts_at ? new Date(it.starts_at).toLocaleString() : '—'} • Ends: {it.ends_at ? new Date(it.ends_at).toLocaleString() : '—'}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openRerun(it)} className="text-purple-300">Rerun</Button>
                     <Button variant="outline" size="sm" onClick={() => onDeleteClick(it.id)} className="text-red-400">Delete</Button>
                   </div>
                 </div>
@@ -292,29 +253,6 @@ export default function AdminPromotions() {
             ))}
       </div>
       <ConfirmModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} onConfirm={confirmDelete} title="Delete promotion" description="Are you sure you want to delete this promotion? This action cannot be undone." confirmText="Delete" cancelText="Cancel" />
-
-      <Dialog open={rerunOpen} onOpenChange={setRerunOpen}>
-        <DialogContent className="w-full max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rerun promotion</DialogTitle>
-            <DialogDescription className="text-gray-400">Select a new start and end date. The original image and details will be reused.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div>
-              <label className="text-sm text-gray-300">Starts</label>
-              <input type="datetime-local" className="mt-1 p-2 rounded bg-slate-800 border border-slate-700 w-full" value={rerunStarts} onChange={(e)=>setRerunStarts(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-sm text-gray-300">Ends</label>
-              <input type="datetime-local" className="mt-1 p-2 rounded bg-slate-800 border border-slate-700 w-full" value={rerunEnds} onChange={(e)=>setRerunEnds(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={()=>setRerunOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={doRerun}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
