@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function AdminPromotions() {
   const { user, token, isAdmin } = useAuth();
@@ -27,6 +28,8 @@ export default function AdminPromotions() {
   const [progressInfo, setProgressInfo] = useState('');
   const [error, setError] = useState(null);
   const [openConfirm, setOpenConfirm] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -83,6 +86,18 @@ export default function AdminPromotions() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const onDeleteClick = (id) => {
+    setDeleteId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    await remove(deleteId);
+    setDeleteId(null);
+    setShowDeleteConfirm(false);
   };
 
   if (!isAdmin) return <div className="p-4">Access denied</div>;
@@ -190,10 +205,10 @@ export default function AdminPromotions() {
             <DialogTrigger asChild>
               <Button variant="primary" size="sm" onClick={() => { setError(null); setOpenConfirm(true); }}>Create</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="w-full max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Confirm creation</DialogTitle>
-                <DialogDescription>You're about to create a promotion. Confirm to proceed.</DialogDescription>
+                  <DialogDescription className="text-gray-400">You're about to create a promotion. Confirm to proceed.</DialogDescription>
               </DialogHeader>
               <CardContent className="py-2">
                 <div className="text-sm text-gray-300 mb-2"><strong>{form.title}</strong></div>
@@ -226,12 +241,13 @@ export default function AdminPromotions() {
                     <div className="text-xs text-gray-500 mt-1">Starts: {it.starts_at ? new Date(it.starts_at).toLocaleString() : '—'} • Ends: {it.ends_at ? new Date(it.ends_at).toLocaleString() : '—'}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => remove(it.id)} className="text-red-400">Delete</Button>
+                    <Button variant="outline" size="sm" onClick={() => onDeleteClick(it.id)} className="text-red-400">Delete</Button>
                   </div>
                 </div>
               </Card>
             ))}
       </div>
+      <ConfirmModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} onConfirm={confirmDelete} title="Delete promotion" description="Are you sure you want to delete this promotion? This action cannot be undone." confirmText="Delete" cancelText="Cancel" />
     </div>
   );
 }

@@ -25,7 +25,7 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title = 'Conf
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-md">
+  <DialogContent className="z-60 bg-slate-900 border-slate-700 text-white sm:max-w-md">
         <DialogHeader className="text-center">
           <motion.div
             initial={{ scale: 0 }}
