@@ -33,17 +33,12 @@ export default function PromotionsBanner() {
       .then((r) => r.json())
       .then((data) => {
         if (mounted && Array.isArray(data) && data.length > 0) {
+          // hide any promo that has been dismissed (presence in dismissedMap)
           const filtered = data.filter(d => {
             const id = d.id;
-            const dismissedAt = dismissedMap && dismissedMap[id];
-            if (!dismissedAt) return true; // not dismissed
-            // determine item timestamp: prefer created_at, then starts_at
-            const when = d.created_at || d.createdAt || d.starts_at || d.startsAt || null;
-            if (!when) return false; // no timestamp, hide if dismissed
-            const created = (new Date(when)).getTime();
-            if (Number.isNaN(created)) return false;
-            // show if item was created after the dismissal time
-            return created > Number(dismissedAt);
+            const dismissed = dismissedMap && dismissedMap[id];
+            if (dismissed) return false; // explicitly hidden
+            return true;
           }).slice(0, 6);
           setItems(filtered);
         }
@@ -79,8 +74,7 @@ export default function PromotionsBanner() {
               <div className="flex-none pl-2">
                 <button
                   onClick={() => {
-                    const tsNow = Date.now();
-                    const nextMap = { ...(dismissedMap || {}), [it.id]: tsNow };
+                    const nextMap = { ...(dismissedMap || {}), [it.id]: true };
                     setDismissedMap(nextMap);
                     try { localStorage.setItem('promotions:dismissed', JSON.stringify(nextMap)); } catch {}
                     setItems((s) => s.filter(x => x.id !== it.id));
