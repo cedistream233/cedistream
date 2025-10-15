@@ -266,10 +266,10 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
     const sharp = (await import('sharp')).default;
     const transformRaw = req.body && req.body.transform ? req.body.transform : null;
     let buffer;
-    if (transformRaw) {
+  if (transformRaw) {
       let transform;
       try { transform = JSON.parse(transformRaw); } catch (e) { transform = null; }
-      if (transform && typeof transform.zoom === 'number' && transform.offset && typeof transform.offset.x === 'number') {
+  if (transform && typeof transform.zoom === 'number' && transform.offset && typeof transform.offset.x === 'number') {
         // Compute crop rectangle based on original image dimensions
         const imgMeta = await sharp(file.buffer).metadata();
         const origW = imgMeta.width || 1;
@@ -278,32 +278,30 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
         // The preview container is 272x272 (w-72 h-72) in CSS; but we used a 56(=w-56) crop overlay in modal.
         // Instead of relying on CSS pixels, transform.offset is provided in pixels relative to preview container center.
         // We treat zoom as scale applied to the image relative to original size.
-        const zoom = Number(transform.zoom) || 1;
-        const outputSize = Number(transform.outputSize || Number(process.env.PROMO_IMAGE_MAX_DIM || 600));
+  const zoom = Number(transform.zoom) || 1;
+  const outputSize = Number(transform.outputSize || Number(process.env.PROMO_IMAGE_MAX_DIM || 600));
+  const viewport = Number(transform.viewportSize || 280);
         // offset given in px relative to preview center; convert to image coordinate system
         const offsetX = Number(transform.offset.x || 0);
         const offsetY = Number(transform.offset.y || 0);
 
-        // Determine scaled image display size in preview: displayW = origW * zoom, displayH = origH * zoom
-        const displayW = origW * zoom;
-        const displayH = origH * zoom;
-
-        // The crop is centered at preview center + offset; preview center corresponds to center of display
-        // So compute center point in display coords: centerDisplayX = displayW/2 + offsetX
-        const centerDisplayX = displayW / 2 + offsetX;
-        const centerDisplayY = displayH / 2 + offsetY;
-
-        // We want to extract a square of size outputSize from the display space, mapped back to original image pixels
-        const halfOut = outputSize / 2;
-        // Map display coords back to original image coords by dividing by zoom
-        const extractLeft = Math.round((centerDisplayX - halfOut) / zoom);
-        const extractTop = Math.round((centerDisplayY - halfOut) / zoom);
-        const extractSize = Math.round(outputSize / zoom);
+  // In the preview, the square viewport is 'viewport' CSS px. The image is rendered scaled by 'zoom',
+  // and offset is measured in viewport pixels relative to the viewport center.
+  // The mapping from viewport to original pixels is: original = (viewport / zoom) scaled by (orig/displayDisplay),
+  // but since we draw at 1 CSS px per image px before zoom, we can use: original = viewport / zoom.
+  // So to crop the square visible in the viewport:
+  const halfViewport = viewport / 2;
+  const centerX_in_original = (origW / 2) + (offsetX / zoom);
+  const centerY_in_original = (origH / 2) + (offsetY / zoom);
+  const halfCrop_in_original = halfViewport / zoom;
+  const extractLeft = Math.round(centerX_in_original - halfCrop_in_original);
+  const extractTop = Math.round(centerY_in_original - halfCrop_in_original);
+  const extractSize = Math.round((viewport) / zoom);
 
         // Clamp values
         const left = Math.max(0, Math.min(extractLeft, origW - 1));
         const top = Math.max(0, Math.min(extractTop, origH - 1));
-        const size = Math.max(1, Math.min(extractSize, Math.max(origW, origH)));
+  const size = Math.max(1, Math.min(extractSize, Math.min(origW, origH)));
 
         // Use extract and resize to get exact output
         buffer = await sharp(file.buffer).extract({ left, top, width: size, height: size }).resize(outputSize, outputSize).jpeg({ quality: 90 }).toBuffer();

@@ -46,7 +46,7 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
     const wrap = imgWrapRef.current;
     const rect = wrap ? wrap.getBoundingClientRect() : { width: 280, height: 280 };
     // offset.x/y already represent pixels moved via dragging in the preview coordinates used
-    const params = { zoom, offset: { x: offset.x, y: offset.y }, outputSize };
+    const params = { zoom, offset: { x: offset.x, y: offset.y }, viewportSize: Math.round(rect.width), outputSize };
     await onConfirm(file, params);
     onClose();
   };
