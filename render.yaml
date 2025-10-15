@@ -1,0 +1,73 @@
+# Render blueprint for cedistream
+# Replace <REPO_URL> and fill secrets/values before importing into Render
+
+services:
+  - type: static_site
+    name: cedistream-frontend
+    repo: https://github.com/cedistream233/cedistream.git
+    branch: master
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    publishPath: dist
+    env:
+      VITE_API_BASE:
+        type: env
+        value: "https://cedistreambackend.onrender.com" # backend URL (changed to cedistreambackend.onrender.com)
+
+  - type: web_service
+    name: cedistream-backend
+    repo: https://github.com/cedistream233/cedistream.git
+    branch: master
+    rootDir: backend
+    buildCommand: "npm install --production"
+    startCommand: "npm run start"
+    env:
+      NODE_ENV:
+        type: env
+        value: production
+      DATABASE_URL:
+        type: secret
+        secretName: DATABASE_URL
+      JWT_SECRET:
+        type: secret
+        secretName: JWT_SECRET
+      SUPABASE_URL:
+        type: secret
+        secretName: SUPABASE_URL
+      SUPABASE_ANON_KEY:
+        type: secret
+        secretName: SUPABASE_ANON_KEY
+      SUPABASE_SERVICE_ROLE_KEY:
+        type: secret
+        secretName: SUPABASE_SERVICE_ROLE_KEY
+      PAYSTACK_SECRET_KEY:
+        type: secret
+        secretName: PAYSTACK_SECRET_KEY
+      FRONTEND_URL:
+        type: env
+        value: "https://cedistream.onrender.com" # frontend host
+    healthCheckPath: /health
+    instances: 1
+    plan: starter # adjust plan as needed
+
+# Optional: static file service that serves built frontend with custom headers (if you prefer server-in-front-of-cdn)
+# Uncomment and fill in if you want the frontend served by a Node web service instead of static_site.
+
+#  - type: web_service
+#    name: cedistream-frontend-server
+#    repo: <REPO_URL>
+#    branch: master
+#    rootDir: frontend
+#    buildCommand: "npm install && npm run build"
+#    startCommand: "node scripts/serve-static-with-headers.js"
+#    env:
+#      NODE_ENV:
+#        type: env
+#        value: production
+#    instances: 1
+#    plan: starter
+
+# Notes:
+# - Replace <REPO_URL> with your repository URL (git@github.com:owner/repo.git or https url).
+# - Add the listed secrets in Render's Dashboard (DATABASE_URL, JWT_SECRET, etc.) before enabling the service.
+# - You can import this file in Render (Blueprints) to create both services at once.
