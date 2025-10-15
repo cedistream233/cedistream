@@ -117,6 +117,8 @@ export default function AdminPromotions() {
             // open preview modal; on confirm we'll upload
             setPreviewFile(f);
             setPreviewOpen(true);
+            // reset the input value so selecting the same file again will fire change
+            e.target.value = '';
           }} />
           <Button size="sm" variant="outline" onClick={() => imageRef.current?.click()} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</Button>
         </div>
@@ -125,9 +127,9 @@ export default function AdminPromotions() {
             <img src={form.image} alt="preview" className="h-20 rounded object-cover border border-slate-700" />
           </div>
         )}
-        <ImagePreviewModal
+          <ImagePreviewModal
           isOpen={previewOpen}
-          onClose={() => { setPreviewOpen(false); setPreviewFile(null); }}
+          onClose={() => { setPreviewOpen(false); /* keep previewFile so user can re-open preview without reselecting */ }}
           file={previewFile}
           imageUrl={null}
           onConfirm={async (file, transformParams) => {

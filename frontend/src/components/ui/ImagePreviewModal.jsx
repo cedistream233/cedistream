@@ -76,7 +76,7 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
 
   return (
     <Dialog open={!!isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-2xl">
+      <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-center">
           <motion.div
             initial={{ scale: 0 }}
@@ -90,9 +90,9 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
           <DialogDescription className="text-gray-400">Adjust position and zoom then confirm to upload the edited image.</DialogDescription>
         </DialogHeader>
 
-        <div className="my-4 flex flex-col sm:flex-row items-start gap-4">
-          <div className="flex items-center justify-center">
-            {/* The square crop is now the main frame */}
+          <div className="my-4 flex flex-col sm:flex-row items-start gap-6">
+            <div className="flex items-center justify-center w-full">
+            {/* Responsive square crop: use viewport-relative sizing on small screens and fixed on larger */}
             <div
               ref={imgWrapRef}
               onMouseDown={startDrag}
@@ -102,7 +102,7 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
               onTouchStart={startDrag}
               onTouchMove={onMove}
               onTouchEnd={endDrag}
-              className="w-72 h-72 rounded overflow-hidden border border-slate-700 bg-slate-800 relative"
+              className="mx-auto w-[min(84vw,320px)] h-[min(84vw,320px)] sm:w-96 sm:h-96 rounded overflow-hidden border border-slate-700 bg-slate-800 relative"
             >
               {previewUrl ? (
                 <img
@@ -118,7 +118,7 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
             </div>
           </div>
 
-          <div className="flex-1">
+          <div className="flex-1 min-w-[240px]">
             <div className="mb-2 text-sm text-gray-300">Zoom</div>
             <input type="range" min="0.5" max="3" step="0.01" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full" />
             <div className="mt-2 mb-4 text-sm text-gray-300">Position (drag image to move)</div>
@@ -129,7 +129,7 @@ export default function ImagePreviewModal({ isOpen, onClose, file, imageUrl, onC
           </div>
         </div>
 
-        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0">
+        <DialogFooter className="mt-4 pt-3 border-t border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0">
           <Button variant="secondary" onClick={onClose} className="border-slate-600 hover:bg-slate-800">Cancel</Button>
           <Button onClick={handleConfirm} className="bg-purple-600 hover:bg-purple-700">Upload</Button>
         </DialogFooter>
