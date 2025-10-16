@@ -53,7 +53,7 @@ cedistream/
 ├── frontend/          # React frontend (Vite)
 │   ├── src/
 │   ├── public/
-│   └── netlify.toml   # Netlify deployment config
+│   └── netlify.toml   # (removed) previously used for Netlify deployment
 ├── backend/           # Node.js API server
 │   ├── src/
 │   ├── database/      # SQL migrations and schemas
@@ -79,7 +79,7 @@ cedistream/
 For detailed production deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 **Quick deployment overview**:
-- Frontend: Deploy to Netlify
+- Frontend: Deploy to Render (Static Site)
 - Backend: Deploy to Render
 - Database: Neon PostgreSQL
 - Storage: Supabase

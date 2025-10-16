@@ -1,7 +1,8 @@
 import { config } from './config.js';
 
 // Patch global fetch to prefix relative /api requests with backendUrl in production
-// This avoids Netlify trying to serve /api/* from the static site (404)
+// This avoids the static site host serving /api/* directly (404) by rewriting
+// client-side calls to the API to the backend URL.
 (function patchGlobalFetch() {
   if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
   const originalFetch = window.fetch.bind(window);

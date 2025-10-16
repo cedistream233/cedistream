@@ -1,10 +1,10 @@
 # CediStream Production Deployment Guide
 
-This guide provides step-by-step instructions for deploying CediStream to production using Netlify (frontend) and Render (backend).
+This guide provides step-by-step instructions for deploying CediStream to production using Render (frontend + backend).
 
 ## 🏗️ Architecture Overview
 
-- **Frontend**: React SPA hosted on Netlify
+- **Frontend**: React SPA hosted on Render (Static Site)
 - **Backend**: Node.js API hosted on Render
 - **Database**: Neon PostgreSQL
 - **File Storage**: Supabase
@@ -62,7 +62,7 @@ This guide provides step-by-step instructions for deploying CediStream to produc
    PORT=10000
    DATABASE_URL=your-neon-postgres-connection-string
    JWT_SECRET=your-generated-jwt-secret
-   FRONTEND_URL=https://cedistream.netlify.app
+   FRONTEND_URL=https://cedistream.onrender.com
    SUPABASE_URL=your-supabase-project-url
    SUPABASE_ANON_KEY=your-supabase-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
@@ -85,35 +85,35 @@ This guide provides step-by-step instructions for deploying CediStream to produc
    - Wait for deployment to complete
    - Test your API at `https://cedistream.onrender.com/api/health`
 
-## 🌐 Step 2: Frontend Deployment (Netlify)
+## 🌐 Step 2: Frontend Deployment (Render Static Site)
 
 ### 2.1 Prepare the Frontend
 
 1. **Update backend URL**: The frontend will automatically use your Render backend URL through environment variables.
 
-### 2.2 Deploy to Netlify
+### 2.2 Deploy to Render
 
-1. **Create Netlify Account**: Sign up at [netlify.com](https://netlify.com)
+1. **Create Render Account**: Sign up at [render.com](https://render.com)
 
-2. **Create a New Site**:
+2. **Create a New Static Site**:
    - Connect your GitHub repository
    - Choose the frontend folder as the base directory
-   - Or use the `netlify.toml` file in the frontend folder
+   - Or use the `render.yaml` file in the frontend folder
 
 3. **Configure Build Settings**:
-   - Base directory: `frontend`
-   - Build command: `npm run build`
-   - Publish directory: `frontend/dist`
+    - Base directory: `frontend`
+    - Build command: `npm run build`
+    - Publish directory: `frontend/dist`
 
-4. **Configure Environment Variables** in Netlify dashboard:
+4. **Configure Environment Variables** in Render dashboard for the Static Site:
    ```
-   VITE_BACKEND_URL=https://cedistream.onrender.com
+   VITE_BACKEND_URL=https://cedistream-backend.onrender.com
    ```
 
 5. **Deploy and Test**:
-   - Click "Deploy site"
+   - Click "Manual Deploy" or enable auto-deploy on push
    - Wait for deployment to complete
-   - Test your app at `https://cedistream.netlify.app`
+   - Test your app at `https://cedistream.onrender.com`
 
 ## 📊 Step 3: Monitoring Setup (UptimeRobot)
 
@@ -129,7 +129,7 @@ This guide provides step-by-step instructions for deploying CediStream to produc
 
 3. **Add Frontend Monitor**:
    - Monitor Type: HTTP(s)
-   - URL: `https://cedistream.netlify.app`
+   - URL: `https://cedistream.onrender.com`
    - Monitoring Interval: 5 minutes
    - Alert Contacts: Your email
 
@@ -239,7 +239,7 @@ npm run migrate-add-username-pin
 Your CediStream application should now be running in production with:
 
 - ✅ Scalable backend on Render
-- ✅ Fast frontend on Netlify CDN
+- ✅ Fast frontend hosted on Render (Global CDN)
 - ✅ Reliable database with Neon
 - ✅ File storage with Supabase
 - ✅ Payment processing with Paystack
@@ -247,4 +247,4 @@ Your CediStream application should now be running in production with:
 
 ---
 
-**Need help?** Check the logs in your Render and Netlify dashboards, and ensure all environment variables are set correctly.
+**Need help?** Check the logs in your Render dashboard and ensure all environment variables are set correctly.

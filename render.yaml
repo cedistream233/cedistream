@@ -2,13 +2,13 @@
 # Replace <REPO_URL> and fill secrets/values before importing into Render
 
 services:
-  - type: static_site
+  - type: web_service
     name: cedistream-frontend
     repo: https://github.com/cedistream233/cedistream.git
     branch: master
     rootDir: frontend
     buildCommand: "npm install && npm run build"
-    publishPath: dist
+    startCommand: "npm start"
     env:
       VITE_BACKEND_URL:
         type: env

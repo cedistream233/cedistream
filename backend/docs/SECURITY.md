@@ -15,7 +15,7 @@
 - ✅ **Environment Separation**: Proper environment variable handling for dev/prod
 - ✅ **Build Optimization**: Console logs removed in production builds
 - ✅ **Source Maps**: Disabled for production to prevent code exposure
-- ✅ **Netlify Security Headers**: CSP, XSS protection, and HSTS configured
+ - ✅ **Static host Security Headers**: CSP, XSS protection, and HSTS configured (configure on Render or proxy)
 
 ## ✅ Code Quality Fixes
 
@@ -35,7 +35,7 @@
 ## ✅ Production Readiness
 
 ### Infrastructure
-- ✅ **Netlify Configuration**: Complete with redirects, security headers, and caching
+- ✅ **Static Site Configuration**: Complete with redirects, security headers, and caching (Render static site)
 - ✅ **Render Configuration**: Ready-to-deploy with health checks
 - ✅ **Environment Templates**: Comprehensive .env.example files
 - ✅ **Workspace Setup**: Monorepo configuration with concurrent dev scripts
@@ -58,14 +58,14 @@
 1. **Database Setup**: Run migrations on Neon PostgreSQL
 2. **Supabase Setup**: Create storage buckets
 3. **Backend Deploy**: Deploy to Render with environment variables
-4. **Frontend Deploy**: Deploy to Netlify with backend URL
+4. **Frontend Deploy**: Deploy to Render Static Site with backend URL
 5. **Monitoring Setup**: Configure UptimeRobot for keep-alive
 
 ## 🔧 Maintenance
 
 ### Regular Tasks
 - Monitor UptimeRobot alerts
-- Check Render/Netlify deployment logs
+- Check Render deployment logs
 - Update dependencies monthly
 - Rotate JWT secrets quarterly
 - Monitor database performance

@@ -89,11 +89,8 @@ const allowedOrigins = new Set([
   primaryFrontend,
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  // Production Netlify site (explicitly allowed in case FRONTEND_URL is not set)
   // Primary Render frontend host
   'https://cedistream.onrender.com',
-  // Legacy/backup Netlify site (kept for safety)
-  'https://cedistream.netlify.app',
 ]);
 app.use(cors({
   origin: (origin, cb) => {
