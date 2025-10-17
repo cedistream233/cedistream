@@ -21,7 +21,9 @@ if (process.env.DATABASE_URL) {
   });
 
   pool.on('error', (err) => {
-    console.error('⚠️  Postgres pool error:', err);
+    // Pool errors are typically idle client connection issues; log as warning instead of error
+    // to avoid alarming production logs. The query retry logic will handle transient failures.
+    console.warn('⚠️  Postgres pool error (idle client or network):', err?.message || err);
   });
 } else {
   console.warn('⚠️  DATABASE_URL not set. Database operations will fail until configured.');
@@ -46,6 +48,11 @@ const _queryWithClient = async (text, params = []) => {
   }
 };
 
+// Track last error time to throttle noisy repeated transient errors
+let lastTransientErrorTime = 0;
+let lastTransientErrorCode = null;
+const TRANSIENT_LOG_THROTTLE_MS = 10000; // only log same transient error once per 10s
+
 // Public query wrapper with retry/backoff for transient network/DNS errors
 export const query = async (text, params = []) => {
   const maxAttempts = Number(process.env.PG_QUERY_MAX_ATTEMPTS || 3);
@@ -61,12 +68,24 @@ export const query = async (text, params = []) => {
       const code = err && err.code ? String(err.code) : null;
       // If transient, retry with backoff
       if (attempt < maxAttempts && code && transientCodes.has(code)) {
-        const backoff = Math.min(2000, 200 * attempt);
+        const backoff = Math.min(3000, 300 * Math.pow(1.5, attempt - 1)); // exponential with cap
+        // Throttle logs: only log if different code or enough time passed
+        const now = Date.now();
+        if (code !== lastTransientErrorCode || (now - lastTransientErrorTime) > TRANSIENT_LOG_THROTTLE_MS) {
+          console.warn(`⚠️  DB transient error (${code}), will retry (attempt ${attempt}/${maxAttempts})`);
+          lastTransientErrorTime = now;
+          lastTransientErrorCode = code;
+        }
         await new Promise(r => setTimeout(r, backoff));
         continue;
       }
-      // Not transient or out of retries: surface error
-      console.error('Database query error:', err);
+      // Not transient or out of retries: surface error (log only once per error type to avoid spam)
+      const now = Date.now();
+      if (code !== lastTransientErrorCode || (now - lastTransientErrorTime) > TRANSIENT_LOG_THROTTLE_MS) {
+        console.error('Database query error:', err);
+        lastTransientErrorTime = now;
+        lastTransientErrorCode = code;
+      }
       throw err;
     }
   }

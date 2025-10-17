@@ -95,7 +95,8 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
 
   const { bucket, objectPath } = parseStorageUrl(song.audio_url || '');
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+  // Extend TTL to 60min for long playback sessions (albums, playlists)
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
     if (error) return res.status(500).json({ error: 'Failed to sign URL' });
     return res.json({ url: data?.signedUrl });
   } catch (e) {
@@ -128,7 +129,7 @@ router.get('/song/:id/preview', async (req, res) => {
           if (fullUrl) {
             const { bucket, objectPath } = parseStorageUrl(fullUrl);
             if (bucket && objectPath) {
-              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
               if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
             }
             return res.json({ url: fullUrl });
@@ -141,7 +142,7 @@ router.get('/song/:id/preview', async (req, res) => {
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
       if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
     }
     // fallback: return original URL (works if public bucket)
@@ -174,7 +175,7 @@ router.get('/video/:id/preview', async (req, res) => {
           if (fullUrl) {
             const { bucket, objectPath } = parseStorageUrl(fullUrl);
             if (bucket && objectPath) {
-              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
               if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
             }
             return res.json({ url: fullUrl });
@@ -187,7 +188,7 @@ router.get('/video/:id/preview', async (req, res) => {
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
       if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
     }
     return res.json({ url: preview });
@@ -237,7 +238,7 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
 
   const { bucket, objectPath } = parseStorageUrl(video.video_url || '');
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
     if (error) return res.status(500).json({ error: 'Failed to sign URL' });
     return res.json({ url: data?.signedUrl });
   } catch (e) {

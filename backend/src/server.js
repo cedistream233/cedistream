@@ -285,25 +285,35 @@ function scheduleExpiredPromotionsCleanup() {
 }
 
 // Helper to run jobs safely: checks DB reachability, retries if transient, respects DISABLE_* flags
+// Tracks last warning time per job to throttle repeated "DB unreachable" logs
+const jobWarningLog = new Map();
+const JOB_WARNING_THROTTLE_MS = 60000; // only log "DB unreachable" for same job once per minute
+
 async function runJobSafely(fn, name = 'background job', opts = {}) {
   try {
     // Global disable switch: if DISABLE_JOBS=1 or specific disable flags set, skip
     if (process.env.DISABLE_JOBS === '1') {
-    console.info(`⏭️  ${name} skipped because DISABLE_JOBS=1`);
+      // Only log skip message once on startup (when opts.initial is true)
+      if (opts.initial) console.info(`⏭️  ${name} skipped because DISABLE_JOBS=1`);
       return;
     }
     // Lightweight reachability check
     try {
       await query('SELECT 1');
     } catch (err) {
-      console.warn(`${name} skipped: DB unreachable (${err.code || err.message})`);
+      const now = Date.now();
+      const lastWarned = jobWarningLog.get(name) || 0;
+      if ((now - lastWarned) > JOB_WARNING_THROTTLE_MS) {
+        console.warn(`⏸️  ${name} skipped: DB unreachable (${err.code || err.message})`);
+        jobWarningLog.set(name, now);
+      }
       return;
     }
 
     // Run actual job
     await fn();
   } catch (err) {
-    console.error(`${name} error:`, err);
+    console.error(`❌ ${name} error:`, err);
   }
 }
 
