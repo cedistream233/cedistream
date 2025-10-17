@@ -215,7 +215,7 @@ export default function UploadVideo() {
         open={showSuccess}
         title="Video Published!"
         message="Your video is live. Share it or view the details."
-        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/videos?id=${encodeURIComponent(created.id)}`; }}
+        onView={() => { setShowSuccess(false); window.location.href = '/dashboard'; }}
         onShare={() => { if (navigator.share && created?.id) navigator.share({ title, url: `${window.location.origin}/videos?id=${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/videos?id=${created.id}`); }}
         onClose={() => setShowSuccess(false)}
       />

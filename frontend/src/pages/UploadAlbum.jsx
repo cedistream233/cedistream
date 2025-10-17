@@ -229,7 +229,7 @@ export default function UploadAlbum() {
         open={showSuccess}
         title="Album Published!"
         message="Your album is live. Share it or view the details."
-        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/albums/${encodeURIComponent(created.id)}`; }}
+        onView={() => { setShowSuccess(false); window.location.href = '/dashboard'; }}
         onShare={() => { if (navigator.share && created?.id) navigator.share({ title, url: `${window.location.origin}/albums/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/albums/${created.id}`); }}
         onClose={() => setShowSuccess(false)}
       />
