@@ -175,7 +175,7 @@ export default function AdminWithdrawals() {
 
   return (
     <AdminLayout currentPageName="Withdrawals" showShortcuts>
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full mx-auto">
         <div className="bg-yellow-500/15 border border-yellow-600/30 text-yellow-200 text-sm rounded-md p-3 mb-6">
           Amounts listed include a Paystack transfer fee of GH₵1.00. When paying creators, send the net amount shown (amount minus GH₵1).
         </div>
