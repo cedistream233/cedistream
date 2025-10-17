@@ -103,8 +103,8 @@ export default function SongDetails() {
 
         // no prefetched preview; prefer metadata.preview_url then fall back to network
         let prev = null;
-        if (song.preview_url) {
-          prev = song.preview_url;
+        if (Object.prototype.hasOwnProperty.call(song, 'preview_url')) {
+          prev = song.preview_url || null; // explicit knowledge: may be null
         } else {
           try { prev = await Song.getPreviewUrl(song.id); } catch (e) { prev = null; }
         }

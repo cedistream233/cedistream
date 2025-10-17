@@ -37,7 +37,10 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
     (async () => {
       if (!item?.id) { setHasPreview(false); return; }
       // If metadata contains preview_url for any type, we are done
-      if (item.preview_url) { setHasPreview(true); return; }
+      if (Object.prototype.hasOwnProperty.call(item, 'preview_url')) {
+        setHasPreview(Boolean(item.preview_url));
+        return;
+      }
 
       try {
         if (type === 'song') {

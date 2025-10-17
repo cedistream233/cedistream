@@ -38,7 +38,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
       if (!item?.id || !(item?.audio_url || item?.is_song)) return;
 
       // If backend included preview_url on the item metadata, use it immediately
-      if (item.preview_url) {
+      if (Object.prototype.hasOwnProperty.call(item, 'preview_url')) {
         // Only accept explicit preview_url; never use raw audio_url for playback
         setPreviewUrl(item.preview_url || null);
         return;
@@ -76,7 +76,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
       }
     })();
     return () => { if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current); };
-  }, [item?.id, item?.audio_url]);
+  }, [item?.id, item?.audio_url, item?.preview_url]);
 
   const ensureAudio = () => {
     if (!previewUrl) return null;

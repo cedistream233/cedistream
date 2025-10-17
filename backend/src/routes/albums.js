@@ -61,7 +61,26 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Album not found' });
     }
     
-    res.json(result.rows[0]);
+    const album = result.rows[0];
+    
+    // Enrich album.songs with preview_url from songs table so frontend can skip fetch when null
+    if (album.songs && Array.isArray(album.songs)) {
+      try {
+        const songIds = album.songs.map(s => s.id).filter(Boolean);
+        if (songIds.length > 0) {
+          const songsRes = await query(
+            `SELECT id, preview_url FROM songs WHERE id = ANY($1::uuid[])`,
+            [songIds]
+          );
+          const previewMap = Object.fromEntries(songsRes.rows.map(r => [r.id, r.preview_url]));
+          album.songs = album.songs.map(s => ({ ...s, preview_url: previewMap[s.id] || null }));
+        }
+      } catch (e) {
+        // If songs table doesn't exist or query fails, continue without preview_url enrichment
+      }
+    }
+    
+    res.json(album);
   } catch (err) { next(err); }
 });
 

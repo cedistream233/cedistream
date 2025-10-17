@@ -85,9 +85,9 @@ export default function VideoDetails() {
         }
       }
 
-      // fallback to preview; prefer metadata.preview_url
-      if (video.preview_url) {
-        setMediaUrl(video.preview_url); setCanAccess(false); return;
+      // fallback to preview; prefer metadata.preview_url; if explicitly null, skip fetch
+      if (Object.prototype.hasOwnProperty.call(video, 'preview_url')) {
+        setMediaUrl(video.preview_url || null); setCanAccess(false); return;
       }
       try {
         const { Video: VideoEntity } = await import('@/entities/Video');

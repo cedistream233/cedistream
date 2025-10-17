@@ -157,8 +157,10 @@ export default function AlbumDetails() {
       const fulls = {};
       for (const s of album.songs) {
         // Seed preview from metadata or fetch preview URL
-        if (s.preview_url) {
-          previews[s.id] = s.preview_url;
+        // Important: If preview_url property exists (even if null), skip fetching to avoid 404s
+        if (Object.prototype.hasOwnProperty.call(s, 'preview_url')) {
+          if (s.preview_url) previews[s.id] = s.preview_url;
+          // else known to be missing; do not fetch
         } else {
           try {
             const p = await Song.getPreviewUrl(s.id);
