@@ -32,9 +32,9 @@ export default function PurchasedAlbumRow({ album }) {
       <div className="pl-3 flex items-center gap-2">
         <button
           onClick={(e) => { e.stopPropagation(); navigate(`/albums/${encodeURIComponent(album.id)}`); }}
-          className="px-3 py-1.5 rounded-md bg-slate-800 text-white text-sm hover:bg-slate-700"
+          className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700"
         >
-          Open
+          Play
         </button>
       </div>
     </div>

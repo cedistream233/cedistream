@@ -125,36 +125,36 @@ export default function AdminEarnings() {
     <AdminLayout currentPageName="Platform earnings" showShortcuts>
       <h1 className="text-2xl font-bold mb-4">Platform earnings</h1>
       <Card className="bg-slate-900/60 border-slate-700 p-4 mb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="inline-flex bg-slate-800 rounded p-1">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="inline-flex bg-slate-800 rounded p-1 w-full sm:w-auto">
               {['daily','monthly','yearly'].map(m => (
                 <button
                   key={m}
                   onClick={() => setMode(m)}
-                  className={`px-3 py-1 rounded-md ${mode===m ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                  className={`flex-1 sm:flex-none px-3 py-1 rounded-md ${mode===m ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
                 >{m.charAt(0).toUpperCase()+m.slice(1)}</button>
               ))}
             </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto w-full sm:w-auto">
+              <div className="text-sm bg-slate-800 text-green-300 px-3 py-1 rounded-md whitespace-nowrap">Total Gross GH₵ {totals.gross.toFixed(2)}</div>
+              <div className="text-sm bg-slate-800 text-yellow-300 px-3 py-1 rounded-md whitespace-nowrap">Platform net GH₵ {totals.platform_net.toFixed(2)}</div>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="text-sm bg-slate-800 text-green-300 px-3 py-1 rounded-md">Total Gross GH₵ {totals.gross.toFixed(2)}</div>
-            <div className="text-sm bg-slate-800 text-yellow-300 px-3 py-1 rounded-md">Platform net GH₵ {totals.platform_net.toFixed(2)}</div>
-          </div>
-        </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-3">
-          <div className="w-full sm:w-auto">
-            <label className="block text-xs text-gray-400 mb-1">From</label>
-            <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="w-full sm:w-auto p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
-          </div>
-          <div className="w-full sm:w-auto">
-            <label className="block text-xs text-gray-400 mb-1">To</label>
-            <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="w-full sm:w-auto p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600 rounded-md w-full sm:w-auto">Refresh</Button>
-            <Button variant="secondary" onClick={exportCsv} className="rounded-md w-full sm:w-auto">Export CSV</Button>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs text-gray-400 mb-1">From</label>
+              <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="w-full p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
+            </div>
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs text-gray-400 mb-1">To</label>
+              <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="w-full p-2 rounded-md bg-slate-800 border border-slate-700 text-gray-200" />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600 rounded-md flex-1 sm:flex-none">Refresh</Button>
+              <Button variant="secondary" onClick={exportCsv} className="rounded-md flex-1 sm:flex-none">Export CSV</Button>
+            </div>
           </div>
         </div>
       </Card>
@@ -166,38 +166,40 @@ export default function AdminEarnings() {
       ) : (
         <Card className="bg-slate-900/60 border-slate-700 p-0 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-gray-400">
-                <tr>
-                  <th className="px-4 py-2">{mode === 'daily' ? 'Day' : mode === 'monthly' ? 'Month' : 'Year'}</th>
-                  <th className="px-4 py-2">Gross (GHS)</th>
-                  <th className="px-4 py-2">Platform fee (GHS)</th>
-                  <th className="px-4 py-2">Paystack fee (GHS)</th>
-                  <th className="px-4 py-2">Platform net (GHS)</th>
-                  <th className="px-4 py-2">Creator amount (GHS)</th>
-                </tr>
-              </thead>
-              <tbody className="text-gray-200">
-                {grouped.map(r => (
-                  <tr key={r.key} className="border-t border-slate-800">
-                    <td className="px-4 py-2">{r.key}</td>
-                    <td className="px-4 py-2">{Number(r.gross).toFixed(2)}</td>
-                    <td className="px-4 py-2">{Number(r.platform_fee).toFixed(2)}</td>
-                    <td className="px-4 py-2">{Number(r.paystack_fee).toFixed(2)}</td>
-                    <td className="px-4 py-2">{Number(r.platform_net).toFixed(2)}</td>
-                    <td className="px-4 py-2">{Number(r.creator_amount).toFixed(2)}</td>
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full text-sm">
+                <thead className="text-left text-gray-400">
+                  <tr>
+                    <th className="px-2 sm:px-4 py-2 whitespace-nowrap">{mode === 'daily' ? 'Day' : mode === 'monthly' ? 'Month' : 'Year'}</th>
+                    <th className="px-2 sm:px-4 py-2 whitespace-nowrap">Gross (GHS)</th>
+                    <th className="px-2 sm:px-4 py-2 whitespace-nowrap">Platform fee</th>
+                    <th className="px-2 sm:px-4 py-2 whitespace-nowrap">Paystack fee</th>
+                    <th className="px-2 sm:px-4 py-2 whitespace-nowrap">Platform net</th>
+                    <th className="px-2 sm:px-4 py-2 whitespace-nowrap">Creator amount</th>
                   </tr>
-                ))}
-                <tr className="border-t border-slate-800 font-semibold">
-                  <td className="px-4 py-2">TOTAL</td>
-                  <td className="px-4 py-2">{totals.gross.toFixed(2)}</td>
-                  <td className="px-4 py-2">{totals.platform_fee.toFixed(2)}</td>
-                  <td className="px-4 py-2">{totals.paystack_fee.toFixed(2)}</td>
-                  <td className="px-4 py-2">{totals.platform_net.toFixed(2)}</td>
-                  <td className="px-4 py-2">{totals.creator_amount.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="text-gray-200">
+                  {grouped.map(r => (
+                    <tr key={r.key} className="border-t border-slate-800">
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{r.key}</td>
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{Number(r.gross).toFixed(2)}</td>
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{Number(r.platform_fee).toFixed(2)}</td>
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{Number(r.paystack_fee).toFixed(2)}</td>
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{Number(r.platform_net).toFixed(2)}</td>
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{Number(r.creator_amount).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-slate-800 font-semibold">
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">TOTAL</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{totals.gross.toFixed(2)}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{totals.platform_fee.toFixed(2)}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{totals.paystack_fee.toFixed(2)}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{totals.platform_net.toFixed(2)}</td>
+                    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">{totals.creator_amount.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </Card>
       )}

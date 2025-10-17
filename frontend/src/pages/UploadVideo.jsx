@@ -144,23 +144,49 @@ export default function UploadVideo() {
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-2">Video</label>
-              <div className="flex items-center gap-3">
-                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
-                  {video ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                    {video ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                  </div>
+                  <div className="flex-1">
+                    <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setVideo(e.target.files?.[0]||null)} />
+                    <Button onClick={()=>videoRef.current?.click()} className="bg-pink-600 hover:bg-pink-700"><Upload className="w-4 h-4 mr-2"/>Select Video</Button>
+                  </div>
                 </div>
-                <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setVideo(e.target.files?.[0]||null)} />
-                <Button onClick={()=>videoRef.current?.click()} className="bg-pink-600 hover:bg-pink-700"><Upload className="w-4 h-4 mr-2"/>Select Video</Button>
+                {video && (
+                  <div className="bg-slate-800/50 border border-slate-700 rounded p-2">
+                    <div className="text-sm text-green-400 font-medium truncate">{video.name}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Size: {(video.size / (1024 * 1024)).toFixed(2)} MB
+                      {video.type && ` • Type: ${video.type.split('/')[1]?.toUpperCase() || video.type}`}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-2">Preview (optional)</label>
-            <div className="flex items-center gap-3">
-              <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
-                {preview ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  {preview ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                </div>
+                <div className="flex-1">
+                  <input ref={previewRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setPreview(e.target.files?.[0]||null)} />
+                  <Button onClick={()=>previewRef.current?.click()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800"><Upload className="w-4 h-4 mr-2"/>Select Preview</Button>
+                </div>
               </div>
-              <input ref={previewRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setPreview(e.target.files?.[0]||null)} />
-              <Button onClick={()=>previewRef.current?.click()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800"><Upload className="w-4 h-4 mr-2"/>Select Preview</Button>
+              {preview && (
+                <div className="bg-slate-800/50 border border-slate-700 rounded p-2">
+                  <div className="text-sm text-green-400 font-medium truncate">{preview.name}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Size: {(preview.size / (1024 * 1024)).toFixed(2)} MB
+                    {preview.type && ` • Type: ${preview.type.split('/')[1]?.toUpperCase() || preview.type}`}
+                  </div>
+                </div>
+              )}
             </div>
             <p className="text-xs text-gray-500 mt-1">Tip: keep previews short (e.g. 15–30 seconds) to optimize load time.</p>
           </div>

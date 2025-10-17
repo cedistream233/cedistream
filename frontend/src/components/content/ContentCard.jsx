@@ -7,7 +7,7 @@ import { setPostAuthIntent } from '@/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true }) {
-  const { updateMyUserData } = useAuth();
+  const { updateMyUserData, user: authUser } = useAuth();
   // prefer cover_image, fallback to thumbnail
   const image = item.cover_image || item.thumbnail || null;
   const title = item.title;
@@ -29,7 +29,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [user, setUser] = useState(null);
+  const [demoUser, setDemoUser] = useState(null);
   const [owned, setOwned] = useState(false);
 
   useEffect(() => {
@@ -60,15 +60,23 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
   loadPreview();
     (async () => {
       try {
-        const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
-        setUser(u);
-        if (u && Array.isArray(u.purchases)) {
-          setOwned(u.purchases.some(p => p.item_id === item.id));
+        // Ownership precedence: server flag -> authenticated user purchases -> demo_user localStorage
+        if (typeof item?.owned_by_me === 'boolean') {
+          setOwned(Boolean(item.owned_by_me));
+        } else if (authUser && Array.isArray(authUser.purchases)) {
+          setOwned(authUser.purchases.some(p => p.item_id === item.id));
         } else {
-          setOwned(false);
+          const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
+          setDemoUser(u);
+          if (u && Array.isArray(u.purchases)) {
+            setOwned(u.purchases.some(p => p.item_id === item.id));
+          } else {
+            setOwned(false);
+          }
         }
       } catch {
-        setUser(null);
+        setDemoUser(null);
+        setOwned(false);
       }
     })();
     return () => { if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current); };
@@ -98,6 +106,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
   };
 
   const togglePreview = () => {
+    if (owned) return;
     const el = ensureAudio();
     if (!el) return;
     if (playing) {
@@ -179,7 +188,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
               </div>
               {/* Center play button */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {previewUrl ? (
+                {previewUrl && !owned ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="relative w-18 h-18">
                       {/* circular progress ring */}
@@ -223,71 +232,90 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
 
               {/* Bottom action row */}
               <div className="absolute bottom-4 left-4 right-4 flex gap-2 items-center">
-                <Button
-                  onClick={(e)=>{ e.stopPropagation(); (onViewDetails||(()=>{}))(); }}
-                  className="flex-1 bg-white/90 text-black hover:bg-white"
-                >
-                  View Details
-                </Button>
-                {type !== 'album' && (
+                {owned ? (
                   <Button
-                    onClick={async (e)=>{
-                      e.stopPropagation();
-                      // Delegate to parent if it wants to handle add-to-cart (e.g., open modal)
-                      if (onAddToCart) return onAddToCart();
+                    onClick={(e)=>{ e.stopPropagation();
+                      if (type === 'song') window.location.href = `/songs/${item.id}?autoplay=1`;
+                      else if (type === 'album') window.location.href = `/albums/${item.id}`;
+                      else if (type === 'video') window.location.href = `/videos?id=${item.id}`;
+                    }}
+                    className={`flex-1 text-white ${
+                      type === 'song' || type === 'video'
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+                        : 'bg-slate-800 hover:bg-slate-700'
+                    }`}
+                  >
+                    {type === 'song' || type === 'video' ? 'Play' : 'Open'}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={(e)=>{ e.stopPropagation(); (onViewDetails||(()=>{}))(); }}
+                      className="flex-1 bg-white/90 text-black hover:bg-white"
+                    >
+                      View Details
+                    </Button>
+                    {type !== 'album' && (
+                      <Button
+                        onClick={async (e)=>{
+                          e.stopPropagation();
+                          // Delegate to parent if it wants to handle add-to-cart (e.g., open modal)
+                          if (onAddToCart) return onAddToCart();
 
-                      const token = localStorage.getItem('token');
-                      const min = Number(price || 0);
-                      if (!token) {
-                        try {
-                          setPostAuthIntent({
-                            action: 'add-to-cart',
-                            item: {
+                          const token = localStorage.getItem('token');
+                          const min = Number(price || 0);
+                          if (!token) {
+                            try {
+                              setPostAuthIntent({
+                                action: 'add-to-cart',
+                                item: {
+                                  item_type: type,
+                                  item_id: item.id,
+                                  title: title,
+                                  price: min,
+                                  min_price: min,
+                                  image: item.cover_image || item.thumbnail || null,
+                                },
+                                redirect: '/cart'
+                              });
+                            } catch {}
+                            window.location.href = '/signup';
+                            return;
+                          }
+
+                          // Authenticated: update cart in user/demo_user (use updateMyUserData when available)
+                          try {
+                            const cartItem = {
                               item_type: type,
                               item_id: item.id,
                               title: title,
                               price: min,
                               min_price: min,
                               image: item.cover_image || item.thumbnail || null,
-                            },
-                            redirect: '/cart'
-                          });
-                        } catch {}
-                        window.location.href = '/signup';
-                        return;
-                      }
+                            };
+                            const u = JSON.parse(localStorage.getItem('user') || 'null') || JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
+                            const currentCart = (u?.cart) || [];
+                            const exists = currentCart.some(i => i.item_id === item.id && i.item_type === type);
+                            if (!exists) {
+                              if (updateMyUserData) {
+                                await updateMyUserData({ cart: [...currentCart, cartItem] });
+                              } else {
+                                const next = { ...(u||{}), cart: [...currentCart, cartItem] };
+                                try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+                                try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
+                              }
+                            }
+                          } catch (err) { console.error(err); }
 
-                      // Authenticated: update cart in user/demo_user (use updateMyUserData when available)
-                      try {
-                        const cartItem = {
-                          item_type: type,
-                          item_id: item.id,
-                          title: title,
-                          price: min,
-                          min_price: min,
-                          image: item.cover_image || item.thumbnail || null,
-                        };
-                        const u = JSON.parse(localStorage.getItem('user') || 'null') || JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
-                        const currentCart = (u?.cart) || [];
-                        const exists = currentCart.some(i => i.item_id === item.id && i.item_type === type);
-                        if (!exists) {
-                          if (updateMyUserData) {
-                            await updateMyUserData({ cart: [...currentCart, cartItem] });
-                          } else {
-                            const next = { ...(u||{}), cart: [...currentCart, cartItem] };
-                            try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
-                            try { localStorage.setItem('user', JSON.stringify(next)); } catch {}
-                          }
-                        }
-                      } catch (err) { console.error(err); }
-
-                      // navigate to cart for checkout
-                      window.location.href = '/cart';
-                    }}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                  >
-                    Buy
-                  </Button>
+                          // navigate to cart for checkout
+                          window.location.href = '/cart';
+                        }}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      >
+                        Buy
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

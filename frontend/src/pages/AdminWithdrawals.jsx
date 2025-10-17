@@ -268,16 +268,16 @@ export default function AdminWithdrawals() {
                     <Card className="bg-slate-900/60 border-slate-700">
                       <div className="p-4">
                         <div className="flex items-start justify-between gap-4">
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <div className="text-sm text-indigo-300">{r.username ? `@${r.username}` : r.email}</div>
                             <div className="font-semibold text-white">{r.first_name || r.last_name ? `${r.first_name || ''} ${r.last_name || ''}`.trim() : 'Creator'}</div>
                             <div className="text-green-300 font-semibold mt-1">GH₵ {Number(r.amount).toFixed(2)} <span className="text-xs text-gray-400">net GH₵ {Number(r.amount_to_receive).toFixed(2)}</span></div>
                             <div className="text-sm text-gray-300 mt-1">Send via {r.destination_type === 'mobile_money' ? 'Mobile Money' : r.destination_type}: {r.destination_account}</div>
                             <div className="text-xs text-gray-400 mt-1">Mobile: {r.phone || '—'} • Requested: {new Date(r.created_at).toLocaleString()}</div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => openAction(r.id, 'paid')}>Sent</Button>
-                            <Button variant="destructive" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
+                          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                            <Button className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap" onClick={() => openAction(r.id, 'paid')}>Sent</Button>
+                            <Button variant="destructive" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap" onClick={() => openAction(r.id, 'rejected')}>Decline</Button>
                           </div>
                         </div>
                       </div>
@@ -292,29 +292,31 @@ export default function AdminWithdrawals() {
           {loading ? <div className="text-gray-300">Loading...</div> : (
             <Card className="bg-slate-900/60 border-slate-700 p-4">
               {rows.length === 0 ? <div className="text-gray-400">No paid withdrawals in range.</div> : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-400">
-                      <tr>
-                        <th className="p-2">Processed At</th>
-                        <th className="p-2">Creator</th>
-                        <th className="p-2">Amount</th>
-                        <th className="p-2">Reference</th>
-                        <th className="p-2">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-200">
-                      {rows.map(r => (
-                        <tr key={r.id} className="border-t border-slate-800">
-                          <td className="p-2">{r.processed_at ? new Date(r.processed_at).toLocaleString() : '—'}</td>
-                          <td className="p-2">{r.first_name} {r.last_name} ({r.username || r.email})</td>
-                          <td className="p-2">GH₵ {Number(r.amount_to_receive).toFixed(2)}</td>
-                          <td className="p-2">{r.reference || '—'}</td>
-                          <td className="p-2">{r.notes || '—'}</td>
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-left text-gray-400">
+                        <tr>
+                          <th className="p-2 whitespace-nowrap">Processed At</th>
+                          <th className="p-2 whitespace-nowrap">Creator</th>
+                          <th className="p-2 whitespace-nowrap">Amount</th>
+                          <th className="p-2 whitespace-nowrap">Reference</th>
+                          <th className="p-2 whitespace-nowrap">Notes</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="text-gray-200">
+                        {rows.map(r => (
+                          <tr key={r.id} className="border-t border-slate-800">
+                            <td className="p-2 whitespace-nowrap">{r.processed_at ? new Date(r.processed_at).toLocaleString() : '—'}</td>
+                            <td className="p-2">{r.first_name} {r.last_name} ({r.username || r.email})</td>
+                            <td className="p-2 whitespace-nowrap">GH₵ {Number(r.amount_to_receive).toFixed(2)}</td>
+                            <td className="p-2">{r.reference || '—'}</td>
+                            <td className="p-2">{r.notes || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </Card>
@@ -324,27 +326,29 @@ export default function AdminWithdrawals() {
           {loading ? <div className="text-gray-300">Loading...</div> : (
             <Card className="bg-slate-900/60 border-slate-700 p-4">
               {rows.length === 0 ? <div className="text-gray-400">No declined withdrawals in range.</div> : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-400">
-                      <tr>
-                        <th className="p-2">Processed At</th>
-                        <th className="p-2">Creator</th>
-                        <th className="p-2">Amount</th>
-                        <th className="p-2">Reason</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-200">
-                      {rows.map(r => (
-                        <tr key={r.id} className="border-t border-slate-800">
-                          <td className="p-2">{r.processed_at ? new Date(r.processed_at).toLocaleString() : '—'}</td>
-                          <td className="p-2">{r.first_name} {r.last_name} ({r.username || r.email})</td>
-                          <td className="p-2">GH₵ {Number(r.amount).toFixed(2)}</td>
-                          <td className="p-2">{r.notes || '—'}</td>
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-left text-gray-400">
+                        <tr>
+                          <th className="p-2 whitespace-nowrap">Processed At</th>
+                          <th className="p-2 whitespace-nowrap">Creator</th>
+                          <th className="p-2 whitespace-nowrap">Amount</th>
+                          <th className="p-2 whitespace-nowrap">Reason</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="text-gray-200">
+                        {rows.map(r => (
+                          <tr key={r.id} className="border-t border-slate-800">
+                            <td className="p-2 whitespace-nowrap">{r.processed_at ? new Date(r.processed_at).toLocaleString() : '—'}</td>
+                            <td className="p-2">{r.first_name} {r.last_name} ({r.username || r.email})</td>
+                            <td className="p-2 whitespace-nowrap">GH₵ {Number(r.amount).toFixed(2)}</td>
+                            <td className="p-2">{r.notes || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </Card>

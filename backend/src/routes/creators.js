@@ -1,7 +1,32 @@
 import { Router } from 'express';
 import { query } from '../lib/database.js';
+import { verifyToken } from '../lib/auth.js';
 
 const router = Router();
+
+// Optional auth middleware - sets req.user if valid token present, but doesn't reject if missing
+const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token) {
+    try {
+      const decoded = verifyToken(token);
+      if (decoded) {
+        const result = await query(
+          'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE id = $1 AND is_active = true',
+          [decoded.id]
+        );
+        if (result.rows.length > 0) {
+          req.user = result.rows[0];
+        }
+      }
+    } catch (error) {
+      // Silently ignore invalid tokens for optional auth
+    }
+  }
+  next();
+};
 
 // Helper: resolve an identifier that may be a user id or a username
 async function resolveUserIdentifier(identifier) {
@@ -141,12 +166,15 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // GET /api/creators/:id/content
-router.get('/:id/content', async (req, res, next) => {
+router.get('/:id/content', optionalAuth, async (req, res, next) => {
   try {
     const { id: rawId } = req.params;
     const id = await resolveUserIdentifier(rawId);
     if (!id) return res.status(404).json({ error: 'Creator not found' });
-  const [albumsRes, videosRes, songsRes] = await Promise.all([
+    
+    const userId = req.user?.id; // from authenticateToken middleware if present
+    
+    const [albumsRes, videosRes, songsRes] = await Promise.all([
       query(
         `SELECT a.*, COALESCE(cp.stage_name, u.first_name || ' ' || u.last_name) as artist
          FROM albums a
@@ -162,18 +190,42 @@ router.get('/:id/content', async (req, res, next) => {
          WHERE v.user_id = $1
          ORDER BY v.created_at DESC`,
         [id]
+      ),
+      query(
+        `SELECT s.id, s.title, s.price, s.created_at, s.cover_image, s.preview_url, s.album_id
+         FROM songs s
+         WHERE s.user_id = $1
+         ORDER BY s.created_at DESC`,
+        [id]
       )
-        ,
-        query(
-          `SELECT s.id, s.title, s.price, s.created_at, s.cover_image, s.preview_url, s.album_id
-           FROM songs s
-           WHERE s.user_id = $1
-           ORDER BY s.created_at DESC`,
-          [id]
-        )
     ]);
 
-      res.json({ albums: albumsRes.rows, videos: videosRes.rows, songs: songsRes.rows });
+    // Add owned_by_me flag for authenticated users
+    let albums = albumsRes.rows;
+    let videos = videosRes.rows;
+    let songs = songsRes.rows;
+
+    if (userId) {
+      // Get user's purchases
+      const purchasesRes = await query(
+        `SELECT item_type, item_id FROM purchases 
+         WHERE user_id = $1 AND payment_status IN ('completed', 'success')`,
+        [userId]
+      );
+      const purchases = purchasesRes.rows;
+      const purchasedAlbums = new Set(purchases.filter(p => p.item_type === 'album').map(p => p.item_id));
+      const purchasedVideos = new Set(purchases.filter(p => p.item_type === 'video').map(p => p.item_id));
+      const purchasedSongs = new Set(purchases.filter(p => p.item_type === 'song').map(p => p.item_id));
+
+      albums = albums.map(a => ({ ...a, owned_by_me: purchasedAlbums.has(a.id) }));
+      videos = videos.map(v => ({ ...v, owned_by_me: purchasedVideos.has(v.id) }));
+      songs = songs.map(s => ({ 
+        ...s, 
+        owned_by_me: purchasedSongs.has(s.id) || (s.album_id && purchasedAlbums.has(s.album_id))
+      }));
+    }
+
+    res.json({ albums, videos, songs });
   } catch (err) { next(err); }
 });
 

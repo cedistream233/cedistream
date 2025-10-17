@@ -138,6 +138,8 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || 'Update failed');
       await refreshProfile();
       setSuccess('Profile details updated');
+      // Clear success message after 3 seconds to prevent confusion on refresh
+      setTimeout(() => setSuccess(''), 3000);
     } catch (e) {
       setError(e.message);
     } finally {

@@ -18,12 +18,19 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
 
   useEffect(() => {
     try {
-      const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
-      if (u && Array.isArray(u.purchases)) {
-        setOwned(u.purchases.some(p => p.item_id === item.id));
-      } else setOwned(false);
+      // Ownership precedence: server flag -> authenticated user purchases -> demo_user localStorage
+      if (typeof item?.owned_by_me === 'boolean') {
+        setOwned(Boolean(item.owned_by_me));
+      } else if (user && Array.isArray(user.purchases)) {
+        setOwned(user.purchases.some(p => p.item_id === item.id));
+      } else {
+        const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
+        if (u && Array.isArray(u.purchases)) {
+          setOwned(u.purchases.some(p => p.item_id === item.id));
+        } else setOwned(false);
+      }
     } catch { setOwned(false); }
-  }, [item?.id]);
+  }, [item?.id, item?.owned_by_me, user]);
 
   useEffect(() => {
     let aborted = false;
@@ -101,44 +108,61 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
         </div>
       </div>
       <div className="pl-3 flex items-center gap-2">
-        {hasPreview !== false ? (
+        {owned ? (
           <button
-            onClick={async (e) => {
-              e.stopPropagation();
-              try {
-                // attempt to prefetch preview URL and store for immediate use on details page
-                if (type === 'song') {
-                  const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-                  if (res.ok) {
-                    const d = await res.json();
-                    if (d?.url) {
-                      try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
-                    }
-                  }
-                } else if (type === 'video') {
-                  const res = await fetch(`/api/media/video/${encodeURIComponent(item.id)}/preview`);
-                  if (res.ok) {
-                    const d = await res.json();
-                    if (d?.url) {
-                      try { sessionStorage.setItem(`preview:video:${item.id}`, d.url); } catch {}
-                    }
-                  }
-                }
-              } catch (err) {
-                // ignore
-              }
-              // navigate to details; the details page will pick up sessionStorage preview if present
+            onClick={(e)=>{ e.stopPropagation();
               if (type === 'video') window.location.href = `/videos?id=${encodeURIComponent(item.id)}`;
               else window.location.href = `/songs/${encodeURIComponent(item.id)}`;
             }}
-            className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
+            className={`px-3 py-2 rounded-md text-white text-sm ${
+              type === 'song' || type === 'video' 
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' 
+                : 'bg-slate-800 hover:bg-slate-700'
+            }`}
           >
-            Preview
+            {type === 'song' || type === 'video' ? 'Play' : 'Open'}
           </button>
-        ) : null}
-        <button
-          onClick={async (e) => {
-            e.stopPropagation();
+        ) : (
+          hasPreview !== false ? (
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  // attempt to prefetch preview URL and store for immediate use on details page
+                  if (type === 'song') {
+                    const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
+                    if (res.ok) {
+                      const d = await res.json();
+                      if (d?.url) {
+                        try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
+                      }
+                    }
+                  } else if (type === 'video') {
+                    const res = await fetch(`/api/media/video/${encodeURIComponent(item.id)}/preview`);
+                    if (res.ok) {
+                      const d = await res.json();
+                      if (d?.url) {
+                        try { sessionStorage.setItem(`preview:video:${item.id}`, d.url); } catch {}
+                      }
+                    }
+                  }
+                } catch (err) {
+                  // ignore
+                }
+                // navigate to details; the details page will pick up sessionStorage preview if present
+                if (type === 'video') window.location.href = `/videos?id=${encodeURIComponent(item.id)}`;
+                else window.location.href = `/songs/${encodeURIComponent(item.id)}`;
+              }}
+              className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
+            >
+              Preview
+            </button>
+          ) : null
+        )}
+        {!owned && (
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
             try {
               // if onAddToCart callback is provided, call it (page-level handlers may implement custom flows)
               if (onAddToCart) return onAddToCart();
@@ -205,6 +229,7 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
         >
           Buy
         </button>
+        )}
       </div>
     </div>
   );

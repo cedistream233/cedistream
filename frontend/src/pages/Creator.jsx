@@ -18,17 +18,21 @@ export default function Creator() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/creators/${encodeURIComponent(id)}`);
-    const data = res.ok ? await res.json() : null;
-    setCreator(data);
-    const resolvedId = data?.user_id || id;
-    const res2 = await fetch(`/api/creators/${encodeURIComponent(id)}/content`);
-    const data2 = res2.ok ? await res2.json() : { albums: [], videos: [] };
-    setContent(data2);
-  const singlesData = await Song.list({ user_id: resolvedId });
-  // only show standalone singles (exclude songs that are part of albums)
-  const onlySingles = Array.isArray(singlesData) ? singlesData.filter(s => !s.album_id) : [];
-  setSingles(onlySingles);
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const res = await fetch(`/api/creators/${encodeURIComponent(id)}`, { headers });
+        const data = res.ok ? await res.json() : null;
+        setCreator(data);
+        
+        const res2 = await fetch(`/api/creators/${encodeURIComponent(id)}/content`, { headers });
+        const data2 = res2.ok ? await res2.json() : { albums: [], videos: [], songs: [] };
+        setContent(data2);
+        
+        // Use songs from the content endpoint (now includes owned_by_me)
+        // Filter to only show standalone singles (exclude songs that are part of albums)
+        const onlySingles = Array.isArray(data2.songs) ? data2.songs.filter(s => !s.album_id) : [];
+        setSingles(onlySingles);
       } finally { setLoading(false); }
     })();
   }, [id]);
@@ -78,6 +82,7 @@ export default function Creator() {
                       price: song.price,
                       cover_image: song.cover_image,
                       release_date: song.release_date || song.published_at || song.created_at || null,
+                      owned_by_me: song.owned_by_me, // pass server flag
                     }}
                     type="song"
                     onAddToCart={() => {
@@ -123,7 +128,17 @@ export default function Creator() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {content.albums.map((album) => (
-                <ContentCard key={album.id} item={{ ...album, release_date: album.release_date || album.published_at || album.created_at || null }} type="album" onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`} showPwyw={false} />
+                <ContentCard 
+                  key={album.id} 
+                  item={{ 
+                    ...album, 
+                    release_date: album.release_date || album.published_at || album.created_at || null,
+                    owned_by_me: album.owned_by_me // pass server flag
+                  }} 
+                  type="album" 
+                  onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`} 
+                  showPwyw={false} 
+                />
               ))}
             </div>
           )}
@@ -138,7 +153,11 @@ export default function Creator() {
               {content.videos.map((video) => (
                 <ContentCard
                   key={video.id}
-                  item={{ ...video, release_date: video.release_date || video.published_at || video.created_at || null }}
+                  item={{ 
+                    ...video, 
+                    release_date: video.release_date || video.published_at || video.created_at || null,
+                    owned_by_me: video.owned_by_me // pass server flag
+                  }}
                   type="video"
                   onViewDetails={() => { window.location.href = `/videos?id=${encodeURIComponent(video.id)}`; }}
                   showPwyw={false}
