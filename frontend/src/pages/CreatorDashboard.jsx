@@ -213,11 +213,9 @@ export default function CreatorDashboard() {
     try {
       const tokenLocal = token || localStorage.getItem('token');
       
-      // Fetch user profile with creator data
+      // Fetch user profile first to get authedId
       const profileResponse = await fetch('/api/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${tokenLocal}`
-        }
+        headers: { 'Authorization': `Bearer ${tokenLocal}` }
       });
       
       let authedId = null;
@@ -225,89 +223,68 @@ export default function CreatorDashboard() {
         const profileData = await profileResponse.json();
         setUser(profileData);
         authedId = profileData?.id;
-        
-        // We'll rely on /api/creators/:id for authoritative counts & totals
       }
 
-      // Get creator totals (earnings, sales, albums, videos)
-      if (authedId) {
-        const cMetaRes = await fetch(`/api/creators/${authedId}`);
-        if (cMetaRes.ok) {
-          const meta = await cMetaRes.json();
-          setStats(prev => ({
-            ...prev,
-            totalEarnings: parseFloat(meta.total_earnings || 0),
-            totalSales: parseInt(meta.total_sales || 0, 10),
-            albumCount: parseInt(meta.albums_count || 0, 10),
-            songsCount: parseInt(meta.songs_count || 0, 10),
-            videoCount: parseInt(meta.videos_count || 0, 10)
-          }));
-        }
+      if (!authedId) {
+        setLoading(false);
+        fetchingDashboard.current = false;
+        return;
       }
 
-      // Load my content (albums/videos for this creator)
-      if (authedId || user?.id) {
-        try {
-          setContentLoading(true);
-          const idToUse = authedId || user?.id;
-          if (idToUse) {
-            const cRes = await fetch(`/api/creators/${idToUse}/content`);
-            if (cRes.ok) {
-              const cData = await cRes.json();
-              // ensure songs only counts standalone songs (not tracks that belong to albums)
-              const allSongs = cData.songs || [];
-              const standaloneSongs = Array.isArray(allSongs) ? allSongs.filter(s => !s.album_id) : [];
-              setMyContent({ albums: cData.albums || [], videos: cData.videos || [], songs: allSongs });
-              setStats(prev => ({ ...prev, songsCount: standaloneSongs.length }));
-            }
-          }
-        } catch {}
-        finally { setContentLoading(false); }
+      // Parallelize all remaining fetches to reduce load time from ~7s to ~1-2s
+      const [metaRes, contentRes, salesRes] = await Promise.allSettled([
+        fetch(`/api/creators/${authedId}`),
+        fetch(`/api/creators/${authedId}/content`),
+        fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${(salesPage - 1) * salesPageSize}`, {
+          headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
+        })
+      ]);
+
+      // Process creator metadata
+      if (metaRes.status === 'fulfilled' && metaRes.value.ok) {
+        const meta = await metaRes.value.json();
+        setStats(prev => ({
+          ...prev,
+          totalEarnings: parseFloat(meta.total_earnings || 0),
+          totalSales: parseInt(meta.total_sales || 0, 10),
+          albumCount: parseInt(meta.albums_count || 0, 10),
+          songsCount: parseInt(meta.songs_count || 0, 10),
+          videoCount: parseInt(meta.videos_count || 0, 10)
+        }));
       }
 
-      // Always ensure songsCount is accurate by querying songs endpoint and counting standalone singles
-      try {
-        const idToUse2 = authedId || user?.id;
-        if (idToUse2) {
-          const songsList = await Song.list({ user_id: idToUse2 });
-          const onlySingles = Array.isArray(songsList) ? songsList.filter(s => !s.album_id) : [];
-          setStats(prev => ({ ...prev, songsCount: onlySingles.length }));
-        }
-      } catch (e) {
-        // ignore
+      // Process content
+      if (contentRes.status === 'fulfilled' && contentRes.value.ok) {
+        const cData = await contentRes.value.json();
+        const allSongs = cData.songs || [];
+        const standaloneSongs = Array.isArray(allSongs) ? allSongs.filter(s => !s.album_id) : [];
+        setMyContent({ albums: cData.albums || [], videos: cData.videos || [], songs: allSongs });
+        setStats(prev => ({ ...prev, songsCount: standaloneSongs.length }));
+        setContentLoading(false);
+      } else {
+        setContentLoading(false);
       }
 
-      // Recent sales for this creator (paginated)
-        try {
-          const offset = (salesPage - 1) * salesPageSize;
-          const salesRes = await fetch(`/api/uploads/recent-sales?limit=${salesPageSize}&offset=${offset}`, {
-            headers: { 'Authorization': tokenLocal ? `Bearer ${tokenLocal}` : '' }
-          });
-          if (salesRes.ok) {
-            const data = await salesRes.json();
-            const rows = Array.isArray(data?.items) ? data.items : [];
-            setRecentSales(rows.map(r => ({
-              id: r.id,
-              item: r.item,
-              type: r.item_type,
-              amount: parseFloat(r.amount || 0), // gross
-              creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null, // net if backend provides
-              date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
-              buyer: r.buyer_name || '—'
-            })));
-            setSalesTotal(typeof data?.total === 'number' ? data.total : rows.length);
-            setSalesHasMore(rows.length === salesPageSize && rows.length > 0);
-          } else {
-            setRecentSales([]);
-            setSalesHasMore(false);
-            setSalesTotal(0);
-          }
-        } catch (e) {
-          setRecentSales([]);
-          setSalesHasMore(false);
-          setSalesTotal(0);
-        }
-      // No hardcoded values; keep monthly/views at 0 unless we have analytics sources
+      // Process sales
+      if (salesRes.status === 'fulfilled' && salesRes.value.ok) {
+        const data = await salesRes.value.json();
+        const rows = Array.isArray(data?.items) ? data.items : [];
+        setRecentSales(rows.map(r => ({
+          id: r.id,
+          item: r.item,
+          type: r.item_type,
+          amount: parseFloat(r.amount || 0),
+          creatorAmount: typeof r.creator_amount !== 'undefined' ? parseFloat(r.creator_amount || 0) : null,
+          date: r.date ? new Date(r.date).toISOString().slice(0,10) : '',
+          buyer: r.buyer_name || '—'
+        })));
+        setSalesTotal(typeof data?.total === 'number' ? data.total : rows.length);
+        setSalesHasMore(rows.length === salesPageSize && rows.length > 0);
+      } else {
+        setRecentSales([]);
+        setSalesHasMore(false);
+        setSalesTotal(0);
+      }
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
