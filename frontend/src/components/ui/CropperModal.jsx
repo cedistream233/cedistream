@@ -16,6 +16,7 @@ export default function CropperModal({ isOpen, onClose, file, onConfirm, aspect 
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const handleCropComplete = useCallback((_, areaPixels) => {
     setCroppedAreaPixels(areaPixels);
@@ -23,13 +24,18 @@ export default function CropperModal({ isOpen, onClose, file, onConfirm, aspect 
 
   const handleConfirm = async () => {
     if (!file || !croppedAreaPixels) return onClose();
+    if (busy) return; // prevent re-entry
+    setBusy(true);
     try {
       const blob = await getCroppedImg(URL.createObjectURL(file), croppedAreaPixels, rotation);
       await onConfirm(blob);
+      onClose();
     } catch (e) {
       console.error('Crop error', e);
+      // keep modal open so user can retry or cancel
+    } finally {
+      setBusy(false);
     }
-    onClose();
   };
 
   return (
@@ -62,8 +68,10 @@ export default function CropperModal({ isOpen, onClose, file, onConfirm, aspect 
         </div>
 
         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 space-y-2 space-y-reverse sm:space-y-0 mt-4">
-          <Button variant="secondary" onClick={onClose} className="border-slate-600 hover:bg-slate-800">Cancel</Button>
-          <Button onClick={handleConfirm} className="bg-purple-600 hover:bg-purple-700">Crop & Save</Button>
+          <Button variant="secondary" onClick={onClose} className="border-slate-600 hover:bg-slate-800" disabled={busy}>Cancel</Button>
+          <Button onClick={handleConfirm} className="bg-purple-600 hover:bg-purple-700" disabled={busy || !croppedAreaPixels || !file}>
+            {busy ? 'Processing…' : 'Crop & Save'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
