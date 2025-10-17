@@ -73,6 +73,10 @@ export default function CreatorDashboard() {
   const [withdrawSummary, setWithdrawSummary] = useState({ available: 0, minWithdrawal: 10, transferFee: 1.0, currency: 'GHS' });
   const [withdrawHistory, setWithdrawHistory] = useState([]);
   const [successModal, setSuccessModal] = useState({ open: false, message: '' });
+  
+  // Guard to prevent concurrent/duplicate fetchDashboardData calls (avoid 429 rate limit)
+  const fetchingDashboard = useRef(false);
+  const lastFetchTime = useRef(0);
 
   // hydrate basic user info and trigger an initial fetch without needing a manual refresh
   useEffect(() => {
@@ -198,6 +202,14 @@ export default function CreatorDashboard() {
   }, []);
 
   const fetchDashboardData = async () => {
+    // Deduplicate: skip if already fetching or if fetched within last 2 seconds
+    const now = Date.now();
+    if (fetchingDashboard.current || (now - lastFetchTime.current < 2000)) {
+      return;
+    }
+    fetchingDashboard.current = true;
+    lastFetchTime.current = now;
+
     try {
       const tokenLocal = token || localStorage.getItem('token');
       
@@ -301,6 +313,7 @@ export default function CreatorDashboard() {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+      fetchingDashboard.current = false;
     }
   };
 
