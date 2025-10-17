@@ -186,6 +186,7 @@ export default function UploadSong() {
         open={showSuccess}
         title="Song Published!"
         message="Your song is live. Share it or manage it in My Content."
+        compact={true}
         created={created}
         onManage={() => { setShowSuccess(false); window.location.href = '/dashboard?tab=content'; }}
         onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/songs/${encodeURIComponent(created.id)}`; }}

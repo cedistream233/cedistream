@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from './button';
 import { CheckCircle2, Share2, ExternalLink } from 'lucide-react';
 
-export default function PublishSuccessModal({ open, onClose, title='Published!', message='Your content is now live.', onView, onShare, created = null, onManage, onUploadAnother }) {
+export default function PublishSuccessModal({ open, onClose, title='Published!', message='Your content is now live.', onView, onShare, created = null, onManage, onUploadAnother, compact = false }) {
   const url = created?.id ? `${window.location.origin}/${created.type === 'video' ? 'videos?id=' + created.id : created.type === 'song' ? `songs/${created.id}` : `albums/${created.id}`}` : null;
   return (
     <Dialog open={open}>
@@ -16,7 +16,7 @@ export default function PublishSuccessModal({ open, onClose, title='Published!',
           <DialogDescription className="text-gray-300">{message}</DialogDescription>
         </DialogHeader>
 
-        {created ? (
+        {!compact && created ? (
           <div className="mt-3 flex gap-3 items-center">
             <div className="w-20 h-12 rounded overflow-hidden bg-slate-800 flex items-center justify-center border border-slate-700">
               {created.thumbnail ? <img src={created.thumbnail} className="w-full h-full object-cover" alt="thumb"/> : null}
@@ -30,30 +30,52 @@ export default function PublishSuccessModal({ open, onClose, title='Published!',
         ) : null}
 
         <div className="mt-4 flex gap-3">
-          {onManage && (
-            <Button onClick={onManage} className="bg-purple-600 hover:bg-purple-700">
-              <ExternalLink className="w-4 h-4 mr-2"/> Go to My Content
-            </Button>
-          )}
+          {compact ? (
+            // compact mode: show only the original simple actions (View, Share, Close)
+            <>
+              {onView && (
+                <Button onClick={onView} className="bg-purple-600 hover:bg-purple-700">
+                  <ExternalLink className="w-4 h-4 mr-2"/> View
+                </Button>
+              )}
+              {onShare && (
+                <Button onClick={onShare} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
+                  <Share2 className="w-4 h-4 mr-2"/> Share
+                </Button>
+              )}
+              {onClose && (
+                <Button onClick={onClose} variant="ghost" className="ml-auto">Close</Button>
+              )}
+            </>
+          ) : (
+            // full mode with manage/uploadanother options
+            <>
+              {onManage && (
+                <Button onClick={onManage} className="bg-purple-600 hover:bg-purple-700">
+                  <ExternalLink className="w-4 h-4 mr-2"/> Go to My Content
+                </Button>
+              )}
 
-          {onView && (
-            <Button onClick={onView} className="bg-slate-700 hover:bg-slate-800">
-              <ExternalLink className="w-4 h-4 mr-2"/> Open Public View
-            </Button>
-          )}
+              {onView && (
+                <Button onClick={onView} className="bg-slate-700 hover:bg-slate-800">
+                  <ExternalLink className="w-4 h-4 mr-2"/> Open Public View
+                </Button>
+              )}
 
-          {onShare && (
-            <Button onClick={onShare} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
-              <Share2 className="w-4 h-4 mr-2"/> Share
-            </Button>
-          )}
+              {onShare && (
+                <Button onClick={onShare} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
+                  <Share2 className="w-4 h-4 mr-2"/> Share
+                </Button>
+              )}
 
-          {onUploadAnother && (
-            <Button onClick={onUploadAnother} variant="ghost" className="ml-auto">Upload another</Button>
-          )}
+              {onUploadAnother && (
+                <Button onClick={onUploadAnother} variant="ghost" className="ml-auto">Upload another</Button>
+              )}
 
-          {onClose && !onUploadAnother && (
-            <Button onClick={onClose} variant="ghost" className="ml-auto">Close</Button>
+              {onClose && !onUploadAnother && (
+                <Button onClick={onClose} variant="ghost" className="ml-auto">Close</Button>
+              )}
+            </>
           )}
         </div>
       </DialogContent>
