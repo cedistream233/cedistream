@@ -7,6 +7,7 @@ import { Plus, Trash2, MoveVertical, Upload, Music, Image as ImageIcon } from 'l
 import CropperModal from '@/components/ui/CropperModal';
 import UploadProgressModal from '@/components/ui/UploadProgressModal';
 import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export default function UploadAlbum() {
   const [title, setTitle] = useState('');
@@ -19,6 +20,7 @@ export default function UploadAlbum() {
   const tracksContainerRef = useRef(null);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [success, setSuccess] = useState('');
   const [progress, setProgress] = useState(0);
   const [eta, setEta] = useState('');
@@ -59,7 +61,7 @@ export default function UploadAlbum() {
   const onPublish = async () => handleSubmit();
 
   const handleSubmit = async () => {
-    setError(''); setSuccess(''); setPublishing(true);
+    setError(''); setSuccess(''); setShowErrorModal(false); setPublishing(true);
     try {
       if (!title || !price) throw new Error('Title and price are required');
       const fd = new FormData();
@@ -116,6 +118,8 @@ export default function UploadAlbum() {
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setTracks([]);
     } catch (e) {
       setError(e.message);
+      // show modal so user sees the error even if scrolled down
+      setShowErrorModal(true);
     } finally {
       setPublishing(false); setTimeout(()=>setShowProgress(false), 600);
     }
@@ -245,12 +249,26 @@ export default function UploadAlbum() {
         title="Album Published!"
         message="Your album is live. Share it or manage it in My Content."
         created={created}
+        compact={true}
         onManage={() => { setShowSuccess(false); window.location.href = '/dashboard?tab=content'; }}
         onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/albums/${encodeURIComponent(created.id)}`; }}
         onShare={() => { if (navigator.share && created?.id) navigator.share({ title: created?.title || 'New album', url: `${window.location.origin}/albums/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/albums/${created.id}`); }}
         onUploadAnother={() => { setShowSuccess(false); window.location.href = '/upload/album'; }}
         onClose={() => setShowSuccess(false)}
       />
+
+      {/* Error modal shown when upload fails so user sees it regardless of scroll position */}
+      <Dialog open={showErrorModal}>
+        <DialogContent className="bg-slate-900 text-white border border-red-900/30">
+          <DialogHeader>
+            <DialogTitle className="text-red-400">Failed to upload album</DialogTitle>
+            <DialogDescription className="text-gray-300">{error || 'An unexpected error occurred while uploading your album.'}</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={()=>setShowErrorModal(false)} className="bg-purple-600 hover:bg-purple-700">Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

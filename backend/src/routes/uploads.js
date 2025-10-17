@@ -9,15 +9,52 @@ import { getPool } from '../lib/database.js';
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Helper to upload a file buffer to supabase and return public URL
+// Helper to upload a file buffer to supabase and return public URL.
+// Implements simple retry/backoff for transient network/gateway errors (502, network connection lost).
 async function uploadToStorage(bucket, path, buffer, contentType) {
   if (!supabase) throw new Error('Storage not configured');
-  const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
-    cacheControl: '3600', upsert: true, contentType
-  });
-  if (error) throw error;
-  const { data } = await supabase.storage.from(bucket).getPublicUrl(path);
-  return data?.publicUrl;
+
+  const maxAttempts = Number(process.env.SUPABASE_UPLOAD_ATTEMPTS || 3);
+  const baseDelay = Number(process.env.SUPABASE_UPLOAD_BACKOFF_MS || 500);
+  let lastErr = null;
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
+        cacheControl: '3600', upsert: true, contentType
+      });
+      if (error) {
+        lastErr = error;
+        // If this was the last attempt, throw the error; otherwise retry
+        if (attempt === maxAttempts) throw error;
+        console.warn(`uploadToStorage attempt ${attempt} failed:`, error?.message || error);
+      } else {
+        // try to get public url; sometimes this can also transiently fail
+        const { data, error: pubErr } = await supabase.storage.from(bucket).getPublicUrl(path);
+        if (pubErr) {
+          lastErr = pubErr;
+          if (attempt === maxAttempts) throw pubErr;
+          console.warn(`getPublicUrl attempt ${attempt} failed:`, pubErr?.message || pubErr);
+        } else {
+          return data?.publicUrl;
+        }
+      }
+    } catch (err) {
+      // Catch unexpected exceptions (network / fetch wrapper errors)
+      lastErr = err;
+      if (attempt === maxAttempts) throw err;
+      console.warn(`uploadToStorage attempt ${attempt} threw, will retry:`, err?.message || err);
+    }
+
+    // exponential backoff before next attempt
+    const delay = baseDelay * Math.pow(2, attempt - 1);
+    await sleep(delay);
+  }
+
+  // If we exit loop without returning, throw the last seen error
+  throw lastErr || new Error('uploadToStorage failed');
 }
 
 // Create or draft an album with cover and songs; publish optional
@@ -314,14 +351,11 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
       const maxDim = Number(process.env.PROMO_IMAGE_MAX_DIM || 1200);
       buffer = await sharp(file.buffer).resize({ width: maxDim, height: maxDim, fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
     }
-    const ext = 'jpg';
-    const storagePath = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-    const { error } = await supabase.storage.from(bucket).upload(storagePath, buffer, { upsert: true, contentType: 'image/jpeg' });
-    if (error) throw error;
-    const { data } = await supabase.storage.from(bucket).getPublicUrl(storagePath);
-    const publicUrl = data?.publicUrl;
-    return res.json({ url: publicUrl, storagePath });
+  const ext = 'jpg';
+  const storagePath = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+  const publicUrl = await uploadToStorage(bucket, storagePath, buffer, 'image/jpeg');
+  return res.json({ url: publicUrl, storagePath });
   } catch (err) {
     console.error('Promotions image upload error:', err);
     return res.status(500).json({ error: 'Failed to upload image' });

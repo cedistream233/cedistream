@@ -246,23 +246,13 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     const filePath = `profiles/${userId}/${Date.now()}.${ext}`;
 
     const bucket = process.env.SUPABASE_BUCKET || 'profiles';
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, req.file.buffer, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: req.file.mimetype || 'image/jpeg',
-      });
-    if (uploadError) {
-      console.error('Supabase upload error:', uploadError);
+    let imageUrl = null;
+    try {
+      imageUrl = await uploadToStorage(bucket, filePath, req.file.buffer, req.file.mimetype || 'image/jpeg');
+    } catch (err) {
+      console.error('Supabase upload error (profile image):', err);
       return res.status(500).json({ error: 'Failed to upload image' });
     }
-
-    const { data: publicUrlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
-
-    const imageUrl = publicUrlData?.publicUrl;
 
     // Update user profile_image
     const result = await query(
