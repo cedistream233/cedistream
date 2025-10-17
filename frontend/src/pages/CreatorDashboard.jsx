@@ -78,6 +78,12 @@ export default function CreatorDashboard() {
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) setUser(JSON.parse(userData));
+    try {
+      // honor ?tab= query param so uploads can deep-link to My Content
+      const qp = new URLSearchParams(window.location.search);
+      const initialTab = qp.get('tab');
+      if (initialTab) setTab(initialTab);
+    } catch (e) {}
     // fire an initial fetch using token from localStorage if available
     fetchDashboardData();
   }, []);

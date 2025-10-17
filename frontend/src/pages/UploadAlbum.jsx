@@ -228,9 +228,12 @@ export default function UploadAlbum() {
       <PublishSuccessModal
         open={showSuccess}
         title="Album Published!"
-        message="Your album is live. Share it or view the details."
-        onView={() => { setShowSuccess(false); window.location.href = '/dashboard'; }}
-        onShare={() => { if (navigator.share && created?.id) navigator.share({ title, url: `${window.location.origin}/albums/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/albums/${created.id}`); }}
+        message="Your album is live. Share it or manage it in My Content."
+        created={created}
+        onManage={() => { setShowSuccess(false); window.location.href = '/dashboard?tab=content'; }}
+        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/albums/${encodeURIComponent(created.id)}`; }}
+        onShare={() => { if (navigator.share && created?.id) navigator.share({ title: created?.title || 'New album', url: `${window.location.origin}/albums/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/albums/${created.id}`); }}
+        onUploadAnother={() => { setShowSuccess(false); window.location.href = '/upload/album'; }}
         onClose={() => setShowSuccess(false)}
       />
     </div>
