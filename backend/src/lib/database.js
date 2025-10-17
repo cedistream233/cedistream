@@ -80,7 +80,7 @@ export const closePool = async () => {
   if (pool) {
     try {
       await pool.end();
-      console.log('🧹 Postgres pool closed');
+  console.info('🧹 Postgres pool closed');
     } catch (e) {
       console.error('Error closing Postgres pool:', e);
     }

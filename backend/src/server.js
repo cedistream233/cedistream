@@ -185,7 +185,7 @@ app.use('*', (req, res) => {
 function scheduleAutoFailPendingPurchases() {
   const disabled = String(process.env.DISABLE_PENDING_AUTOFAIL || '').toLowerCase() === 'true';
   if (disabled) {
-    console.log('⏭️  Pending auto-fail job disabled via DISABLE_PENDING_AUTOFAIL=true');
+    console.info('⏭️  Pending auto-fail job disabled via DISABLE_PENDING_AUTOFAIL=true');
     return;
   }
   const windowMinutes = Number(process.env.PENDING_FAIL_MINUTES || 30);
@@ -201,7 +201,7 @@ function scheduleAutoFailPendingPurchases() {
          RETURNING id`
     );
     if (res && res.rowCount) {
-      console.log(`🟡 Auto-failed ${res.rowCount} stale pending purchase(s)`);
+      console.info(`🟡 Auto-failed ${res.rowCount} stale pending purchase(s)`);
     }
   };
 
@@ -213,7 +213,7 @@ function scheduleAutoFailPendingPurchases() {
 // Start server with graceful fallback if port is in use
 function startServer(port, attemptsLeft = 10) {
   const server = app.listen(port, () => {
-    console.log(`✅ Server listening on Port:${port}`);
+    console.info(`✅ Server listening on Port:${port}`);
   });
 
   server.on('error', (err) => {
@@ -238,7 +238,7 @@ scheduleAutoFailPendingPurchases();
 function scheduleExpiredPromotionsCleanup() {
   const disabled = String(process.env.DISABLE_PROMO_CLEANUP || '').toLowerCase() === 'true';
   if (disabled) {
-    console.log('⏭️  Promotions cleanup job disabled via DISABLE_PROMO_CLEANUP=true');
+    console.info('⏭️  Promotions cleanup job disabled via DISABLE_PROMO_CLEANUP=true');
     return;
   }
   const pollMinutes = Number(process.env.PROMO_CLEANUP_POLL_MINUTES || 60); // default hourly
@@ -277,7 +277,7 @@ function scheduleExpiredPromotionsCleanup() {
       // delete promotion row
       try { await query('DELETE FROM promotions WHERE id = $1', [p.id]); } catch (e) { console.warn('Failed to delete expired promotion row', e); }
     }
-    console.log(`🧹 Cleaned up ${rows.length} expired promotion(s)`);
+  console.info(`🧹 Cleaned up ${rows.length} expired promotion(s)`);
   };
 
   setTimeout(() => runJobSafely(runOnce, 'Expired promotions cleanup job', { initial: true }), Math.max(0, initialDelayMs));
@@ -289,7 +289,7 @@ async function runJobSafely(fn, name = 'background job', opts = {}) {
   try {
     // Global disable switch: if DISABLE_JOBS=1 or specific disable flags set, skip
     if (process.env.DISABLE_JOBS === '1') {
-      console.log(`⏭️  ${name} skipped because DISABLE_JOBS=1`);
+    console.info(`⏭️  ${name} skipped because DISABLE_JOBS=1`);
       return;
     }
     // Lightweight reachability check
@@ -312,7 +312,7 @@ scheduleExpiredPromotionsCleanup();
 // Graceful shutdown
 const shutdown = async (signal) => {
   try {
-    console.log(`\n${signal} received. Shutting down gracefully...`);
+  console.info(`\n${signal} received. Shutting down gracefully...`);
     await closePool();
     process.exit(0);
   } catch (e) {

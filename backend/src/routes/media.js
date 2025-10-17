@@ -108,9 +108,36 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
 router.get('/song/:id/preview', async (req, res) => {
   try {
     const { id } = req.params;
-    const songRes = await query('SELECT preview_url FROM songs WHERE id = $1', [id]);
+    const songRes = await query('SELECT id, user_id, preview_url, audio_url FROM songs WHERE id = $1', [id]);
     if (!songRes.rows.length) return res.status(404).json({ error: 'Song not found' });
-    const preview = songRes.rows[0]?.preview_url;
+    const song = songRes.rows[0];
+
+    // If user provided an Authorization token and is the owner, return full media URL
+    const auth = req.headers['authorization'];
+    if (auth && auth.split(' ')[1]) {
+      try {
+        // authenticate token without failing the request if invalid
+        const tok = auth.split(' ')[1];
+        const decoded = await (async () => {
+          try { return (await import('../lib/auth.js')).verifyToken(tok); } catch { return null; }
+        })();
+        const userId = decoded?.id;
+        if (userId && String(userId) === String(song.user_id)) {
+          // owner gets signed full audio URL if present
+          const fullUrl = song.audio_url;
+          if (fullUrl) {
+            const { bucket, objectPath } = parseStorageUrl(fullUrl);
+            if (bucket && objectPath) {
+              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+              if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+            }
+            return res.json({ url: fullUrl });
+          }
+        }
+      } catch (e) { /* ignore auth errors and fall back to preview */ }
+    }
+
+    const preview = song.preview_url;
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
@@ -129,9 +156,34 @@ router.get('/song/:id/preview', async (req, res) => {
 router.get('/video/:id/preview', async (req, res) => {
   try {
     const { id } = req.params;
-    const vRes = await query('SELECT preview_url FROM videos WHERE id = $1', [id]);
+    const vRes = await query('SELECT id, user_id, preview_url, video_url FROM videos WHERE id = $1', [id]);
     if (!vRes.rows.length) return res.status(404).json({ error: 'Video not found' });
-    const preview = vRes.rows[0]?.preview_url;
+    const video = vRes.rows[0];
+
+    // If user provided Authorization and is owner, return full signed URL
+    const auth = req.headers['authorization'];
+    if (auth && auth.split(' ')[1]) {
+      try {
+        const tok = auth.split(' ')[1];
+        const decoded = await (async () => {
+          try { return (await import('../lib/auth.js')).verifyToken(tok); } catch { return null; }
+        })();
+        const userId = decoded?.id;
+        if (userId && String(userId) === String(video.user_id)) {
+          const fullUrl = video.video_url;
+          if (fullUrl) {
+            const { bucket, objectPath } = parseStorageUrl(fullUrl);
+            if (bucket && objectPath) {
+              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 5);
+              if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+            }
+            return res.json({ url: fullUrl });
+          }
+        }
+      } catch (e) { /* ignore auth errors and fall back to preview */ }
+    }
+
+    const preview = video.preview_url;
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
