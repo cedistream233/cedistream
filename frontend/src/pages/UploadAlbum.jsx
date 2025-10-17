@@ -16,6 +16,7 @@ export default function UploadAlbum() {
   const [releaseDate, setReleaseDate] = useState('');
   const [cover, setCover] = useState(null);
   const [tracks, setTracks] = useState([]);
+  const tracksContainerRef = useRef(null);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -29,7 +30,21 @@ export default function UploadAlbum() {
   const [pendingCover, setPendingCover] = useState(null);
 
   // Tracks for albums do not collect per-track price or duration; album price covers access
-  const addTrack = () => setTracks(t => [...t, { id: crypto.randomUUID(), title: '', audio: null, preview: null }]);
+  const addTrack = () => {
+    const newTrack = { id: crypto.randomUUID(), title: '', audio: null, preview: null };
+    setTracks(t => {
+      const next = [...t, newTrack];
+      // scroll to new track on next tick
+      setTimeout(() => {
+        try {
+          const container = tracksContainerRef.current;
+          const el = container ? container.querySelector(`[data-track-id="${newTrack.id}"]`) : document.querySelector(`[data-track-id="${newTrack.id}"]`);
+          if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) { /* ignore */ }
+      }, 100);
+      return next;
+    });
+  };
   const removeTrack = (id) => setTracks(t => t.filter(x => x.id !== id));
   const moveTrack = (id, dir) => setTracks(t => {
     const idx = t.findIndex(x => x.id === id);
@@ -116,7 +131,7 @@ export default function UploadAlbum() {
         <CardHeader>
           <CardTitle className="text-white">Album Details</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+  <CardContent className="space-y-4" ref={tracksContainerRef}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Title</label>
@@ -183,7 +198,7 @@ export default function UploadAlbum() {
             <div className="text-sm text-gray-400">No tracks yet. Add your first track.</div>
           )}
           {tracks.map((t, idx) => (
-            <div key={t.id} className="p-4 rounded-lg border border-purple-900/20 bg-slate-900/40 space-y-3">
+            <div key={t.id} data-track-id={t.id} className="p-4 rounded-lg border border-purple-900/20 bg-slate-900/40 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="text-gray-300 font-medium flex items-center gap-2"><MoveVertical className="w-4 h-4"/> Track {idx+1}</div>
                 <Button variant="outline" onClick={()=>removeTrack(t.id)} className="border-slate-700 text-red-300 hover:bg-slate-800" size="sm"><Trash2 className="w-4 h-4 mr-1"/>Remove</Button>
