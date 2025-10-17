@@ -27,7 +27,8 @@ if (process.env.DATABASE_URL) {
   console.warn('⚠️  DATABASE_URL not set. Database operations will fail until configured.');
 }
 
-export const query = async (text, params) => {
+// Internal low-level query that uses a client and sets a statement timeout
+const _queryWithClient = async (text, params = []) => {
   if (!pool) {
     throw new Error('Database not configured. Please set DATABASE_URL in your .env file.');
   }
@@ -40,12 +41,37 @@ export const query = async (text, params) => {
     }
     const result = await client.query(text, params);
     return result;
-  } catch (error) {
-    console.error('Database query error:', error);
-    throw error;
   } finally {
     client.release();
   }
+};
+
+// Public query wrapper with retry/backoff for transient network/DNS errors
+export const query = async (text, params = []) => {
+  const maxAttempts = Number(process.env.PG_QUERY_MAX_ATTEMPTS || 3);
+  const transientCodes = new Set(['ENOTFOUND', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'EAI_AGAIN']);
+  let attempt = 0;
+  let lastErr = null;
+
+  while (++attempt <= maxAttempts) {
+    try {
+      return await _queryWithClient(text, params);
+    } catch (err) {
+      lastErr = err;
+      const code = err && err.code ? String(err.code) : null;
+      // If transient, retry with backoff
+      if (attempt < maxAttempts && code && transientCodes.has(code)) {
+        const backoff = Math.min(2000, 200 * attempt);
+        await new Promise(r => setTimeout(r, backoff));
+        continue;
+      }
+      // Not transient or out of retries: surface error
+      console.error('Database query error:', err);
+      throw err;
+    }
+  }
+  // Shouldn't get here, but throw last error to be safe
+  throw lastErr || new Error('Unknown database error');
 };
 
 export const getPool = () => pool;

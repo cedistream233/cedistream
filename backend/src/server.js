@@ -194,24 +194,20 @@ function scheduleAutoFailPendingPurchases() {
   const pollMs = Math.max(1, pollMinutes) * 60 * 1000;
 
   const runOnce = async () => {
-    try {
-      const res = await query(
-        `UPDATE purchases
+    const res = await query(
+      `UPDATE purchases
          SET payment_status = 'failed', updated_at = NOW()
          WHERE payment_status = 'pending' AND created_at < NOW() - INTERVAL '${windowMinutes} minutes'
          RETURNING id`
-      );
-      if (res.rowCount) {
-        console.log(`🟡 Auto-failed ${res.rowCount} stale pending purchase(s)`);
-      }
-    } catch (e) {
-      console.error('Auto-fail pending purchases job error:', e);
+    );
+    if (res && res.rowCount) {
+      console.log(`🟡 Auto-failed ${res.rowCount} stale pending purchase(s)`);
     }
   };
 
-  // Defer first run slightly to avoid competing with startup/health checks
-  setTimeout(runOnce, Math.max(0, initialDelayMs));
-  setInterval(runOnce, pollMs);
+  // schedule safely via runJobSafely wrapper defined below
+  setTimeout(() => runJobSafely(runOnce, 'Auto-fail pending purchases job', { initial: true }), Math.max(0, initialDelayMs));
+  setInterval(() => runJobSafely(runOnce, 'Auto-fail pending purchases job'), pollMs);
 }
 
 // Start server with graceful fallback if port is in use
@@ -250,46 +246,65 @@ function scheduleExpiredPromotionsCleanup() {
   const pollMs = Math.max(1, pollMinutes) * 60 * 1000;
 
   const runOnce = async () => {
-    try {
-      // Find expired promotions
-      const res = await query(`SELECT id, image FROM promotions WHERE ends_at IS NOT NULL AND ends_at < NOW()`);
-      if (!res || res.rowCount === 0) return;
-      const rows = res.rows;
-      for (const p of rows) {
-        // Attempt to remove image from storage if available
-        try {
-          if (p.image && process.env.SUPABASE_URL) {
-            // derive bucket and path similar to delete handler
-            const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-            const marker = `/storage/v1/object/public/${bucket}/`;
-            let path = null;
-            const idx = p.image.indexOf(marker);
-            if (idx !== -1) path = p.image.slice(idx + marker.length);
-            else {
-              const alt = `/${bucket}/`;
-              const idx2 = p.image.indexOf(alt);
-              if (idx2 !== -1) path = p.image.slice(idx2 + alt.length);
-            }
-            if (path) {
-              // lazy import supabase to avoid startup dependency
-              const { supabase } = await import('./lib/supabase.js');
-              if (supabase) await supabase.storage.from(bucket).remove([path]);
-            }
+    // Find expired promotions
+    const res = await query(`SELECT id, image FROM promotions WHERE ends_at IS NOT NULL AND ends_at < NOW()`);
+    if (!res || res.rowCount === 0) return;
+    const rows = res.rows;
+    for (const p of rows) {
+      // Attempt to remove image from storage if available
+      try {
+        if (p.image && process.env.SUPABASE_URL) {
+          // derive bucket and path similar to delete handler
+          const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+          const marker = `/storage/v1/object/public/${bucket}/`;
+          let path = null;
+          const idx = p.image.indexOf(marker);
+          if (idx !== -1) path = p.image.slice(idx + marker.length);
+          else {
+            const alt = `/${bucket}/`;
+            const idx2 = p.image.indexOf(alt);
+            if (idx2 !== -1) path = p.image.slice(idx2 + alt.length);
           }
-        } catch (e) {
-          console.warn('Failed to remove expired promotion image:', e.message || e);
+          if (path) {
+            // lazy import supabase to avoid startup dependency
+            const { supabase } = await import('./lib/supabase.js');
+            if (supabase) await supabase.storage.from(bucket).remove([path]);
+          }
         }
-        // delete promotion row
-        try { await query('DELETE FROM promotions WHERE id = $1', [p.id]); } catch (e) { console.warn('Failed to delete expired promotion row', e); }
+      } catch (e) {
+        console.warn('Failed to remove expired promotion image:', e.message || e);
       }
-      console.log(`🧹 Cleaned up ${rows.length} expired promotion(s)`);
-    } catch (e) {
-      console.error('Expired promotions cleanup job error:', e);
+      // delete promotion row
+      try { await query('DELETE FROM promotions WHERE id = $1', [p.id]); } catch (e) { console.warn('Failed to delete expired promotion row', e); }
     }
+    console.log(`🧹 Cleaned up ${rows.length} expired promotion(s)`);
   };
 
-  setTimeout(runOnce, Math.max(0, initialDelayMs));
-  setInterval(runOnce, pollMs);
+  setTimeout(() => runJobSafely(runOnce, 'Expired promotions cleanup job', { initial: true }), Math.max(0, initialDelayMs));
+  setInterval(() => runJobSafely(runOnce, 'Expired promotions cleanup job'), pollMs);
+}
+
+// Helper to run jobs safely: checks DB reachability, retries if transient, respects DISABLE_* flags
+async function runJobSafely(fn, name = 'background job', opts = {}) {
+  try {
+    // Global disable switch: if DISABLE_JOBS=1 or specific disable flags set, skip
+    if (process.env.DISABLE_JOBS === '1') {
+      console.log(`⏭️  ${name} skipped because DISABLE_JOBS=1`);
+      return;
+    }
+    // Lightweight reachability check
+    try {
+      await query('SELECT 1');
+    } catch (err) {
+      console.warn(`${name} skipped: DB unreachable (${err.code || err.message})`);
+      return;
+    }
+
+    // Run actual job
+    await fn();
+  } catch (err) {
+    console.error(`${name} error:`, err);
+  }
 }
 
 scheduleExpiredPromotionsCleanup();
