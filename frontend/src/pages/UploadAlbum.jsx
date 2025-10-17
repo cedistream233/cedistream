@@ -249,6 +249,11 @@ function FilePicker({ label, accept, value, onChange }) {
         <Input readOnly value={value?.name || ''} placeholder={`Select ${label.toLowerCase()}`} className="bg-slate-800 border-slate-700 text-white" />
         <input ref={ref} type="file" accept={accept} className="hidden" onChange={(e)=>onChange(e.target.files?.[0]||null)} />
         <Button type="button" onClick={()=>ref.current?.click()} className="bg-purple-600 hover:bg-purple-700"><Upload className="w-4 h-4 mr-1"/>Choose</Button>
+        {value && (
+          <div className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
+            Added
+          </div>
+        )}
       </div>
     </div>
   );

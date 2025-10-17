@@ -146,8 +146,15 @@ export default function UploadVideo() {
               <label className="block text-xs text-gray-400 mb-2">Video</label>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
-                    {video ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                  <div className="flex flex-col items-start">
+                    <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                      {video ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                    </div>
+                    {video && (
+                      <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
+                        Added
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setVideo(e.target.files?.[0]||null)} />
@@ -170,8 +177,15 @@ export default function UploadVideo() {
             <label className="block text-xs text-gray-400 mb-2">Preview (optional)</label>
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
-                  {preview ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                <div className="flex flex-col items-start">
+                  <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                    {preview ? <VideoIcon className="w-8 h-8 text-purple-400" /> : <VideoIcon className="w-8 h-8 text-slate-500" />}
+                  </div>
+                  {preview && (
+                    <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
+                      Added
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1">
                   <input ref={previewRef} type="file" accept="video/*" className="hidden" onChange={(e)=>setPreview(e.target.files?.[0]||null)} />

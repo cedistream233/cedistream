@@ -142,8 +142,15 @@ export default function UploadSong() {
             <div>
               <label className="block text-xs text-gray-400 mb-2">Audio</label>
               <div className="flex items-center gap-3">
-                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
-                  {audio ? <Music className="w-8 h-8 text-purple-400" /> : <Music className="w-8 h-8 text-slate-500" />}
+                <div className="flex flex-col items-start">
+                  <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                    {audio ? <Music className="w-8 h-8 text-purple-400" /> : <Music className="w-8 h-8 text-slate-500" />}
+                  </div>
+                  {audio && (
+                    <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
+                      Added
+                    </div>
+                  )}
                 </div>
                 <input ref={audioRef} type="file" accept="audio/*" className="hidden" onChange={(e)=>setAudio(e.target.files?.[0]||null)} />
                 <Button onClick={()=>audioRef.current?.click()} className="bg-pink-600 hover:bg-pink-700"><Upload className="w-4 h-4 mr-2"/>Select Audio</Button>
@@ -153,8 +160,15 @@ export default function UploadSong() {
           <div>
             <label className="block text-xs text-gray-400 mb-2">Preview (optional)</label>
             <div className="flex items-center gap-3">
-              <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
-                {preview ? <Music className="w-8 h-8 text-purple-400" /> : <Music className="w-8 h-8 text-slate-500" />}
+              <div className="flex flex-col items-start">
+                <div className="w-32 h-20 rounded overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  {preview ? <Music className="w-8 h-8 text-purple-400" /> : <Music className="w-8 h-8 text-slate-500" />}
+                </div>
+                {preview && (
+                  <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
+                    Added
+                  </div>
+                )}
               </div>
               <input ref={previewRef} type="file" accept="audio/*" className="hidden" onChange={(e)=>setPreview(e.target.files?.[0]||null)} />
               <Button onClick={()=>previewRef.current?.click()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800"><Upload className="w-4 h-4 mr-2"/>Select Preview</Button>
