@@ -1,8 +1,20 @@
 async function getPreviewUrl(id) {
-  const res = await fetch(`/api/media/song/${id}/preview`);
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.url || null;
+  const url = `/api/media/song/${encodeURIComponent(id)}/preview`;
+  try {
+    let res = await fetch(url);
+    // If 404, treat as 'no preview' and return null (not an error)
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      // retry once for transient errors
+      try { res = await fetch(url); } catch (e) { /* ignore */ }
+      if (!res || !res.ok) return null;
+    }
+    const data = await res.json();
+    return data?.url || null;
+  } catch (err) {
+    console.warn('getPreviewUrl failed:', err?.message || err);
+    return null;
+  }
 }
 async function getSignedUrl(id, token) {
   const res = await fetch(`/api/media/song/${id}`, {

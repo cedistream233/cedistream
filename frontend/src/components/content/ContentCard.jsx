@@ -46,13 +46,9 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
 
       setLoadingPreview(true);
       try {
-        const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-        if (res.ok) {
-          const d = await res.json();
-          setPreviewUrl(d.url || null);
-        } else {
-          setPreviewUrl(null);
-        }
+        const { Song } = await import('@/entities/Song');
+        const url = await Song.getPreviewUrl(item.id);
+        setPreviewUrl(url || null);
       } catch {
         setPreviewUrl(null);
       } finally { setLoadingPreview(false); }

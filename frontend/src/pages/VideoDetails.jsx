@@ -89,10 +89,12 @@ export default function VideoDetails() {
       if (video.preview_url) {
         setMediaUrl(video.preview_url); setCanAccess(false); return;
       }
-      const prevRes = await fetch(`/api/media/video/${video.id}/preview`);
-      if (prevRes.ok) {
-        const d = await prevRes.json(); setMediaUrl(d.url); setCanAccess(false);
-      } else {
+      try {
+        const { Video: VideoEntity } = await import('@/entities/Video');
+        const prevUrl = await VideoEntity.getPreviewUrl(video.id);
+        if (prevUrl) { setMediaUrl(prevUrl); setCanAccess(false); }
+        else { setMediaUrl(null); setCanAccess(false); }
+      } catch (e) {
         setMediaUrl(null); setCanAccess(false);
       }
     })();

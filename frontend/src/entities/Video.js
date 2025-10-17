@@ -45,6 +45,22 @@ export const Video = {
     if (!res.ok) return null;
     return res.json();
   },
+  async getPreviewUrl(id) {
+    const url = `/api/media/video/${encodeURIComponent(id)}/preview`;
+    try {
+      let res = await fetch(url);
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        try { res = await fetch(url); } catch (e) { /* ignore */ }
+        if (!res || !res.ok) return null;
+      }
+      const data = await res.json();
+      return data?.url || null;
+    } catch (err) {
+      console.warn('getVideoPreviewUrl failed:', err?.message || err);
+      return null;
+    }
+  }
 };
 
 export default VideoSchema;

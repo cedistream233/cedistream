@@ -41,25 +41,13 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
 
       try {
         if (type === 'song') {
-          const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-          if (!aborted) {
-            if (res.ok) {
-              const d = await res.json();
-              setHasPreview(!!d?.url);
-            } else {
-              setHasPreview(false);
-            }
-          }
+          const { Song } = await import('@/entities/Song');
+          const url = await Song.getPreviewUrl(item.id);
+          if (!aborted) setHasPreview(!!url);
         } else if (type === 'video') {
-          const res = await fetch(`/api/media/video/${encodeURIComponent(item.id)}/preview`);
-          if (!aborted) {
-            if (res.ok) {
-              const d = await res.json();
-              setHasPreview(!!d?.url);
-            } else {
-              setHasPreview(false);
-            }
-          }
+          const { Video } = await import('@/entities/Video');
+          const url = await Video.getPreviewUrl(item.id);
+          if (!aborted) setHasPreview(!!url);
         } else {
           setHasPreview(false);
         }
@@ -128,23 +116,15 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
               onClick={async (e) => {
                 e.stopPropagation();
                 try {
-                  // attempt to prefetch preview URL and store for immediate use on details page
+                  // attempt to prefetch preview URL using entity helpers and store for immediate use on details page
                   if (type === 'song') {
-                    const res = await fetch(`/api/media/song/${encodeURIComponent(item.id)}/preview`);
-                    if (res.ok) {
-                      const d = await res.json();
-                      if (d?.url) {
-                        try { sessionStorage.setItem(`preview:${item.id}`, d.url); } catch {}
-                      }
-                    }
+                    const { Song } = await import('@/entities/Song');
+                    const url = await Song.getPreviewUrl(item.id);
+                    if (url) { try { sessionStorage.setItem(`preview:${item.id}`, url); } catch {} }
                   } else if (type === 'video') {
-                    const res = await fetch(`/api/media/video/${encodeURIComponent(item.id)}/preview`);
-                    if (res.ok) {
-                      const d = await res.json();
-                      if (d?.url) {
-                        try { sessionStorage.setItem(`preview:video:${item.id}`, d.url); } catch {}
-                      }
-                    }
+                    const { Video } = await import('@/entities/Video');
+                    const url = await Video.getPreviewUrl(item.id);
+                    if (url) { try { sessionStorage.setItem(`preview:video:${item.id}`, url); } catch {} }
                   }
                 } catch (err) {
                   // ignore

@@ -477,7 +477,10 @@ export default function AlbumDetails() {
                       {(() => {
                         const hasFull = !!trackFullUrls[song.id];
                         const hasPreview = !!trackPreviewUrls[song.id];
-                        if (audioFetching && !hasFull && !hasPreview) return 'Loading...';
+                        // If we're globally fetching audio and the album actually has previews,
+                        // show Loading... while those previews are being fetched. If the album
+                        // has no previews at all, show 'Locked' instead (no preview uploaded).
+                        if (audioFetching && albumHasAnyPreview && !hasFull && !hasPreview) return 'Loading...';
                         if (isOwner) {
                           return (hasFull || hasPreview) ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No audio';
                         }
