@@ -7,6 +7,7 @@ import { Upload, Image as ImageIcon, Music } from 'lucide-react';
 import CropperModal from '@/components/ui/CropperModal';
 import UploadProgressModal from '@/components/ui/UploadProgressModal';
 import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
+import ErrorModal from '@/components/ui/ErrorModal';
 
 export default function UploadSong() {
   const [title, setTitle] = useState('');
@@ -24,6 +25,7 @@ export default function UploadSong() {
   const [eta, setEta] = useState('');
   const [showProgress, setShowProgress] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showError, setShowError] = useState(false);
   const [created, setCreated] = useState(null);
 
   const coverRef = useRef(null);
@@ -82,16 +84,14 @@ export default function UploadSong() {
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setAudio(null); setPreview(null);
     } catch (e) {
       setError(e.message);
+      setShowError(true);
     } finally {
       setBusy(false); setTimeout(()=>setShowProgress(false), 600);
     }
   };
-
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold text-white mb-4">Upload New Song</h1>
-      {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
-      {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
 
       <Card className="bg-slate-900/50 border-purple-900/20 mb-6">
         <CardHeader>
@@ -205,6 +205,18 @@ export default function UploadSong() {
         onConfirm={async (blob)=>{
           const file = new File([blob], 'song-cover.jpg', { type: 'image/jpeg' });
           setCover(file);
+        }}
+      />
+
+      <ErrorModal
+        isOpen={showError}
+        onClose={() => setShowError(false)}
+        title="Upload Failed"
+        error={error}
+        description="There was a problem uploading your song. Please check the error details and try again."
+        actionText="Try Again"
+        onAction={() => {
+          // Just close the modal - user can fix issues and resubmit
         }}
       />
     </div>

@@ -7,6 +7,7 @@ import { Upload, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import CropperModal from '@/components/ui/CropperModal';
 import UploadProgressModal from '@/components/ui/UploadProgressModal';
 import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
+import ErrorModal from '@/components/ui/ErrorModal';
 
 export default function UploadVideo() {
   const [title, setTitle] = useState('');
@@ -24,6 +25,7 @@ export default function UploadVideo() {
   const [eta, setEta] = useState('');
   const [showProgress, setShowProgress] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showError, setShowError] = useState(false);
   const [created, setCreated] = useState(null);
 
   const thumbRef = useRef(null);
@@ -80,6 +82,7 @@ export default function UploadVideo() {
       setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null); setPreview(null);
     } catch (e) {
       setError(e.message);
+      setShowError(true);
     } finally {
       setBusy(false); setTimeout(()=>setShowProgress(false), 600);
     }
@@ -88,8 +91,6 @@ export default function UploadVideo() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold text-white mb-4">Upload New Video</h1>
-      {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
-      {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
 
       <Card className="bg-slate-900/50 border-purple-900/20 mb-6">
         <CardHeader>
@@ -225,6 +226,7 @@ export default function UploadVideo() {
       />
 
   <UploadProgressModal open={showProgress} title="Uploading Video" description="Your video is uploading. This may take a while depending on size and network." percent={progress} info={eta||'Preparing…'} />
+      
       <PublishSuccessModal
         open={showSuccess}
         title="Video Published!"
@@ -235,6 +237,18 @@ export default function UploadVideo() {
         onShare={() => { if (navigator.share && created?.id) navigator.share({ title: created?.title || 'New video', url: `${window.location.origin}/videos?id=${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/videos?id=${created.id}`); }}
         onUploadAnother={() => { setShowSuccess(false); window.location.href = '/upload/video'; }}
         onClose={() => setShowSuccess(false)}
+      />
+
+      <ErrorModal
+        isOpen={showError}
+        onClose={() => setShowError(false)}
+        title="Upload Failed"
+        error={error}
+        description="There was a problem uploading your video. Please check the error details and try again."
+        actionText="Try Again"
+        onAction={() => {
+          // Just close the modal - user can fix issues and resubmit
+        }}
       />
     </div>
   );

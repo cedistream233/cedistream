@@ -7,7 +7,13 @@ import { query } from '../lib/database.js';
 import QueryStream from 'pg-query-stream';
 import { getPool } from '../lib/database.js';
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+// Unlimited file size to support large video uploads (YouTube-length videos ~1 hour+)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: Infinity // No file size limit
+  }
+});
 
 // Helper to upload a file buffer to supabase and return public URL.
 // Implements simple retry/backoff for transient network/gateway errors (502, network connection lost).
@@ -23,7 +29,11 @@ async function uploadToStorage(bucket, path, buffer, contentType) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
-        cacheControl: '3600', upsert: true, contentType
+        cacheControl: '3600', 
+        upsert: true, 
+        contentType,
+        // Remove file size restrictions from Supabase client
+        duplex: 'half'
       });
       if (error) {
         lastErr = error;

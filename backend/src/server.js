@@ -72,8 +72,10 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for upload endpoints to allow large file uploads
+  skip: (req) => req.path.startsWith('/api/uploads/')
 });
-``
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 auth requests per windowMs
@@ -103,7 +105,9 @@ app.use(cors({
 // Use JSON by default; Paystack webhook uses raw body at the route level
 // Raw body required for Paystack signature verification on webhook
 app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);
-app.use(express.json());
+// Increase body size limit to handle large file uploads (unlimited for videos)
+app.use(express.json({ limit: '50mb' })); // For JSON payloads with base64 encoded data
+app.use(express.urlencoded({ limit: '50mb', extended: true })); // For form data
 
 // Shallow health check (no DB) for platform probes like Render/UptimeRobot
 const shallowHealthHandler = (req, res) => {

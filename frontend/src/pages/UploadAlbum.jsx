@@ -7,6 +7,7 @@ import { Plus, Trash2, MoveVertical, Upload, Music, Image as ImageIcon } from 'l
 import CropperModal from '@/components/ui/CropperModal';
 import UploadProgressModal from '@/components/ui/UploadProgressModal';
 import PublishSuccessModal from '@/components/ui/PublishSuccessModal';
+import ErrorModal from '@/components/ui/ErrorModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export default function UploadAlbum() {
@@ -128,8 +129,6 @@ export default function UploadAlbum() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-2xl font-bold text-white mb-4">Upload New Album</h1>
-      {error && <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-600 rounded p-2">{error}</div>}
-      {success && <div className="mb-4 text-sm text-green-300 bg-green-500/10 border border-green-600 rounded p-2">{success}</div>}
 
       <Card className="bg-slate-900/50 border-purple-900/20 mb-6">
         <CardHeader>
@@ -258,17 +257,17 @@ export default function UploadAlbum() {
       />
 
       {/* Error modal shown when upload fails so user sees it regardless of scroll position */}
-      <Dialog open={showErrorModal}>
-        <DialogContent className="bg-slate-900 text-white border border-red-900/30">
-          <DialogHeader>
-            <DialogTitle className="text-red-400">Failed to upload album</DialogTitle>
-            <DialogDescription className="text-gray-300">{error || 'An unexpected error occurred while uploading your album.'}</DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 flex justify-end">
-            <Button onClick={()=>setShowErrorModal(false)} className="bg-purple-600 hover:bg-purple-700">Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title="Upload Failed"
+        error={error}
+        description="There was a problem uploading your album. Please check the error details and try again."
+        actionText="Try Again"
+        onAction={() => {
+          // Just close the modal - user can fix issues and resubmit
+        }}
+      />
     </div>
   );
 }
