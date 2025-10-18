@@ -94,11 +94,17 @@ router.delete('/:id', authenticateToken, requireRole(['admin']), async (req, res
   const imageUrl = r.rows[0].image;
   const storagePath = r.rows[0].storage_path || null;
     // Attempt to remove image from storage if configured
-    if ((storagePath || imageUrl) && supabase) {
+    if ((storagePath || imageUrl)) {
       try {
         const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+        const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
         if (storagePath) {
-          await supabase.storage.from(bucket).remove([storagePath]);
+          if (useBackblaze) {
+            const b2 = createBackblazeClient();
+            await b2.from(bucket).remove([storagePath]);
+          } else {
+            await supabase.storage.from(bucket).remove([storagePath]);
+          }
         } else {
           // Try to derive path from public URL
           let path = null;
@@ -114,7 +120,12 @@ router.delete('/:id', authenticateToken, requireRole(['admin']), async (req, res
             if (idx2 !== -1) path = imageUrl.slice(idx2 + alt.length);
           }
           if (path) {
-            await supabase.storage.from(bucket).remove([path]);
+            if (useBackblaze) {
+              const b2 = createBackblazeClient();
+              await b2.from(bucket).remove([path]);
+            } else {
+              await supabase.storage.from(bucket).remove([path]);
+            }
           }
         }
       } catch (e) {

@@ -4,6 +4,7 @@ import multer from 'multer';
 import { query } from '../lib/database.js';
 import { generateToken, authenticateToken, generateResetToken, verifyResetToken } from '../lib/auth.js';
 import { supabase } from '../lib/supabase.js';
+import { createBackblazeClient } from '../lib/backblaze.js';
 
 const router = express.Router();
 const MAX_PIN_ATTEMPTS = 5; // configurable
@@ -248,9 +249,18 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     const bucket = process.env.SUPABASE_BUCKET || 'profiles';
     let imageUrl = null;
     try {
-      imageUrl = await uploadToStorage(bucket, filePath, req.file.buffer, req.file.mimetype || 'image/jpeg');
+      const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+      if (useBackblaze) {
+        const b2 = createBackblazeClient();
+        const b = b2.from(bucket);
+        const up = await b.upload(filePath, req.file.buffer, { contentType: req.file.mimetype || 'image/jpeg' });
+        if (up.error) throw up.error;
+        imageUrl = (await b.getPublicUrl(filePath)).data.publicUrl;
+      } else {
+        imageUrl = await uploadToStorage(bucket, filePath, req.file.buffer, req.file.mimetype || 'image/jpeg');
+      }
     } catch (err) {
-      console.error('Supabase upload error (profile image):', err);
+      console.error('Storage upload error (profile image):', err);
       return res.status(500).json({ error: 'Failed to upload image' });
     }
 
@@ -293,9 +303,17 @@ router.delete('/profile/image', authenticateToken, async (req, res) => {
         objectPath = bucketIdx >= 0 ? parts.slice(bucketIdx + 1).join('/') : parts.slice(1).join('/');
       }
       if (objectPath) {
-        await supabase.storage
-          .from(bucket)
-          .remove([objectPath]);
+        try {
+          const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+          if (useBackblaze) {
+            const b2 = createBackblazeClient();
+            await b2.from(bucket).remove([objectPath]);
+          } else {
+            await supabase.storage.from(bucket).remove([objectPath]);
+          }
+        } catch (e) {
+          console.warn('Failed to delete previous profile image:', e?.message || e);
+        }
       }
       } catch (e) {
         // Continue even if delete fails

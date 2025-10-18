@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { authenticateToken, requireRole } from '../lib/auth.js';
 import { supabase } from '../lib/supabase.js';
+import { createBackblazeClient } from '../lib/backblaze.js';
 import { query } from '../lib/database.js';
 
 import QueryStream from 'pg-query-stream';
@@ -18,7 +19,12 @@ const upload = multer({
 // Helper to upload a file buffer to supabase and return public URL.
 // Implements simple retry/backoff for transient network/gateway errors (502, network connection lost).
 async function uploadToStorage(bucket, path, buffer, contentType) {
-  if (!supabase) throw new Error('Storage not configured');
+  // Prefer Backblaze if configured
+  const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+  let backblaze = null;
+  if (useBackblaze) backblaze = createBackblazeClient();
+
+  if (!supabase && !backblaze) throw new Error('Storage not configured');
 
   const maxAttempts = Number(process.env.SUPABASE_UPLOAD_ATTEMPTS || 3);
   const baseDelay = Number(process.env.SUPABASE_UPLOAD_BACKOFF_MS || 500);
@@ -28,27 +34,39 @@ async function uploadToStorage(bucket, path, buffer, contentType) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
-        cacheControl: '3600', 
-        upsert: true, 
-        contentType,
-        // Remove file size restrictions from Supabase client
-        duplex: 'half'
-      });
-      if (error) {
-        lastErr = error;
-        // If this was the last attempt, throw the error; otherwise retry
-        if (attempt === maxAttempts) throw error;
-        console.warn(`uploadToStorage attempt ${attempt} failed:`, error?.message || error);
+      let uploadResult;
+      if (backblaze) {
+        const b = backblaze.from(bucket);
+        uploadResult = await b.upload(path, buffer, { contentType });
+        if (uploadResult.error) throw uploadResult.error;
+        // attempt to build public url
+        const { data } = await b.getPublicUrl(path);
+        if (data && data.publicUrl) return data.publicUrl;
+        // fallback to simple returned data
+        if (uploadResult.data && uploadResult.data.fileName) return process.env.BACKBLAZE_PUBLIC_BASE ? `${process.env.BACKBLAZE_PUBLIC_BASE}/${encodeURIComponent(uploadResult.data.fileName)}` : null;
       } else {
-        // try to get public url; sometimes this can also transiently fail
-        const { data, error: pubErr } = await supabase.storage.from(bucket).getPublicUrl(path);
-        if (pubErr) {
-          lastErr = pubErr;
-          if (attempt === maxAttempts) throw pubErr;
-          console.warn(`getPublicUrl attempt ${attempt} failed:`, pubErr?.message || pubErr);
+        const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
+          cacheControl: '3600', 
+          upsert: true, 
+          contentType,
+          // Remove file size restrictions from Supabase client
+          duplex: 'half'
+        });
+        if (error) {
+          lastErr = error;
+          // If this was the last attempt, throw the error; otherwise retry
+          if (attempt === maxAttempts) throw error;
+          console.warn(`uploadToStorage attempt ${attempt} failed:`, error?.message || error);
         } else {
-          return data?.publicUrl;
+          // try to get public url; sometimes this can also transiently fail
+          const { data, error: pubErr } = await supabase.storage.from(bucket).getPublicUrl(path);
+          if (pubErr) {
+            lastErr = pubErr;
+            if (attempt === maxAttempts) throw pubErr;
+            console.warn(`getPublicUrl attempt ${attempt} failed:`, pubErr?.message || pubErr);
+          } else {
+            return data?.publicUrl;
+          }
         }
       }
     } catch (err) {

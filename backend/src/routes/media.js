@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabase } from '../lib/supabase.js';
+import { createBackblazeClient } from '../lib/backblaze.js';
 import { authenticateToken } from '../lib/auth.js';
 import { query } from '../lib/database.js';
 
@@ -95,6 +96,22 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
 
   const { bucket, objectPath } = parseStorageUrl(song.audio_url || '');
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
+  // For Backblaze private buckets we proxy/stream the file. If Backblaze is configured use it.
+  const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+  if (useBackblaze) {
+    try {
+      const b2 = createBackblazeClient();
+      const b = b2.from(bucket);
+      // Return a short-lived URL that points to our streaming endpoint which will handle ranges
+      // The frontend should call /api/media/stream/:bucket/:encodedPath; we will return that URL here.
+      const encodedPath = encodeURIComponent(objectPath);
+      const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+      return res.json({ url: streamUrl });
+    } catch (e) {
+      console.error('Backblaze create signed url error', e);
+      return res.status(500).json({ error: 'Failed to create playback URL' });
+    }
+  }
   // Extend TTL to 60min for long playback sessions (albums, playlists)
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
     if (error) return res.status(500).json({ error: 'Failed to sign URL' });
@@ -142,8 +159,14 @@ router.get('/song/:id/preview', async (req, res) => {
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-      if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+        const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+        if (useBackblaze) {
+          const encodedPath = encodeURIComponent(objectPath);
+          const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+          return res.json({ url: streamUrl });
+        }
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
+        if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
     }
     // fallback: return original URL (works if public bucket)
     return res.json({ url: preview });
@@ -175,8 +198,14 @@ router.get('/video/:id/preview', async (req, res) => {
           if (fullUrl) {
             const { bucket, objectPath } = parseStorageUrl(fullUrl);
             if (bucket && objectPath) {
-              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-              if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+                const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+                if (useBackblaze) {
+                  const encodedPath = encodeURIComponent(objectPath);
+                  const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+                  return res.json({ url: streamUrl });
+                }
+                const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
+                if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
             }
             return res.json({ url: fullUrl });
           }
@@ -248,6 +277,35 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
 });
 
 export default router;
+// Stream endpoint used for Backblaze private buckets. Path components are: /api/media/stream/:bucket/:encodedPath
+router.get('/stream/:bucket/:encodedPath', async (req, res) => {
+  try {
+    const { bucket, encodedPath } = req.params;
+    const objectPath = decodeURIComponent(encodedPath);
+    const range = req.headers.range || null;
+    const b2 = createBackblazeClient();
+    const downloader = b2.from(bucket);
+    const result = await downloader.downloadStream(objectPath, range);
+    if (result.error) return res.status(404).json({ error: 'Not found' });
+    // Set headers forwarded from B2 if present
+    const headers = result.headers || {};
+    if (headers['content-type']) res.setHeader('Content-Type', headers['content-type']);
+    if (headers['content-length']) res.setHeader('Content-Length', headers['content-length']);
+    if (headers['content-range']) res.setHeader('Content-Range', headers['content-range']);
+    if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
+    // stream the body
+    const body = result.data;
+    if (body && typeof body.pipe === 'function') {
+      return body.pipe(res);
+    }
+    // fallback: body as Buffer
+    if (Buffer.isBuffer(body)) return res.end(body);
+    res.status(500).end();
+  } catch (e) {
+    console.error('media stream error', e);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 // Optional: ownership checker (not wired in server.js by default)
 export const checkOwnership = async (req, res) => {
   try {

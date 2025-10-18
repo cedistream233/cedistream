@@ -257,7 +257,7 @@ function scheduleExpiredPromotionsCleanup() {
     for (const p of rows) {
       // Attempt to remove image from storage if available
       try {
-        if (p.image && process.env.SUPABASE_URL) {
+        if (p.image) {
           // derive bucket and path similar to delete handler
           const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
           const marker = `/storage/v1/object/public/${bucket}/`;
@@ -270,9 +270,20 @@ function scheduleExpiredPromotionsCleanup() {
             if (idx2 !== -1) path = p.image.slice(idx2 + alt.length);
           }
           if (path) {
-            // lazy import supabase to avoid startup dependency
-            const { supabase } = await import('./lib/supabase.js');
-            if (supabase) await supabase.storage.from(bucket).remove([path]);
+            try {
+              const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
+              if (useBackblaze) {
+                const { createBackblazeClient } = await import('./lib/backblaze.js');
+                const b2 = createBackblazeClient();
+                await b2.from(bucket).remove([path]);
+              } else {
+                // lazy import supabase to avoid startup dependency
+                const { supabase } = await import('./lib/supabase.js');
+                if (supabase) await supabase.storage.from(bucket).remove([path]);
+              }
+            } catch (e) {
+              console.warn('Failed to remove expired promotion image:', e.message || e);
+            }
           }
         }
       } catch (e) {
