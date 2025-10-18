@@ -155,27 +155,38 @@ export default function AlbumDetails() {
       setAudioFetching(true);
       const previews = {};
       const fulls = {};
-      for (const s of album.songs) {
-        // Seed preview from metadata or fetch preview URL
-        // Important: If preview_url property exists (even if null), skip fetching to avoid 404s
+      
+      // Parallelize all preview and full URL fetches instead of sequential loop
+      const previewPromises = album.songs.map(async (s) => {
         if (Object.prototype.hasOwnProperty.call(s, 'preview_url')) {
-          if (s.preview_url) previews[s.id] = s.preview_url;
-          // else known to be missing; do not fetch
-        } else {
-          try {
-            const p = await Song.getPreviewUrl(s.id);
-            if (p) previews[s.id] = p;
-          } catch {}
+          return { id: s.id, preview: s.preview_url };
         }
+        try {
+          const p = await Song.getPreviewUrl(s.id);
+          return { id: s.id, preview: p };
+        } catch {
+          return { id: s.id, preview: null };
+        }
+      });
 
-        // Always attempt per-song full fetch when logged in; backend authorizes purchase/ownership
-        if (token) {
-          try {
-            const f = await Song.getSignedUrl(s.id, token);
-            if (f) fulls[s.id] = f;
-          } catch {}
+      const fullPromises = token ? album.songs.map(async (s) => {
+        try {
+          const f = await Song.getSignedUrl(s.id, token);
+          return { id: s.id, full: f };
+        } catch {
+          return { id: s.id, full: null };
         }
-      }
+      }) : [];
+
+      // Wait for all fetches in parallel
+      const [previewResults, fullResults] = await Promise.all([
+        Promise.all(previewPromises),
+        Promise.all(fullPromises)
+      ]);
+
+      previewResults.forEach(r => { if (r.preview) previews[r.id] = r.preview; });
+      fullResults.forEach(r => { if (r.full) fulls[r.id] = r.full; });
+
       setTrackPreviewUrls(previews);
       setTrackFullUrls(fulls);
       setAudioFetching(false);

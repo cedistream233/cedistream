@@ -58,17 +58,17 @@ export default function SongDetails() {
       setSong(data);
       // Seed preview URL from metadata immediately so UI buttons render enabled sooner
       if (data?.preview_url) setPreviewUrl(prev => prev || data.preview_url);
-      // fetch sales summary if owner
-      try {
-        const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
-        const ownerId = u?.id || getIdFromToken(localStorage.getItem('token'));
-        if (ownerId && data?.user_id && String(ownerId) === String(data.user_id)) {
-          const token = localStorage.getItem('token');
-          const res = await fetch(`/api/uploads/sales/song/${data.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }});
-          if (res.ok) setSalesSummary(await res.json());
-          else setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 });
-        }
-      } catch (e) { setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 }); }
+      
+      // Parallelize sales fetch for owners (don't block the main load)
+      const u = JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null') || {};
+      const ownerId = u?.id || getIdFromToken(localStorage.getItem('token'));
+      if (ownerId && data?.user_id && String(ownerId) === String(data.user_id)) {
+        const token = localStorage.getItem('token');
+        fetch(`/api/uploads/sales/song/${data.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }})
+          .then(res => res.ok ? res.json() : { count: 0, gross_total: 0, creator_total: 0 })
+          .then(setSalesSummary)
+          .catch(() => setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 }));
+      }
       setLoading(false);
     })();
   }, [id]);

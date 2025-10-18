@@ -60,10 +60,25 @@ export default function VideoDetails() {
 
   const loadVideo = async () => {
     setIsLoading(true);
-    const videos = await Video.list();
-    const foundVideo = videos.find(v => v.id === videoId);
-    setVideo(foundVideo);
-    setIsLoading(false);
+    try {
+      const videos = await Video.list();
+      const foundVideo = videos.find(v => v.id === videoId);
+      setVideo(foundVideo);
+      
+      // Parallelize sales fetch for owners (non-blocking)
+      if (foundVideo) {
+        const ownerId = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
+        if (ownerId && String(ownerId) === String(foundVideo.user_id)) {
+          const token = localStorage.getItem('token');
+          fetch(`/api/uploads/sales/video/${foundVideo.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' }})
+            .then(res => res.ok ? res.json() : { count: 0, gross_total: 0, creator_total: 0 })
+            .then(setSalesSummary)
+            .catch(() => setSalesSummary({ count: 0, gross_total: 0, creator_total: 0 }));
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
