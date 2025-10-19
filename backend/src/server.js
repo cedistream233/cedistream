@@ -18,7 +18,7 @@ let query, closePool;
 let albumsRouter, videosRouter, purchasesRouter, paystackRouter, paystackWebhookHandler;
 let uploadsRouter, mediaRouter, authRouter, creatorsRouter, songsRouter, withdrawalsRouter;
 let leaderboardRouter, supportRouter, listTicketsHandler, adminEarningsRouter;
-let promotionsRouter, promotionsAdminRouter, diagnosticRouter;
+let promotionsRouter, promotionsAdminRouter;
 
 // Top-level await is supported in Node >= 14; load modules now that env is configured
 ({ query, closePool } = await import('./lib/database.js'));
@@ -35,7 +35,6 @@ let promotionsRouter, promotionsAdminRouter, diagnosticRouter;
 ({ default: adminEarningsRouter } = await import('./routes/adminEarnings.js'));
 ({ default: promotionsRouter } = await import('./routes/promotions.js'));
 ({ default: promotionsAdminRouter } = await import('./routes/promotionsAdmin.js'));
-({ default: diagnosticRouter } = await import('./routes/diagnostic.js'));
 ({ default: supportRouter, listTicketsHandler } = await import('./routes/support.js'));
 ({ default: paystackRouter, paystackWebhookHandler } = await import('./routes/paystack.js'));
 
@@ -193,12 +192,9 @@ app.use('/api/media', mediaRouter);
 app.use('/api/support', supportRouter);
 app.get('/api/support-tickets', listTicketsHandler); // alias for admin listing
 app.use('/api/admin', adminEarningsRouter);
-// Promotions public endpoint (read-only)
 app.use('/api/promotions', promotionsRouter);
 // Admin CRUD for promotions mounted under /api/admin/promotions
 app.use('/api/admin/promotions', promotionsAdminRouter);
-// Diagnostic endpoint for debugging
-app.use('/api/diagnostic', diagnosticRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

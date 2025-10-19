@@ -213,7 +213,7 @@ export default function UploadSong() {
         onClose={() => setShowError(false)}
         title="Upload Failed"
         error={error}
-        description="There was a problem uploading your song. Please check the error details and try again."
+        description="Upload failed — check the error details below and try again. If the issue persists, contact support."
         actionText="Try Again"
         onAction={() => {
           // Just close the modal - user can fix issues and resubmit
