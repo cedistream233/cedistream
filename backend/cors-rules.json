@@ -1,0 +1,30 @@
+{
+  "corsRules": [
+    {
+      "corsRuleName": "cedistream-streaming",
+      "allowedOrigins": [
+        "https://cedistream.onrender.com",
+        "http://localhost:5173",
+        "http://localhost:3000"
+      ],
+      "allowedHeaders": [
+        "authorization",
+        "range",
+        "content-type",
+        "accept"
+      ],
+      "allowedOperations": [
+        "s3_get"
+      ],
+      "exposeHeaders": [
+        "x-bz-content-sha1",
+        "x-bz-file-id",
+        "x-bz-file-name",
+        "content-range",
+        "accept-ranges",
+        "content-length"
+      ],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

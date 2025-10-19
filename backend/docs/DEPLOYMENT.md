@@ -7,7 +7,7 @@ This guide provides step-by-step instructions for deploying CediStream to produc
 - **Frontend**: React SPA hosted on Render (Static Site)
 - **Backend**: Node.js API hosted on Render
 - **Database**: Neon PostgreSQL
-- **File Storage**: Supabase
+- **File Storage**: Backblaze B2
 - **Payments**: Paystack
 - **Monitoring**: UptimeRobot
 
@@ -18,11 +18,11 @@ This guide provides step-by-step instructions for deploying CediStream to produc
    - Create a new project and database
    - Note your connection string
 
-2. **Supabase Storage**
-   - Create account at [supabase.com](https://supabase.com)
-   - Create a new project
-   - Set up storage buckets: `profiles`, `albums`, `media`, `videos`
-   - Note your project URL and keys
+2. **Backblaze B2 Storage**
+   - Create account at [backblaze.com](https://www.backblaze.com/sign-up/b2)
+   - Create buckets for your content
+   - Create an Application Key with read/write permissions
+   - Note your Account ID and Application Key
 
 3. **Paystack Account**
    - Create account at [paystack.com](https://paystack.com)
@@ -63,14 +63,17 @@ This guide provides step-by-step instructions for deploying CediStream to produc
    DATABASE_URL=your-neon-postgres-connection-string
    JWT_SECRET=your-generated-jwt-secret
    FRONTEND_URL=https://cedistream.onrender.com
-   SUPABASE_URL=your-supabase-project-url
-   SUPABASE_ANON_KEY=your-supabase-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-   SUPABASE_BUCKET=profiles
-   SUPABASE_BUCKET_ALBUMS=albums
-   SUPABASE_BUCKET_MEDIA=media
-   SUPABASE_BUCKET_VIDEOS=videos
-   SUPABASE_BUCKET_PREVIEWS=media
+   BACKBLAZE_ACCOUNT_ID=your-backblaze-account-id
+   BACKBLAZE_APPLICATION_KEY=your-backblaze-application-key
+   BACKBLAZE_BUCKET_NAME=cedistream-media
+   BACKBLAZE_PUBLIC_BASE=https://s3.eu-central-003.backblazeb2.com
+   BACKBLAZE_BUCKET_MEDIA=cedistream-audio-files
+   BACKBLAZE_BUCKET_VIDEOS=cedistream-video-files
+   BACKBLAZE_BUCKET_PREVIEWS=cedistream-previews
+   BACKBLAZE_BUCKET_THUMBNAILS=cedistream-video-thumbnails
+   BACKBLAZE_BUCKET_PROFILES=cedistream-profiles
+   BACKBLAZE_BUCKET_ALBUMS=cedistream-album-covers
+   BACKBLAZE_BUCKET_PROMOTIONS=cedistream-promotions
    PAYSTACK_SECRET_KEY=your-paystack-secret-key
    PAYSTACK_PUBLIC_KEY=your-paystack-public-key
    ```
@@ -163,7 +166,7 @@ Render free tier spins down after 15 minutes of inactivity. UptimeRobot will pin
 
 - ✅ Frontend assets are minified and chunked
 - ✅ Database queries are optimized with indexes
-- ✅ File uploads go directly to Supabase
+- ✅ File uploads go directly to Backblaze B2
 - ✅ Images are properly sized and compressed
 - ✅ API responses are cached where appropriate
 
@@ -218,9 +221,9 @@ npm run migrate-add-username-pin
    - Ensure backend is deployed and responding
 
 3. **File uploads failing**:
-   - Check Supabase keys and bucket names
-   - Verify bucket policies allow uploads
-   - Check file size limits
+   - Check Backblaze credentials and bucket names
+   - Verify bucket permissions and CORS rules
+   - Check file size limits and application key permissions
 
 4. **Payments not working**:
    - Verify Paystack keys (use test keys for testing)
@@ -241,7 +244,7 @@ Your CediStream application should now be running in production with:
 - ✅ Scalable backend on Render
 - ✅ Fast frontend hosted on Render (Global CDN)
 - ✅ Reliable database with Neon
-- ✅ File storage with Supabase
+- ✅ File storage with Backblaze B2
 - ✅ Payment processing with Paystack
 - ✅ 24/7 monitoring with UptimeRobot
 

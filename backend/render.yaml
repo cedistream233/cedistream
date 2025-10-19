@@ -8,14 +8,17 @@
 # DATABASE_URL=your-neon-postgres-url
 # JWT_SECRET=your-secure-jwt-secret
 # FRONTEND_URL=https://cedistream.onrender.com
-# SUPABASE_URL=your-supabase-url
-# SUPABASE_ANON_KEY=your-supabase-anon-key
-# SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key
-# SUPABASE_BUCKET=profiles
-# SUPABASE_BUCKET_ALBUMS=albums
-# SUPABASE_BUCKET_MEDIA=media
-# SUPABASE_BUCKET_VIDEOS=videos
-# SUPABASE_BUCKET_PREVIEWS=media
+# BACKBLAZE_ACCOUNT_ID=your-backblaze-account-id
+# BACKBLAZE_APPLICATION_KEY=your-backblaze-application-key
+# BACKBLAZE_BUCKET_NAME=cedistream-media
+# BACKBLAZE_PUBLIC_BASE=https://s3.eu-central-003.backblazeb2.com
+# BACKBLAZE_BUCKET_MEDIA=cedistream-audio-files
+# BACKBLAZE_BUCKET_VIDEOS=cedistream-video-files
+# BACKBLAZE_BUCKET_PREVIEWS=cedistream-previews
+# BACKBLAZE_BUCKET_THUMBNAILS=cedistream-video-thumbnails
+# BACKBLAZE_BUCKET_PROFILES=cedistream-profiles
+# BACKBLAZE_BUCKET_ALBUMS=cedistream-album-covers
+# BACKBLAZE_BUCKET_PROMOTIONS=cedistream-promotions
 # PAYSTACK_SECRET_KEY=your-paystack-secret
 # PAYSTACK_PUBLIC_KEY=your-paystack-public
 

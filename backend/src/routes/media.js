@@ -1,5 +1,4 @@
 import express from 'express';
-import { supabase } from '../lib/supabase.js';
 import { createBackblazeClient } from '../lib/backblaze.js';
 import { authenticateToken } from '../lib/auth.js';
 import { query } from '../lib/database.js';
@@ -19,6 +18,26 @@ async function ensurePurchasesEmailColumn() {
     HAS_PURCHASES_USER_EMAIL = false;
   }
   return HAS_PURCHASES_USER_EMAIL;
+}
+
+// Helpers to map logical bucket names to env vars and determine private buckets
+function getBucketNameFor(key) {
+  // key: 'MEDIA', 'VIDEOS', 'ALBUMS', 'PREVIEWS', 'THUMBNAILS', 'PROFILES', 'PROMOTIONS'
+  return (
+    process.env[`BACKBLAZE_BUCKET_${key}`] ||
+    process.env[`SUPABASE_BUCKET_${key}`] ||
+    process.env[`SUPABASE_BUCKET_${key.toLowerCase()}`] ||
+    process.env[`SUPABASE_BUCKET_${key.toLowerCase()}`.toUpperCase()] ||
+    null
+  );
+}
+
+function isPrivateBucket(bucket) {
+  const privateBuckets = new Set([
+    process.env.BACKBLAZE_BUCKET_MEDIA || process.env.SUPABASE_BUCKET_MEDIA,
+    process.env.BACKBLAZE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_VIDEOS
+  ].filter(Boolean));
+  return privateBuckets.has(bucket);
 }
 
 // Helper to parse Supabase storage public URL into { bucket, objectPath }
@@ -53,7 +72,7 @@ function parseStorageUrl(publicUrl) {
 // Get signed URL for full song audio if user owns it or is the creator
 router.get('/song/:id', authenticateToken, async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+    // ensure Backblaze client is available
     const userId = req.user.id;
     const { id } = req.params;
 
@@ -96,26 +115,24 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
 
   const { bucket, objectPath } = parseStorageUrl(song.audio_url || '');
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
-  // For Backblaze private buckets we proxy/stream the file. If Backblaze is configured use it.
-  const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-  if (useBackblaze) {
-    try {
-      const b2 = createBackblazeClient();
-      const b = b2.from(bucket);
-      // Return a short-lived URL that points to our streaming endpoint which will handle ranges
-      // The frontend should call /api/media/stream/:bucket/:encodedPath; we will return that URL here.
-      const encodedPath = encodeURIComponent(objectPath);
+
+  // For private Backblaze buckets, return a streaming proxy URL handled by our server.
+  // For public files, return the public B2 URL.
+  try {
+    const b2 = createBackblazeClient();
+    const encodedPath = encodeURIComponent(objectPath);
+    // If this bucket is private, return our stream endpoint
+    if (isPrivateBucket(bucket)) {
       const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
       return res.json({ url: streamUrl });
-    } catch (e) {
-      console.error('Backblaze create signed url error', e);
-      return res.status(500).json({ error: 'Failed to create playback URL' });
     }
+    // Public bucket: return constructed public URL
+    const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
+    return res.json({ url: pub.publicUrl });
+  } catch (e) {
+    console.error('Backblaze playback url error', e);
+    return res.status(500).json({ error: 'Failed to create playback URL' });
   }
-  // Extend TTL to 60min for long playback sessions (albums, playlists)
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-    if (error) return res.status(500).json({ error: 'Failed to sign URL' });
-    return res.json({ url: data?.signedUrl });
   } catch (e) {
     console.error('media song error', e);
     return res.status(500).json({ error: 'Internal Server Error' });
@@ -146,8 +163,16 @@ router.get('/song/:id/preview', async (req, res) => {
           if (fullUrl) {
             const { bucket, objectPath } = parseStorageUrl(fullUrl);
             if (bucket && objectPath) {
-              const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-              if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+              try {
+                const b2 = createBackblazeClient();
+                if (isPrivateBucket(bucket)) {
+                  const encodedPath = encodeURIComponent(objectPath);
+                  const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+                  return res.json({ url: streamUrl });
+                }
+                const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
+                if (pub?.publicUrl) return res.json({ url: pub.publicUrl });
+              } catch (e) {/* fall through to return original URL */}
             }
             return res.json({ url: fullUrl });
           }
@@ -159,14 +184,16 @@ router.get('/song/:id/preview', async (req, res) => {
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
-        const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-        if (useBackblaze) {
+      try {
+        const b2 = createBackblazeClient();
+        if (isPrivateBucket(bucket)) {
           const encodedPath = encodeURIComponent(objectPath);
           const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
           return res.json({ url: streamUrl });
         }
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-        if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+        const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
+        if (pub?.publicUrl) return res.json({ url: pub.publicUrl });
+      } catch (e) { /* fall back */ }
     }
     // fallback: return original URL (works if public bucket)
     return res.json({ url: preview });
@@ -217,8 +244,16 @@ router.get('/video/:id/preview', async (req, res) => {
     if (!preview) return res.status(404).json({ error: 'No preview available' });
     const { bucket, objectPath } = parseStorageUrl(preview);
     if (bucket && objectPath) {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-      if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+      try {
+        const b2 = createBackblazeClient();
+        if (isPrivateBucket(bucket)) {
+          const encodedPath = encodeURIComponent(objectPath);
+          const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+          return res.json({ url: streamUrl });
+        }
+        const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
+        if (pub?.publicUrl) return res.json({ url: pub.publicUrl });
+      } catch (e) { /* fall back */ }
     }
     return res.json({ url: preview });
   } catch (e) {
@@ -267,38 +302,201 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
 
   const { bucket, objectPath } = parseStorageUrl(video.video_url || '');
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-    if (error) return res.status(500).json({ error: 'Failed to sign URL' });
-    return res.json({ url: data?.signedUrl });
+  try {
+    const b2 = createBackblazeClient();
+    if (isPrivateBucket(bucket)) {
+      const encodedPath = encodeURIComponent(objectPath);
+      const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+      return res.json({ url: streamUrl });
+    }
+    const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
+    return res.json({ url: pub.publicUrl });
+  } catch (e) {
+    console.error('Backblaze create signed url error', e);
+    return res.status(500).json({ error: 'Failed to create playback URL' });
+  }
   } catch (e) {
     console.error('media video error', e);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
+// Helper to verify ownership or purchase for streamed content
+async function verifyStreamAccess(userId, userEmail, objectPath) {
+  // Parse objectPath to determine content type and ID
+  // Format expectations:
+  // - albums/<userId>/<albumId>/songs/<filename> -> album or song
+  // - songs/<userId>/<filename> -> song
+  // - videos/<userId>/<filename> -> video
+  // - songs/<userId>/previews/<filename> -> preview (public)
+  // - videos/<userId>/<filename>-preview.<ext> -> preview (public)
+  // - profiles/<userId>/<filename> -> profile (owner only)
+  
+  const parts = objectPath.split('/');
+  
+  // Profile images - only owner can access
+  if (parts[0] === 'profiles') {
+    const ownerId = parts[1];
+    return String(userId) === String(ownerId);
+  }
+  
+  // Previews are public - allow access
+  if (objectPath.includes('/previews/') || objectPath.includes('-preview.')) {
+    return true;
+  }
+  
+  // For albums/songs/videos - need to check ownership or purchase
+  if (parts[0] === 'albums') {
+    const creatorId = parts[1];
+    const albumId = parts[2];
+    // Owner check
+    if (String(userId) === String(creatorId)) return true;
+    // Purchase check - need to find the song or album
+    const hasEmail = await ensurePurchasesEmailColumn();
+    const params = [userId];
+    let sql = `SELECT 1 FROM purchases WHERE (user_id = $1`;
+    if (hasEmail && userEmail) {
+      params.push(userEmail);
+      sql += ` OR user_email = $2`;
+    }
+    sql += `) AND (payment_status = 'completed' OR payment_status = 'success')`;
+    // Check if purchased album or any song in the path
+    if (albumId) {
+      params.push(albumId);
+      sql += ` AND (item_type = 'album' AND item_id = $${params.length})`;
+    }
+    sql += ` LIMIT 1`;
+    const pRes = await query(sql, params);
+    return pRes.rows.length > 0;
+  }
+  
+  if (parts[0] === 'songs') {
+    const creatorId = parts[1];
+    // Owner check
+    if (String(userId) === String(creatorId)) return true;
+    // Need to look up song by audio_url pattern to find song ID
+    const urlPattern = `%${objectPath}%`;
+    const songRes = await query('SELECT id, user_id FROM songs WHERE audio_url LIKE $1 LIMIT 1', [urlPattern]);
+    if (!songRes.rows.length) return false;
+    const song = songRes.rows[0];
+    if (String(userId) === String(song.user_id)) return true;
+    // Check purchase
+    const hasEmail = await ensurePurchasesEmailColumn();
+    const params = [userId, song.id];
+    let sql = `SELECT 1 FROM purchases WHERE (user_id = $1`;
+    if (hasEmail && userEmail) {
+      params.push(userEmail);
+      sql += ` OR user_email = $3`;
+    }
+    sql += `) AND (payment_status = 'completed' OR payment_status = 'success')
+           AND ((item_type = 'song' AND item_id = $2) OR (item_type = 'album' AND item_id IN (SELECT album_id FROM songs WHERE id = $2)))
+           LIMIT 1`;
+    const pRes = await query(sql, params);
+    return pRes.rows.length > 0;
+  }
+  
+  if (parts[0] === 'videos') {
+    const creatorId = parts[1];
+    // Owner check
+    if (String(userId) === String(creatorId)) return true;
+    // Look up video
+    const urlPattern = `%${objectPath}%`;
+    const videoRes = await query('SELECT id, user_id FROM videos WHERE video_url LIKE $1 LIMIT 1', [urlPattern]);
+    if (!videoRes.rows.length) return false;
+    const video = videoRes.rows[0];
+    if (String(userId) === String(video.user_id)) return true;
+    // Check purchase
+    const hasEmail = await ensurePurchasesEmailColumn();
+    const params = [userId, video.id];
+    let sql = `SELECT 1 FROM purchases WHERE (user_id = $1`;
+    if (hasEmail && userEmail) {
+      params.push(userEmail);
+      sql += ` OR user_email = $3`;
+    }
+    sql += `) AND (payment_status = 'completed' OR payment_status = 'success')
+           AND item_type = 'video' AND item_id = $2 LIMIT 1`;
+    const pRes = await query(sql, params);
+    return pRes.rows.length > 0;
+  }
+  
+  // Default: deny access
+  return false;
+}
+
 export default router;
+
 // Stream endpoint used for Backblaze private buckets. Path components are: /api/media/stream/:bucket/:encodedPath
+// Requires authentication unless content is public (previews)
 router.get('/stream/:bucket/:encodedPath', async (req, res) => {
   try {
     const { bucket, encodedPath } = req.params;
     const objectPath = decodeURIComponent(encodedPath);
+    
+    // Check if this is preview content (public) or requires auth
+    const isPreview = objectPath.includes('/previews/') || objectPath.includes('-preview.');
+    
+    if (!isPreview) {
+      // Require authentication for non-preview content
+      const auth = req.headers['authorization'];
+      if (!auth || !auth.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      try {
+        const token = auth.split(' ')[1];
+        const { verifyToken } = await import('../lib/auth.js');
+        const decoded = verifyToken(token);
+        const userId = decoded?.id;
+        
+        if (!userId) {
+          return res.status(401).json({ error: 'Invalid token' });
+        }
+        
+        // Load user email for legacy purchase checks
+        let userEmail = null;
+        try {
+          const ur = await query('SELECT email FROM users WHERE id = $1', [userId]);
+          userEmail = ur.rows?.[0]?.email || null;
+        } catch {}
+        
+        // Verify access (ownership or purchase)
+        const hasAccess = await verifyStreamAccess(userId, userEmail, objectPath);
+        if (!hasAccess) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } catch (authError) {
+        console.error('Stream auth error:', authError);
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    }
+    
+    // Stream the content
     const range = req.headers.range || null;
     const b2 = createBackblazeClient();
     const downloader = b2.from(bucket);
     const result = await downloader.downloadStream(objectPath, range);
-    if (result.error) return res.status(404).json({ error: 'Not found' });
+    
+    if (result.error) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    
     // Set headers forwarded from B2 if present
     const headers = result.headers || {};
     if (headers['content-type']) res.setHeader('Content-Type', headers['content-type']);
     if (headers['content-length']) res.setHeader('Content-Length', headers['content-length']);
     if (headers['content-range']) res.setHeader('Content-Range', headers['content-range']);
     if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
-    // stream the body
+    
+    // Enable CORS for streaming endpoint
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    // Stream the body
     const body = result.data;
     if (body && typeof body.pipe === 'function') {
       return body.pipe(res);
     }
-    // fallback: body as Buffer
+    // Fallback: body as Buffer
     if (Buffer.isBuffer(body)) return res.end(body);
     res.status(500).end();
   } catch (e) {

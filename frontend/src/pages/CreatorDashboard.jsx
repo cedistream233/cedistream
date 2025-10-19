@@ -791,6 +791,8 @@ export default function CreatorDashboard() {
           <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-md">
             <DialogHeader className="text-center">
               <DialogTitle className="text-xl font-semibold">Withdraw Funds</DialogTitle>
+              {/* Provide an accessible description to satisfy Radix a11y checks */}
+              <DialogDescription className="sr-only">Enter withdrawal amount and mobile money details, then submit.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3 mt-2">

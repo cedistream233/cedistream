@@ -3,35 +3,68 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { query, closePool } from './lib/database.js'; // Initialize database connection and provide close helper
-import albumsRouter from './routes/albums.js';
-import videosRouter from './routes/videos.js';
-import purchasesRouter from './routes/purchases.js';
-import paystackRouter, { paystackWebhookHandler } from './routes/paystack.js';
-import uploadsRouter from './routes/uploads.js';
-import mediaRouter from './routes/media.js';
-import authRouter from './routes/auth.js';
-import creatorsRouter from './routes/creators.js';
-import songsRouter from './routes/songs.js';
-import withdrawalsRouter from './routes/withdrawals.js';
-import leaderboardRouter from './routes/leaderboard.js';
-import supportRouter, { listTicketsHandler } from './routes/support.js';
-import adminEarningsRouter from './routes/adminEarnings.js';
-import promotionsRouter from './routes/promotions.js';
-import promotionsAdminRouter from './routes/promotionsAdmin.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+// Load env from backend/.env reliably, regardless of working directory, and override any pre-set vars
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, '..', '.env');
+dotenv.config({ path: envPath, override: true });
+
+// Dynamic imports for modules that may read environment variables at import-time.
+// We import them after dotenv.config to ensure env is loaded before any module-level reads.
+let query, closePool;
+let albumsRouter, videosRouter, purchasesRouter, paystackRouter, paystackWebhookHandler;
+let uploadsRouter, mediaRouter, authRouter, creatorsRouter, songsRouter, withdrawalsRouter;
+let leaderboardRouter, supportRouter, listTicketsHandler, adminEarningsRouter;
+let promotionsRouter, promotionsAdminRouter, diagnosticRouter;
+
+// Top-level await is supported in Node >= 14; load modules now that env is configured
+({ query, closePool } = await import('./lib/database.js'));
+({ default: albumsRouter } = await import('./routes/albums.js'));
+({ default: videosRouter } = await import('./routes/videos.js'));
+({ default: purchasesRouter } = await import('./routes/purchases.js'));
+({ default: uploadsRouter } = await import('./routes/uploads.js'));
+({ default: mediaRouter } = await import('./routes/media.js'));
+({ default: authRouter } = await import('./routes/auth.js'));
+({ default: creatorsRouter } = await import('./routes/creators.js'));
+({ default: songsRouter } = await import('./routes/songs.js'));
+({ default: withdrawalsRouter } = await import('./routes/withdrawals.js'));
+({ default: leaderboardRouter } = await import('./routes/leaderboard.js'));
+({ default: adminEarningsRouter } = await import('./routes/adminEarnings.js'));
+({ default: promotionsRouter } = await import('./routes/promotions.js'));
+({ default: promotionsAdminRouter } = await import('./routes/promotionsAdmin.js'));
+({ default: diagnosticRouter } = await import('./routes/diagnostic.js'));
+({ default: supportRouter, listTicketsHandler } = await import('./routes/support.js'));
+({ default: paystackRouter, paystackWebhookHandler } = await import('./routes/paystack.js'));
+
+// Only print masked Backblaze info when debugging to avoid noise in production
+const B2_DEBUG = String(process.env.BACKBLAZE_DEBUG || '').toLowerCase() === 'true';
+const mask = (s) => (s && s.length >= 8) ? `${s.slice(0,4)}...${s.slice(-4)} (len:${s.length})` : (s ? `(len:${s.length})` : 'missing');
+if (B2_DEBUG) {
+  console.info('Backblaze keyId (masked):', mask(process.env.BACKBLAZE_ACCOUNT_ID));
+  console.info('Backblaze appKey length:', process.env.BACKBLAZE_APPLICATION_KEY ? process.env.BACKBLAZE_APPLICATION_KEY.length : 0);
+}
 
 // Validate critical environment variables for production
 if (process.env.NODE_ENV === 'production') {
   const requiredEnvVars = [
     'DATABASE_URL',
     'JWT_SECRET',
-    'SUPABASE_URL',
-    'SUPABASE_ANON_KEY',
-    'SUPABASE_SERVICE_ROLE_KEY',
     'PAYSTACK_SECRET_KEY'
   ];
+  
+  // Storage: require Backblaze B2 for storage in production
+  // BACKBLAZE_BUCKET_NAME is optional; the app prefers per-feature bucket env vars
+  const hasBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY;
+
+  if (!hasBackblaze) {
+    console.error('❌ CRITICAL: No storage configured. Set Backblaze environment variables: BACKBLAZE_ACCOUNT_ID, BACKBLAZE_APPLICATION_KEY');
+    process.exit(1);
+  }
+
+  console.info('✅ Using Backblaze B2 for storage');
   
   const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
   if (missing.length > 0) {
@@ -164,6 +197,8 @@ app.use('/api/admin', adminEarningsRouter);
 app.use('/api/promotions', promotionsRouter);
 // Admin CRUD for promotions mounted under /api/admin/promotions
 app.use('/api/admin/promotions', promotionsAdminRouter);
+// Diagnostic endpoint for debugging
+app.use('/api/diagnostic', diagnosticRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -259,7 +294,7 @@ function scheduleExpiredPromotionsCleanup() {
       try {
         if (p.image) {
           // derive bucket and path similar to delete handler
-          const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
+          const bucket = process.env.BACKBLAZE_BUCKET_PROMOTIONS || 'cedistream-promotions';
           const marker = `/storage/v1/object/public/${bucket}/`;
           let path = null;
           const idx = p.image.indexOf(marker);
@@ -271,16 +306,9 @@ function scheduleExpiredPromotionsCleanup() {
           }
           if (path) {
             try {
-              const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-              if (useBackblaze) {
-                const { createBackblazeClient } = await import('./lib/backblaze.js');
-                const b2 = createBackblazeClient();
-                await b2.from(bucket).remove([path]);
-              } else {
-                // lazy import supabase to avoid startup dependency
-                const { supabase } = await import('./lib/supabase.js');
-                if (supabase) await supabase.storage.from(bucket).remove([path]);
-              }
+              const { createBackblazeClient } = await import('./lib/backblaze.js');
+              const b2 = createBackblazeClient();
+              await b2.from(bucket).remove([path]);
             } catch (e) {
               console.warn('Failed to remove expired promotion image:', e.message || e);
             }

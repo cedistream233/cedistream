@@ -2,7 +2,6 @@ import { Router } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { supabase } from '../lib/supabase.js';
 import { query } from '../lib/database.js';
 
 dotenv.config();

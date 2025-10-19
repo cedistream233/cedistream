@@ -42,7 +42,7 @@ Thumbs.db
 # Vite
 **/.vite/
 
-# Supabase/Secrets (if any local dumps)
+# Database dumps and secrets
 *.dump
 
 # Generated lockfiles (keep one if you prefer)

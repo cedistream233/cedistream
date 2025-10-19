@@ -35,15 +35,12 @@ services:
       JWT_SECRET:
         type: secret
         secretName: JWT_SECRET
-      SUPABASE_URL:
+      BACKBLAZE_ACCOUNT_ID:
         type: secret
-        secretName: SUPABASE_URL
-      SUPABASE_ANON_KEY:
+        secretName: BACKBLAZE_ACCOUNT_ID
+      BACKBLAZE_APPLICATION_KEY:
         type: secret
-        secretName: SUPABASE_ANON_KEY
-      SUPABASE_SERVICE_ROLE_KEY:
-        type: secret
-        secretName: SUPABASE_SERVICE_ROLE_KEY
+        secretName: BACKBLAZE_APPLICATION_KEY
       PAYSTACK_SECRET_KEY:
         type: secret
         secretName: PAYSTACK_SECRET_KEY

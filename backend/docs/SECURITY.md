@@ -56,7 +56,7 @@
 ## 🚀 Deployment Steps
 
 1. **Database Setup**: Run migrations on Neon PostgreSQL
-2. **Supabase Setup**: Create storage buckets
+2. **Backblaze B2 Setup**: Create storage buckets and configure CORS
 3. **Backend Deploy**: Deploy to Render with environment variables
 4. **Frontend Deploy**: Deploy to Render Static Site with backend URL
 5. **Monitoring Setup**: Configure UptimeRobot for keep-alive

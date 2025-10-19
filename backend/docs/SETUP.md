@@ -4,7 +4,7 @@
 
 Your app now uses a **hybrid approach**:
 - **Neon PostgreSQL** for data storage (albums, videos, purchases)
-- **Supabase** for file storage only (images, audio files, video files)
+- **Backblaze B2** for file storage only (images, audio files, video files)
 
 ## Step 1: Neon Database Setup
 
@@ -72,26 +72,34 @@ Your app now uses a **hybrid approach**:
    - Copy and paste the contents of `database/seed.sql`
    - Execute the script
 
-## Step 2: Supabase Storage Setup (Optional)
+## Step 2: Backblaze B2 Storage Setup
 
-If you want to enable file uploads for album covers, audio files, and videos:
+For file uploads (album covers, audio files, and videos):
 
-1. **Get your Supabase project credentials**:
-   - Project URL: `https://your-project-ref.supabase.co`
-   - Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
-   - Service role key (for admin operations)
+1. **Get your Backblaze B2 credentials**:
+   - Account ID and Application Key from https://secure.backblaze.com/b2_buckets.htm
+   - Create an Application Key with read/write permissions
 
 2. **Add to your `.env` file**:
    ```
-   SUPABASE_URL=https://your-project-ref.supabase.co
-   SUPABASE_ANON_KEY=your-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   BACKBLAZE_ACCOUNT_ID=your-account-id
+   BACKBLAZE_APPLICATION_KEY=your-application-key
+   BACKBLAZE_BUCKET_NAME=cedistream-media
+   BACKBLAZE_PUBLIC_BASE=https://s3.eu-central-003.backblazeb2.com
+   BACKBLAZE_BUCKET_MEDIA=cedistream-audio-files
+   BACKBLAZE_BUCKET_VIDEOS=cedistream-video-files
+   BACKBLAZE_BUCKET_PREVIEWS=cedistream-previews
+   BACKBLAZE_BUCKET_THUMBNAILS=cedistream-video-thumbnails
+   BACKBLAZE_BUCKET_PROFILES=cedistream-profiles
+   BACKBLAZE_BUCKET_ALBUMS=cedistream-album-covers
+   BACKBLAZE_BUCKET_PROMOTIONS=cedistream-promotions
    ```
 
-3. **Create storage buckets** in Supabase:
-   - Go to Storage in your Supabase dashboard
-   - Create buckets: `album-covers`, `audio-files`, `video-files`
-   - Set appropriate policies for public read access
+3. **Create storage buckets** in Backblaze:
+   - Go to Buckets in your Backblaze B2 dashboard
+   - Create the buckets listed above
+   - Set public or private access as needed
+   - Apply CORS rules for streaming (see `backend/cors-rules.json`)
 
 ## Step 3: Paystack Integration (Optional)
 
@@ -146,7 +154,7 @@ For payment processing:
 ## Next Steps
 
 1. **Customize the sample data** in `database/seed.sql` with your own content
-2. **Set up file upload flows** to Supabase storage
-3. **Configure authentication** (Neon Auth or custom JWT)
+2. **Test file upload flows** to Backblaze B2 storage
+3. **Configure authentication** (custom JWT-based auth)
 4. **Add Paystack payment processing**
-5. **Deploy to production** (Vercel + Neon + Supabase)
+5. **Deploy to production** (Render.com + Neon + Backblaze B2)

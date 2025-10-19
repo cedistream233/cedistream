@@ -1,7 +1,6 @@
 import express from 'express';
 import multer from 'multer';
 import { authenticateToken, requireRole } from '../lib/auth.js';
-import { supabase } from '../lib/supabase.js';
 import { createBackblazeClient } from '../lib/backblaze.js';
 import { query } from '../lib/database.js';
 
@@ -19,12 +18,8 @@ const upload = multer({
 // Helper to upload a file buffer to supabase and return public URL.
 // Implements simple retry/backoff for transient network/gateway errors (502, network connection lost).
 async function uploadToStorage(bucket, path, buffer, contentType) {
-  // Prefer Backblaze if configured
-  const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-  let backblaze = null;
-  if (useBackblaze) backblaze = createBackblazeClient();
-
-  if (!supabase && !backblaze) throw new Error('Storage not configured');
+  // Use Backblaze client (required)
+  const backblaze = createBackblazeClient();
 
   const maxAttempts = Number(process.env.SUPABASE_UPLOAD_ATTEMPTS || 3);
   const baseDelay = Number(process.env.SUPABASE_UPLOAD_BACKOFF_MS || 500);
@@ -39,35 +34,11 @@ async function uploadToStorage(bucket, path, buffer, contentType) {
         const b = backblaze.from(bucket);
         uploadResult = await b.upload(path, buffer, { contentType });
         if (uploadResult.error) throw uploadResult.error;
-        // attempt to build public url
-        const { data } = await b.getPublicUrl(path);
-        if (data && data.publicUrl) return data.publicUrl;
-        // fallback to simple returned data
-        if (uploadResult.data && uploadResult.data.fileName) return process.env.BACKBLAZE_PUBLIC_BASE ? `${process.env.BACKBLAZE_PUBLIC_BASE}/${encodeURIComponent(uploadResult.data.fileName)}` : null;
-      } else {
-        const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
-          cacheControl: '3600', 
-          upsert: true, 
-          contentType,
-          // Remove file size restrictions from Supabase client
-          duplex: 'half'
-        });
-        if (error) {
-          lastErr = error;
-          // If this was the last attempt, throw the error; otherwise retry
-          if (attempt === maxAttempts) throw error;
-          console.warn(`uploadToStorage attempt ${attempt} failed:`, error?.message || error);
-        } else {
-          // try to get public url; sometimes this can also transiently fail
-          const { data, error: pubErr } = await supabase.storage.from(bucket).getPublicUrl(path);
-          if (pubErr) {
-            lastErr = pubErr;
-            if (attempt === maxAttempts) throw pubErr;
-            console.warn(`getPublicUrl attempt ${attempt} failed:`, pubErr?.message || pubErr);
-          } else {
-            return data?.publicUrl;
-          }
-        }
+  // attempt to build public url (Backblaze Friendly URL)
+  const { data } = await b.getPublicUrl(path);
+  if (data && data.publicUrl) return data.publicUrl;
+  // If for some reason getPublicUrl failed to return a URL, throw to trigger retry logic
+  throw new Error('Failed to build public URL after upload');
       }
     } catch (err) {
       // Catch unexpected exceptions (network / fetch wrapper errors)
@@ -180,7 +151,8 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
   { name: 'preview', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+  // ensure Backblaze storage is configured
+  const b2 = createBackblazeClient();
     const userId = req.user.id;
   const { title, description = null, price, category = null, release_date = null } = req.body;
     if (!title || !price) return res.status(400).json({ error: 'title and price are required' });
@@ -324,7 +296,8 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
 // Upload a single image for promotions (admin only)
 router.post('/promotions-image', authenticateToken, requireRole(['admin']), upload.single('image'), async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+  // ensure Backblaze storage is configured
+  const b2 = createBackblazeClient();
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'image file is required' });
     // server-side processing using sharp. Accept optional transform params from multipart form field 'transform'

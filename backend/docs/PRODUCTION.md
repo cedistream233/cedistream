@@ -4,7 +4,7 @@ This document outlines the minimal steps and recommendations to prepare and run 
 
 ## 1) Environment
 - Create a `.env` file in `backend/` following `.env.example`.
-  - Set `DATABASE_URL`, `APP_URL`, `PORT`, `JWT_SECRET`, `SUPABASE_*` keys as needed.
+  - Set `DATABASE_URL`, `APP_URL`, `PORT`, `JWT_SECRET`, `BACKBLAZE_*` keys as needed.
 - Secure secrets using your environment provider (vault, K8s secrets, systemd env, etc.)
 
 ## 2) Database

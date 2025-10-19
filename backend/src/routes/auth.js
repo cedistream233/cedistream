@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import { query } from '../lib/database.js';
 import { generateToken, authenticateToken, generateResetToken, verifyResetToken } from '../lib/auth.js';
-import { supabase } from '../lib/supabase.js';
 import { createBackblazeClient } from '../lib/backblaze.js';
 
 const router = express.Router();
@@ -238,7 +237,7 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 // Upload/Change profile image
 router.post('/profile/image', authenticateToken, upload.single('image'), async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+  const b2 = createBackblazeClient();
     const userId = req.user.id;
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
@@ -246,23 +245,18 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
     const filePath = `profiles/${userId}/${Date.now()}.${ext}`;
 
-    const bucket = process.env.SUPABASE_BUCKET || 'profiles';
+  // Use Backblaze per-feature bucket env var (profiles)
+  const bucket = process.env.BACKBLAZE_BUCKET_PROFILES || process.env.BACKBLAZE_BUCKET_NAME || 'cedistream-profiles';
     let imageUrl = null;
-    try {
-      const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-      if (useBackblaze) {
-        const b2 = createBackblazeClient();
+      try {
         const b = b2.from(bucket);
         const up = await b.upload(filePath, req.file.buffer, { contentType: req.file.mimetype || 'image/jpeg' });
         if (up.error) throw up.error;
         imageUrl = (await b.getPublicUrl(filePath)).data.publicUrl;
-      } else {
-        imageUrl = await uploadToStorage(bucket, filePath, req.file.buffer, req.file.mimetype || 'image/jpeg');
+      } catch (err) {
+        console.error('Storage upload error (profile image):', err);
+        return res.status(500).json({ error: 'Failed to upload image' });
       }
-    } catch (err) {
-      console.error('Storage upload error (profile image):', err);
-      return res.status(500).json({ error: 'Failed to upload image' });
-    }
 
     // Update user profile_image
     const result = await query(
@@ -281,40 +275,32 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
 // Remove profile image
 router.delete('/profile/image', authenticateToken, async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+    const b2 = createBackblazeClient();
     const userId = req.user.id;
     // Load current image to attempt deletion
     const result = await query('SELECT profile_image FROM users WHERE id = $1', [userId]);
     const current = result.rows[0]?.profile_image;
     if (current) {
-    try {
-      const url = new URL(current);
-      // Supabase public URL contains the path after "/object/public/<bucket>/"
-      const parts = url.pathname.split('/');
-      const idx = parts.findIndex(p => p === 'object');
-      const bucket = process.env.SUPABASE_BUCKET || 'profiles';
-      let objectPath = null;
-      if (idx >= 0) {
-        // format: /object/public/<bucket>/<path>
-        objectPath = parts.slice(idx + 3).join('/');
-      } else {
-        // fallback: attempt to remove leading slash and bucket name
-        const bucketIdx = parts.findIndex(p => p === bucket);
-        objectPath = bucketIdx >= 0 ? parts.slice(bucketIdx + 1).join('/') : parts.slice(1).join('/');
-      }
-      if (objectPath) {
-        try {
-          const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-          if (useBackblaze) {
-            const b2 = createBackblazeClient();
-            await b2.from(bucket).remove([objectPath]);
-          } else {
-            await supabase.storage.from(bucket).remove([objectPath]);
-          }
-        } catch (e) {
-          console.warn('Failed to delete previous profile image:', e?.message || e);
+      try {
+        const url = new URL(current);
+        const parts = url.pathname.split('/');
+        const idx = parts.findIndex(p => p === 'object');
+        // Use Backblaze profiles bucket
+        const bucket = process.env.BACKBLAZE_BUCKET_PROFILES || process.env.BACKBLAZE_BUCKET_NAME || 'cedistream-profiles';
+        let objectPath = null;
+        if (idx >= 0) {
+          objectPath = parts.slice(idx + 3).join('/');
+        } else {
+          const bucketIdx = parts.findIndex(p => p === bucket || p === bucket.replace('cedistream-', ''));
+          objectPath = bucketIdx >= 0 ? parts.slice(bucketIdx + 1).join('/') : parts.slice(1).join('/');
         }
-      }
+        if (objectPath) {
+          try {
+            await b2.from(bucket).remove([objectPath]);
+          } catch (e) {
+            console.warn('Failed to delete previous profile image:', e?.message || e);
+          }
+        }
       } catch (e) {
         // Continue even if delete fails
         console.warn('Failed to parse/delete old profile image:', e?.message || e);

@@ -4,12 +4,20 @@ import {
   Dialog,
   DialogContent,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 export default function ImageViewerModal({ isOpen, onClose, imageUrl }) {
   return (
     <Dialog open={!!isOpen} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="sm:max-w-2xl bg-white text-slate-900 border border-slate-200">
+        {/* Accessible title/description for screen readers (hidden visually) */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>Image preview</DialogTitle>
+          <DialogDescription>View a larger version of the selected image.</DialogDescription>
+        </DialogHeader>
         <div className="flex items-center justify-center">
           {imageUrl ? (
             <img

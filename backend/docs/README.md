@@ -7,8 +7,11 @@ A modern music streaming and monetization platform built with React and Node.js.
 ### Prerequisites
 - Node.js 18+ and npm 9+
 - PostgreSQL database (Neon recommended)
-- Supabase account for file storage
+- **Backblaze B2** account for file storage
 - Paystack account for payments
+
+> 💡 **Storage**: Using Backblaze B2 for production provides 70-85% cost savings vs alternatives.  
+> See [BACKBLAZE.md](./BACKBLAZE.md) and [BACKBLAZE_BUCKET_SETUP.md](./BACKBLAZE_BUCKET_SETUP.md) for setup instructions.
 
 ### Development Setup
 
@@ -69,7 +72,7 @@ cedistream/
 - **Music Streaming**: Upload and stream songs, albums, and videos
 - **Creator Monetization**: Pay-what-you-want pricing model
 - **User Authentication**: Secure login with JWT and PIN recovery
-- **File Storage**: Supabase integration for media files
+- **File Storage**: Backblaze B2 integration for media files
 - **Payment Processing**: Paystack integration for transactions
 - **Admin Dashboard**: Content management and analytics
 - **Responsive Design**: Works on all devices
@@ -82,7 +85,7 @@ For detailed production deployment instructions, see [DEPLOYMENT.md](./DEPLOYMEN
 - Frontend: Deploy to Render (Static Site)
 - Backend: Deploy to Render
 - Database: Neon PostgreSQL
-- Storage: Supabase
+- Storage: Backblaze B2
 - Monitoring: UptimeRobot
 
 ## 🛠️ Tech Stack
@@ -98,9 +101,11 @@ For detailed production deployment instructions, see [DEPLOYMENT.md](./DEPLOYMEN
 - Node.js with Express
 - PostgreSQL with native pg driver
 - JWT authentication
-- Supabase for file storage
+- **Backblaze B2** for file storage
 - Paystack for payments
 - Helmet & rate limiting for security
+- Large file uploads with multipart support
+- Streaming with HTTP Range requests
 
 ## 📝 Available Scripts
 
@@ -127,9 +132,16 @@ npm run seed           # Seed database with sample data
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=your-secure-secret
-SUPABASE_URL=https://...
-SUPABASE_ANON_KEY=...
+
+# Backblaze B2 Storage (Recommended)
+BACKBLAZE_ACCOUNT_ID=your_key_id
+BACKBLAZE_APPLICATION_KEY=your_app_key
+BACKBLAZE_BUCKET_NAME=cedistream-media
+BACKBLAZE_PUBLIC_BASE=https://f001.backblazeb2.com/file/cedistream-media
+
+# Payments
 PAYSTACK_SECRET_KEY=...
+
 # See backend/.env.example for complete list
 ```
 
