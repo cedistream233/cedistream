@@ -258,6 +258,15 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
         return res.status(500).json({ error: 'Failed to upload image' });
       }
 
+    // Read previous profile_image_path before updating so we can delete the old object after
+    let prevPath = null;
+    try {
+      const prevRes = await query('SELECT profile_image_path FROM users WHERE id = $1', [userId]);
+      prevPath = prevRes.rows[0]?.profile_image_path || null;
+    } catch (e) {
+      console.warn('Failed to read previous profile_image_path before update:', e?.message || e);
+    }
+
     // Update user profile_image and store the deterministic object path
     const result = await query(
       `UPDATE users SET profile_image = $1, profile_image_path = $2, updated_at = NOW() WHERE id = $3
@@ -265,19 +274,13 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
       [imageUrl, filePath, userId]
     );
 
-    // Try to delete the previous image (if any) using stored profile_image_path
-    try {
-      const prevRes = await query('SELECT profile_image_path FROM users WHERE id = $1', [userId]);
-      const prevPath = prevRes.rows[0]?.profile_image_path;
-      if (prevPath && prevPath !== filePath) {
-        try {
-          await b2.from(bucket).remove([prevPath]);
-        } catch (e) {
-          console.warn('Failed to delete previous profile image after upload (by path):', e?.message || e);
-        }
+    // Delete the old object if it exists and is different from the new one
+    if (prevPath && prevPath !== filePath) {
+      try {
+        await b2.from(bucket).remove([prevPath]);
+      } catch (e) {
+        console.warn('Failed to delete previous profile image after upload (by path):', e?.message || e);
       }
-    } catch (e) {
-      console.warn('Error while attempting to cleanup previous profile image (by path):', e?.message || e);
     }
 
     return res.json({ ok: true, user: result.rows[0] });
