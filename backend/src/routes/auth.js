@@ -258,12 +258,27 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
         return res.status(500).json({ error: 'Failed to upload image' });
       }
 
-    // Update user profile_image
+    // Update user profile_image and store the deterministic object path
     const result = await query(
-      `UPDATE users SET profile_image = $1, updated_at = NOW() WHERE id = $2
-       RETURNING id, email, username, first_name, last_name, role, profile_image`,
-      [imageUrl, userId]
+      `UPDATE users SET profile_image = $1, profile_image_path = $2, updated_at = NOW() WHERE id = $3
+       RETURNING id, email, username, first_name, last_name, role, profile_image, profile_image_path`,
+      [imageUrl, filePath, userId]
     );
+
+    // Try to delete the previous image (if any) using stored profile_image_path
+    try {
+      const prevRes = await query('SELECT profile_image_path FROM users WHERE id = $1', [userId]);
+      const prevPath = prevRes.rows[0]?.profile_image_path;
+      if (prevPath && prevPath !== filePath) {
+        try {
+          await b2.from(bucket).remove([prevPath]);
+        } catch (e) {
+          console.warn('Failed to delete previous profile image after upload (by path):', e?.message || e);
+        }
+      }
+    } catch (e) {
+      console.warn('Error while attempting to cleanup previous profile image (by path):', e?.message || e);
+    }
 
     return res.json({ ok: true, user: result.rows[0] });
   } catch (error) {
@@ -277,38 +292,19 @@ router.delete('/profile/image', authenticateToken, async (req, res) => {
   try {
     const b2 = createBackblazeClient();
     const userId = req.user.id;
-    // Load current image to attempt deletion
-    const result = await query('SELECT profile_image FROM users WHERE id = $1', [userId]);
-    const current = result.rows[0]?.profile_image;
-    if (current) {
+    // Load current stored object path to attempt deletion
+    const result = await query('SELECT profile_image_path FROM users WHERE id = $1', [userId]);
+    const currentPath = result.rows[0]?.profile_image_path;
+    if (currentPath) {
       try {
-        const url = new URL(current);
-        const parts = url.pathname.split('/');
-        const idx = parts.findIndex(p => p === 'object');
-        // Use Backblaze profiles bucket
-        const bucket = process.env.BACKBLAZE_BUCKET_PROFILES || process.env.BACKBLAZE_BUCKET_NAME || 'cedistream-profiles';
-        let objectPath = null;
-        if (idx >= 0) {
-          objectPath = parts.slice(idx + 3).join('/');
-        } else {
-          const bucketIdx = parts.findIndex(p => p === bucket || p === bucket.replace('cedistream-', ''));
-          objectPath = bucketIdx >= 0 ? parts.slice(bucketIdx + 1).join('/') : parts.slice(1).join('/');
-        }
-        if (objectPath) {
-          try {
-            await b2.from(bucket).remove([objectPath]);
-          } catch (e) {
-            console.warn('Failed to delete previous profile image:', e?.message || e);
-          }
-        }
+        await b2.from(process.env.BACKBLAZE_BUCKET_PROFILES || process.env.BACKBLAZE_BUCKET_NAME || 'cedistream-profiles').remove([currentPath]);
       } catch (e) {
-        // Continue even if delete fails
-        console.warn('Failed to parse/delete old profile image:', e?.message || e);
+        console.warn('Failed to delete previous profile image (by path):', e?.message || e);
       }
     }
 
     const updated = await query(
-      `UPDATE users SET profile_image = NULL, updated_at = NOW() WHERE id = $1
+      `UPDATE users SET profile_image = NULL, profile_image_path = NULL, updated_at = NOW() WHERE id = $1
        RETURNING id, email, username, first_name, last_name, role, profile_image`,
       [userId]
     );
