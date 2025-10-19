@@ -3,26 +3,15 @@ import { Readable } from 'stream';
 import crypto from 'crypto';
 
 // Simple Backblaze B2 client wrapper exposing minimal API used by the app.
-// Expects env vars: BACKBLAZE_ACCOUNT_ID, BACKBLAZE_APPLICATION_KEY
+// Supports logical bucket names (e.g. 'media') mapped to per-feature env vars
+// or a single global physical bucket with logical prefixing.
 
 const accountId = (process.env.BACKBLAZE_ACCOUNT_ID || '').trim();
-// Remove surrounding quotes if present (dotenv may preserve them)
 const rawAppKey = process.env.BACKBLAZE_APPLICATION_KEY || '';
-const appKey = rawAppKey.trim().replace(/^["']|["']$/g, '');
+const appKey = rawAppKey.trim().replace(/^['"]|['"]$/g, '');
 const bucketName = (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME || '').trim();
 
-// Debug helper: only print verbose Backblaze info when BACKBLAZE_DEBUG=true
 const B2_DEBUG = String(process.env.BACKBLAZE_DEBUG || '').toLowerCase() === 'true';
-const mask = (s) => s && s.length > 8 ? `${s.slice(0, 4)}...${s.slice(-4)} (len:${s.length})` : (s ? `(len:${s.length})` : 'MISSING');
-if (B2_DEBUG) {
-  console.debug('[Backblaze] Loading credentials:', {
-    accountId: mask(accountId),
-    appKey: mask(appKey),
-    bucketNameLegacy: bucketName || '(not-set)'
-  });
-}
-
-// List which per-feature buckets are configured (helps avoid confusion)
 const featureBuckets = {
   MEDIA: process.env.BACKBLAZE_BUCKET_MEDIA || null,
   VIDEOS: process.env.BACKBLAZE_BUCKET_VIDEOS || null,
@@ -32,8 +21,12 @@ const featureBuckets = {
   THUMBNAILS: process.env.BACKBLAZE_BUCKET_THUMBNAILS || null,
   PROMOTIONS: process.env.BACKBLAZE_BUCKET_PROMOTIONS || null,
 };
+
 if (B2_DEBUG) {
-  console.debug('[Backblaze] Per-feature buckets:', Object.entries(featureBuckets).filter(([,v])=>v).map(([k,v])=>`${k}=${v}`).join(', ') || '(none configured)');
+  console.debug('[Backblaze] Bucket mapping configuration:');
+  Object.entries(featureBuckets).forEach(([logical, physical]) => {
+    if (physical) console.debug(`  ${logical} -> ${physical}`);
+  });
 }
 
 function toBuffer(streamOrBuffer) {
@@ -41,12 +34,11 @@ function toBuffer(streamOrBuffer) {
   if (streamOrBuffer instanceof Readable) {
     const chunks = [];
     return new Promise((resolve, reject) => {
-      streamOrBuffer.on('data', (c) => chunks.push(c));
+      streamOrBuffer.on('data', c => chunks.push(c));
       streamOrBuffer.on('end', () => resolve(Buffer.concat(chunks)));
       streamOrBuffer.on('error', reject);
     });
   }
-  // assume string
   return Promise.resolve(Buffer.from(String(streamOrBuffer)));
 }
 
@@ -54,210 +46,220 @@ export function createBackblazeClient() {
   if (!accountId || !appKey) {
     throw new Error('Backblaze env vars missing (BACKBLAZE_ACCOUNT_ID, BACKBLAZE_APPLICATION_KEY)');
   }
-  // bucketName is now optional since we use per-feature bucket env vars
 
-  // Use explicit applicationKeyId (Backblaze recommends this for application keys)
   const b2 = new B2({ applicationKeyId: accountId, applicationKey: appKey });
-  // Will be set after authorize; used to build correct public URLs (e.g., https://f003.backblazeb2.com)
-  let downloadBase = null; // e.g., https://f003.backblazeb2.com
+  let downloadBase = null;
 
   async function ensureAuth() {
-    // Avoid concurrent authorize() calls racing — serialize via authInProgress promise
-    if (!b2.authorized) {
-      if (ensureAuth._inProgress) {
-        // another authorize() is running; wait for it
-        await ensureAuth._inProgress;
-        if (b2.authorized) return;
-      }
-
-      // Create a single in-progress promise so concurrent callers await the same work
-      ensureAuth._inProgress = (async () => {
-        try {
-          // Log masked Authorization header for debugging (do not print full key)
-          try {
-            if (B2_DEBUG) {
-              const basic = Buffer.from(`${accountId}:${appKey}`).toString('base64');
-              const maskSmall = (s) => s ? `${s.slice(0,6)}...${s.slice(-6)}` : '(missing)';
-              console.debug('[Backblaze] Authorization header (masked):', maskSmall(basic));
-            }
-          } catch (e) {
-            // ignore masking errors
-          }
-
-          // Try authorize, retry once after a short backoff if we receive 401
-          try {
-            const res = await b2.authorize();
-            downloadBase = res?.data?.downloadUrl || null;
-          } catch (err) {
-            const status = err?.response?.status;
-            const data = err?.response?.data;
-            console.warn('Backblaze authorize attempt failed, will retry once', { status, data });
-            // small backoff
-            await new Promise(r => setTimeout(r, 250));
-            const res2 = await b2.authorize();
-            downloadBase = res2?.data?.downloadUrl || null;
-          }
-        } catch (err) {
-          const status = err?.response?.status;
-          const data = err?.response?.data;
-          const headers = err?.response?.headers;
-          console.error('Backblaze authorization failed', { status, data, headers, message: err?.message });
-          throw new Error(`Backblaze authorization failed${status ? ` (status ${status})` : ''} - check BACKBLAZE_ACCOUNT_ID and BACKBLAZE_APPLICATION_KEY`);
-        } finally {
-          ensureAuth._inProgress = null;
-        }
-      })();
-
+    if (b2.authorized) return;
+    if (ensureAuth._inProgress) {
       await ensureAuth._inProgress;
+      return;
     }
+
+    ensureAuth._inProgress = (async () => {
+      try {
+        if (B2_DEBUG) {
+          try {
+            const basic = Buffer.from(`${accountId}:${appKey}`).toString('base64');
+            console.debug('[Backblaze] authorize (masked):', basic.slice(0, 8) + '...');
+          } catch (e) {}
+        }
+        try {
+          const res = await b2.authorize();
+          downloadBase = res?.data?.downloadUrl || null;
+        } catch (err) {
+          // retry once after small backoff
+          await new Promise(r => setTimeout(r, 250));
+          const retryRes = await b2.authorize();
+          downloadBase = retryRes?.data?.downloadUrl || null;
+        }
+      } catch (err) {
+        const status = err?.response?.status;
+        console.error('Backblaze authorization failed', { status, message: err?.message });
+        throw new Error(`Backblaze authorization failed${status ? ` (status ${status})` : ''}`);
+      } finally {
+        ensureAuth._inProgress = null;
+      }
+    })();
+
+    await ensureAuth._inProgress;
   }
 
-  // Cache bucket id lookup
   const bucketIdCache = new Map();
   async function getBucketId(name) {
     if (bucketIdCache.has(name)) return bucketIdCache.get(name);
     await ensureAuth();
     const { data } = await b2.listBuckets({ accountId });
-    const found = data.buckets.find(b => b.bucketName === name);
+    const found = (data && data.buckets) ? data.buckets.find(b => b.bucketName === name) : null;
     if (!found) throw new Error(`Backblaze bucket not found: ${name}`);
     bucketIdCache.set(name, found.bucketId);
     return found.bucketId;
   }
 
-  // Returns an object with .upload(path, buffer|stream, opts) and .getPublicUrl(path)
+  // Factory for logical bucket
   return {
-    from: (bucket) => ({
-      // Upload accepts a Buffer or Readable stream. For buffers > LARGE_UPLOAD_THRESHOLD
-      // it will use B2 large file APIs (multipart) to avoid size limits.
-      upload: async (path, streamOrBuffer, opts = {}) => {
-        await ensureAuth();
-        const contentType = opts.contentType || 'application/octet-stream';
-        const data = await toBuffer(streamOrBuffer);
-        const LARGE_UPLOAD_THRESHOLD = Number(process.env.BACKBLAZE_LARGE_UPLOAD_THRESHOLD_BYTES || 50 * 1024 * 1024); // 50MB
-
-        if (data.length <= LARGE_UPLOAD_THRESHOLD) {
-          // simple upload
-          const { data: uploadUrlData } = await b2.getUploadUrl({ bucketId: await getBucketId(bucket) });
-          const resp = await b2.uploadFile({
-            uploadUrl: uploadUrlData.uploadUrl,
-            uploadAuthToken: uploadUrlData.authorizationToken,
-            filename: path,
-            data,
-            contentType
-          });
-          return { error: null, data: resp.data };
+    from: (logicalBucket) => {
+      // Resolve logical bucket name (e.g., 'media', 'previews') to physical B2 bucket
+      const resolved = (() => {
+        // Try uppercase mapping first (MEDIA -> BACKBLAZE_BUCKET_MEDIA)
+        const key = String(logicalBucket || '').toUpperCase();
+        const perFeature = featureBuckets[key] || null;
+        
+        if (perFeature) {
+          if (B2_DEBUG) console.debug(`[Backblaze] Resolved '${logicalBucket}' -> '${perFeature}'`);
+          return { physicalBucket: perFeature, prefixWithLogical: false };
         }
-
-        // Large file flow: startLargeFile, uploadPart(s), finishLargeFile
-        const bucketId = await getBucketId(bucket);
-        const start = await b2.startLargeFile({ bucketId, fileName: path, contentType });
-        const fileId = start.data.fileId;
-
-        const partSize = Number(process.env.BACKBLAZE_PART_SIZE || 10 * 1024 * 1024); // 10MB default
-        const parts = [];
-        const sha1List = [];
-        const totalParts = Math.ceil(data.length / partSize);
-        for (let i = 0; i < totalParts; i++) {
-          const offset = i * partSize;
-          const chunk = data.slice(offset, offset + partSize);
-          const { data: uploadPartUrl } = await b2.getUploadPartUrl({ fileId });
-          const partResp = await b2.uploadPart({
-            uploadUrl: uploadPartUrl.uploadUrl,
-            uploadAuthToken: uploadPartUrl.authorizationToken,
-            partNumber: i + 1,
-            data: chunk
-          });
-          // record sha1 for finishLargeFile
-          const sha1 = crypto.createHash('sha1').update(chunk).digest('hex');
-          sha1List.push(sha1);
+        
+        // If using a single global bucket, prefix with logical name
+        if (bucketName) {
+          if (B2_DEBUG) console.debug(`[Backblaze] Using global bucket '${bucketName}' with prefix '${logicalBucket}'`);
+          return { physicalBucket: bucketName, prefixWithLogical: logicalBucket && logicalBucket !== bucketName };
         }
+        
+        // Fallback: treat the provided name as the physical bucket
+        if (B2_DEBUG) console.warn(`[Backblaze] No mapping for '${logicalBucket}', using as-is`);
+        return { physicalBucket: logicalBucket, prefixWithLogical: false };
+      })();
 
-        await b2.finishLargeFile({ fileId, partSha1Array: sha1List });
-        return { error: null, data: { fileId, fileName: path } };
-      },
-      getPublicUrl: async (path) => {
-        // Build using the correct download cluster from authorize():
-        //   <downloadBase>/file/<bucket>/<object>
-        await ensureAuth();
-        const encodePath = (p) => String(p).split('/')
-          .map(seg => encodeURIComponent(seg))
-          .join('/');
+      const { physicalBucket, prefixWithLogical } = resolved;
 
-        // Prefer SDK-derived downloadBase; allow override via BACKBLAZE_PUBLIC_BASE if explicitly set.
-        // If BACKBLAZE_PUBLIC_BASE is used, it should be the base WITHOUT bucket, typically like:
-        //   https://f003.backblazeb2.com/file
-        // We'll append /<bucket>/<path>.
-        const envBase = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim();
-        const baseRoot = envBase && envBase.startsWith('http')
-          ? envBase.replace(/\/?$/, '') // trim trailing slash
-          : (downloadBase ? `${downloadBase}/file` : null);
-
-        if (!baseRoot) {
-          // fallback if authorize didn't set base for some reason
-          return { data: { publicUrl: `https://f003.backblazeb2.com/file/${bucket}/${encodePath(path)}` }, error: null };
-        }
-
-        const publicUrl = `${baseRoot.replace(/\/$/, '')}/${bucket}/${encodePath(path)}`;
-        return { data: { publicUrl }, error: null };
-      },
-      createSignedUrl: async (path, seconds) => {
-        // For public buckets, this is identical to the Friendly URL.
-        await ensureAuth();
-        const encodePath = (p) => String(p).split('/').map(seg => encodeURIComponent(seg)).join('/');
-        const envBase = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim();
-        const baseRoot = envBase && envBase.startsWith('http')
-          ? envBase.replace(/\/?$/, '')
-          : (downloadBase ? `${downloadBase}/file` : null);
-        if (!baseRoot) {
-          return { data: { signedUrl: `https://f003.backblazeb2.com/file/${bucket}/${encodePath(path)}` }, error: null };
-        }
-        const signedUrl = `${baseRoot.replace(/\/$/, '')}/${bucket}/${encodePath(path)}`;
-        return { data: { signedUrl }, error: null };
-      },
-      // Download/stream helper: supports optional HTTP Range header (e.g., 'bytes=0-')
-      downloadStream: async (path, rangeHeader) => {
-        await ensureAuth();
-        const list = await b2.listFileNames({ bucketId: await getBucketId(bucket), prefix: path, maxFileCount: 1 });
-        if (!list.data.files || list.data.files.length === 0) {
-          return { error: 'not_found' };
-        }
-        const file = list.data.files[0];
-        const fileId = file.fileId;
-        // Pass range if provided. The SDK supports a `range` option on downloadFileById in many versions.
-        try {
-          const opts = { fileId };
-          if (rangeHeader) opts.range = rangeHeader;
-          const resp = await b2.downloadFileById(opts);
-          // resp.data is a stream in node environment; resp.headers contains content-length/type
-          return { data: resp.data, headers: resp.headers || {}, info: file };
-        } catch (e) {
-          // Some SDK versions return the body in resp.data as Buffer
-          try {
-            const fallback = await b2.downloadFileById({ fileId });
-            return { data: fallback.data, headers: fallback.headers || {}, info: file };
-          } catch (err) {
-            return { error: err };
-          }
-        }
-      },
-      remove: async (paths) => {
-        await ensureAuth();
-        // Need fileId to delete; list file(s) to get fileId then delete
-        const results = [];
-        for (const p of paths) {
-          const list = await b2.listFileNames({ bucketId: await getBucketId(bucket), prefix: p, maxFileCount: 1 });
-          if (list.data.files && list.data.files.length > 0) {
-            const file = list.data.files[0];
-            await b2.deleteFileVersion({ fileName: file.fileName, fileId: file.fileId });
-            results.push({ success: true, file });
-          } else {
-            results.push({ success: false, error: 'not_found', path: p });
-          }
-        }
-        return { error: null, data: results };
+      function buildObjectPath(path) {
+        if (prefixWithLogical && logicalBucket) return `${logicalBucket}/${path}`;
+        return path;
       }
-    })
-  };
 
-  
+      return {
+        // Upload small files or large multipart when above threshold
+        upload: async (path, streamOrBuffer, opts = {}) => {
+          await ensureAuth();
+          const data = await toBuffer(streamOrBuffer);
+          const contentType = opts.contentType || 'application/octet-stream';
+          const LARGE_UPLOAD_THRESHOLD = Number(process.env.BACKBLAZE_LARGE_UPLOAD_THRESHOLD_BYTES || 50 * 1024 * 1024);
+
+          const objectPath = buildObjectPath(path);
+
+          if (data.length <= LARGE_UPLOAD_THRESHOLD) {
+            const { data: uploadUrlData } = await b2.getUploadUrl({ bucketId: await getBucketId(physicalBucket) });
+            const resp = await b2.uploadFile({
+              uploadUrl: uploadUrlData.uploadUrl,
+              uploadAuthToken: uploadUrlData.authorizationToken,
+              filename: objectPath,
+              data,
+              contentType,
+            });
+            return { error: null, data: resp.data };
+          }
+
+          // Large file
+          const bucketId = await getBucketId(physicalBucket);
+          const start = await b2.startLargeFile({ bucketId, fileName: objectPath, contentType });
+          const fileId = start.data.fileId;
+          const partSize = Number(process.env.BACKBLAZE_PART_SIZE || 10 * 1024 * 1024);
+          const sha1List = [];
+          const totalParts = Math.ceil(data.length / partSize);
+          for (let i = 0; i < totalParts; i++) {
+            const offset = i * partSize;
+            const chunk = data.slice(offset, offset + partSize);
+            const { data: uploadPartUrl } = await b2.getUploadPartUrl({ fileId });
+            await b2.uploadPart({
+              uploadUrl: uploadPartUrl.uploadUrl,
+              uploadAuthToken: uploadPartUrl.authorizationToken,
+              partNumber: i + 1,
+              data: chunk,
+            });
+            sha1List.push(crypto.createHash('sha1').update(chunk).digest('hex'));
+          }
+          await b2.finishLargeFile({ fileId, partSha1Array: sha1List });
+          return { error: null, data: { fileId, fileName: objectPath } };
+        },
+
+        getPublicUrl: async (path) => {
+          await ensureAuth();
+          const encodePath = p => String(p).split('/').map(seg => encodeURIComponent(seg)).join('/');
+          const objectPath = buildObjectPath(path);
+          const envBase = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim();
+          const baseRoot = envBase && envBase.startsWith('http') ? envBase.replace(/\/?$/, '') : (downloadBase ? `${downloadBase}/file` : null);
+          if (!baseRoot) return { error: null, data: { publicUrl: `https://f003.backblazeb2.com/file/${physicalBucket}/${encodePath(objectPath)}` } };
+          const publicUrl = `${baseRoot}/${physicalBucket}/${encodePath(objectPath)}`;
+          return { error: null, data: { publicUrl } };
+        },
+
+        createSignedUrl: async (path, seconds = 60) => {
+          // Try to create a short-lived download authorization token for the exact file.
+          // If the SDK/account doesn't support it or it fails, fall back to returning
+          // the public-style download URL (which will not work for private buckets).
+          await ensureAuth();
+          const encodePath = p => String(p).split('/').map(seg => encodeURIComponent(seg)).join('/');
+          const objectPath = buildObjectPath(path);
+          try {
+            // Use bucketId + prefix to create a download authorization token scoped to this file
+            const bucketId = await getBucketId(physicalBucket);
+            if (typeof b2.getDownloadAuthorization === 'function') {
+              // fileNamePrefix should allow exact file; some SDKs accept fileNamePrefix
+              const authRes = await b2.getDownloadAuthorization({ bucketId, fileNamePrefix: objectPath, validDurationInSeconds: Math.max(60, Number(seconds || 60)) });
+              const token = authRes?.data?.authorizationToken || authRes?.data?.authorization || null;
+              // build URL: downloadBase/file/<bucket>/<encodedPath>?Authorization=<token>
+              const baseRoot = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim() || (downloadBase ? `${downloadBase}/file` : null);
+              const publicRoot = baseRoot || `https://f003.backblazeb2.com/file`;
+              if (token && baseRoot) {
+                const signedUrl = `${publicRoot}/${physicalBucket}/${encodePath(objectPath)}?Authorization=${encodeURIComponent(token)}`;
+                return { error: null, data: { signedUrl } };
+              }
+            }
+          } catch (err) {
+            if (B2_DEBUG) console.warn('[Backblaze] getDownloadAuthorization failed', err?.message || err);
+            // fall through to public url fallback below
+          }
+
+          // Fallback: return the public-style URL (may not work for private buckets)
+          const envBase = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim();
+          const baseRoot = envBase && envBase.startsWith('http') ? envBase.replace(/\/?$/, '') : (downloadBase ? `${downloadBase}/file` : null);
+          if (!baseRoot) return { error: null, data: { signedUrl: `https://f003.backblazeb2.com/file/${physicalBucket}/${encodePath(objectPath)}` } };
+          const signedUrl = `${baseRoot}/${physicalBucket}/${encodePath(objectPath)}`;
+          return { error: null, data: { signedUrl } };
+        },
+
+        downloadStream: async (path, rangeHeader) => {
+          await ensureAuth();
+          const objectPrefix = buildObjectPath(path);
+          const list = await b2.listFileNames({ bucketId: await getBucketId(physicalBucket), prefix: objectPrefix, maxFileCount: 1 });
+          if (!list.data.files || list.data.files.length === 0) return { error: 'not_found' };
+          const file = list.data.files[0];
+          const fileId = file.fileId;
+          try {
+            const opts = { fileId };
+            if (rangeHeader) opts.range = rangeHeader;
+            const resp = await b2.downloadFileById(opts);
+            return { error: null, data: resp.data, headers: resp.headers || {}, info: file };
+          } catch (err) {
+            try {
+              const fallback = await b2.downloadFileById({ fileId });
+              return { error: null, data: fallback.data, headers: fallback.headers || {}, info: file };
+            } catch (e) {
+              return { error: e };
+            }
+          }
+        },
+
+        remove: async (paths) => {
+          await ensureAuth();
+          const results = [];
+          for (const p of paths) {
+            const objectPath = buildObjectPath(p);
+            const list = await b2.listFileNames({ bucketId: await getBucketId(physicalBucket), prefix: objectPath, maxFileCount: 1 });
+            if (list.data.files && list.data.files.length > 0) {
+              const file = list.data.files[0];
+              await b2.deleteFileVersion({ fileName: file.fileName, fileId: file.fileId });
+              results.push({ success: true, file });
+            } else {
+              results.push({ success: false, error: 'not_found', path: p });
+            }
+          }
+          return { error: null, data: results };
+        },
+      };
+    }
+  };
 }
+

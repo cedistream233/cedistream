@@ -33,11 +33,33 @@ function getBucketNameFor(key) {
 }
 
 function isPrivateBucket(bucket) {
-  const privateBuckets = new Set([
-    process.env.BACKBLAZE_BUCKET_MEDIA || process.env.SUPABASE_BUCKET_MEDIA,
-    process.env.BACKBLAZE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_VIDEOS
-  ].filter(Boolean));
-  return privateBuckets.has(bucket);
+  // Consider both per-feature env vars and any configured physical Backblaze bucket name.
+  // This supports setups where logical buckets (e.g. 'media') are namespaced inside
+  // a single physical B2 bucket (BACKBLAZE_BUCKET_NAME) or where features map to
+  // separate physical buckets via BACKBLAZE_BUCKET_MEDIA, BACKBLAZE_BUCKET_VIDEOS, etc.
+  const candidates = new Set();
+  // per-feature Backblaze names
+  if (process.env.BACKBLAZE_BUCKET_MEDIA) candidates.add(process.env.BACKBLAZE_BUCKET_MEDIA);
+  if (process.env.BACKBLAZE_BUCKET_VIDEOS) candidates.add(process.env.BACKBLAZE_BUCKET_VIDEOS);
+  // per-feature Supabase names (legacy)
+  if (process.env.SUPABASE_BUCKET_MEDIA) candidates.add(process.env.SUPABASE_BUCKET_MEDIA);
+  if (process.env.SUPABASE_BUCKET_VIDEOS) candidates.add(process.env.SUPABASE_BUCKET_VIDEOS);
+  // global physical Backblaze bucket name (single-bucket deployments)
+  if (process.env.BACKBLAZE_BUCKET_NAME) candidates.add(process.env.BACKBLAZE_BUCKET_NAME);
+  if (process.env.B2_BUCKET_NAME) candidates.add(process.env.B2_BUCKET_NAME);
+  // Also consider common logical default names
+  candidates.add('media');
+  candidates.add('videos');
+  return candidates.has(bucket);
+}
+
+function getAppBaseUrl(req) {
+  // Prefer explicit APP_URL, otherwise infer from request
+  const envUrl = (process.env.APP_URL || '').trim();
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http');
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`;
 }
 
 // Helper to parse Supabase storage public URL into { bucket, objectPath }
@@ -54,17 +76,36 @@ function parseStorageUrl(publicUrl) {
       const objectPath = parts.slice(objIdx + 3).join('/');
       if (maybeBucket && objectPath) return { bucket: maybeBucket, objectPath };
     }
-    // fallback: find any known bucket segment and use the remainder
+
+    // Backblaze public/download URLs often use /file/<bucket>/<path>
+    const fileIdx = parts.findIndex(p => p === 'file');
+    if (fileIdx >= 0) {
+      const maybeBucket = parts[fileIdx + 1];
+      const objectPath = parts.slice(fileIdx + 2).join('/');
+      if (maybeBucket && objectPath) return { bucket: maybeBucket, objectPath };
+    }
+    // fallback: find any known bucket segment (logical or physical) and use the remainder
     const knownBuckets = [
-      process.env.SUPABASE_BUCKET_MEDIA || 'media',
-      process.env.SUPABASE_BUCKET_VIDEOS || 'videos',
-      process.env.SUPABASE_BUCKET_ALBUMS || 'albums',
-      process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_MEDIA || 'media'
-    ];
+      process.env.BACKBLAZE_BUCKET_NAME,
+      process.env.B2_BUCKET_NAME,
+      process.env.BACKBLAZE_BUCKET_MEDIA,
+      process.env.BACKBLAZE_BUCKET_VIDEOS,
+      process.env.SUPABASE_BUCKET_MEDIA,
+      process.env.SUPABASE_BUCKET_VIDEOS,
+      process.env.SUPABASE_BUCKET_ALBUMS,
+      process.env.SUPABASE_BUCKET_PREVIEWS,
+      'media',
+      'videos',
+      'albums',
+      'previews'
+    ].filter(Boolean);
     for (const b of knownBuckets) {
       const i = parts.findIndex(p => p === b);
       if (i >= 0) return { bucket: b, objectPath: parts.slice(i + 1).join('/') };
     }
+
+    // as a last resort, assume the first path segment is the bucket name
+    if (parts.length >= 2) return { bucket: parts[0], objectPath: parts.slice(1).join('/') };
   } catch {}
   return { bucket: null, objectPath: null };
 }
@@ -120,13 +161,22 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
   // For public files, return the public B2 URL.
   try {
     const b2 = createBackblazeClient();
-    const encodedPath = encodeURIComponent(objectPath);
-    // If this bucket is private, return our stream endpoint
+    // For private buckets, prefer returning a temporary signed URL so the frontend can play directly.
     if (isPrivateBucket(bucket)) {
-      const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+      try {
+        const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
+        const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
+        if (signedUrl) return res.json({ url: signedUrl });
+      } catch (err) {
+        // If signed URL generation fails, fall back to stream proxy
+        console.warn('Failed to create signed URL, falling back to stream proxy', err?.message || err);
+      }
+      const base = getAppBaseUrl(req);
+      const encodedPath = encodeURIComponent(objectPath);
+      const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
+      
       return res.json({ url: streamUrl });
     }
-    // Public bucket: return constructed public URL
     const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
     return res.json({ url: pub.publicUrl });
   } catch (e) {
@@ -166,8 +216,16 @@ router.get('/song/:id/preview', async (req, res) => {
               try {
                 const b2 = createBackblazeClient();
                 if (isPrivateBucket(bucket)) {
+                  try {
+                    const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
+                    const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
+                    if (signedUrl) return res.json({ url: signedUrl });
+                  } catch (err) {
+                    console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
+                  }
+                  const base = getAppBaseUrl(req);
                   const encodedPath = encodeURIComponent(objectPath);
-                  const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+                  const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
                   return res.json({ url: streamUrl });
                 }
                 const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
@@ -187,8 +245,9 @@ router.get('/song/:id/preview', async (req, res) => {
       try {
         const b2 = createBackblazeClient();
         if (isPrivateBucket(bucket)) {
+          const base = getAppBaseUrl(req);
           const encodedPath = encodeURIComponent(objectPath);
-          const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+          const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
           return res.json({ url: streamUrl });
         }
         const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
@@ -226,13 +285,11 @@ router.get('/video/:id/preview', async (req, res) => {
             const { bucket, objectPath } = parseStorageUrl(fullUrl);
             if (bucket && objectPath) {
                 const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
-                if (useBackblaze) {
-                  const encodedPath = encodeURIComponent(objectPath);
-                  const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
-                  return res.json({ url: streamUrl });
-                }
-                const { data, error } = await supabase.storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
-                if (!error && data?.signedUrl) return res.json({ url: data.signedUrl });
+                // With Backblaze, we use the stream proxy for private buckets
+                const base = getAppBaseUrl(req);
+                const encodedPath = encodeURIComponent(objectPath);
+                const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
+                return res.json({ url: streamUrl });
             }
             return res.json({ url: fullUrl });
           }
@@ -247,8 +304,16 @@ router.get('/video/:id/preview', async (req, res) => {
       try {
         const b2 = createBackblazeClient();
         if (isPrivateBucket(bucket)) {
+          try {
+            const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
+            const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
+            if (signedUrl) return res.json({ url: signedUrl });
+          } catch (err) {
+            console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
+          }
+          const base = getAppBaseUrl(req);
           const encodedPath = encodeURIComponent(objectPath);
-          const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+          const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
           return res.json({ url: streamUrl });
         }
         const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
@@ -305,8 +370,9 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
   try {
     const b2 = createBackblazeClient();
     if (isPrivateBucket(bucket)) {
+      const base = getAppBaseUrl(req);
       const encodedPath = encodeURIComponent(objectPath);
-      const streamUrl = `${process.env.APP_URL || ''}/api/media/stream/${bucket}/${encodedPath}`;
+      const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
       return res.json({ url: streamUrl });
     }
     const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);

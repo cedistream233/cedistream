@@ -289,22 +289,24 @@ function scheduleExpiredPromotionsCleanup() {
       // Attempt to remove image from storage if available
       try {
         if (p.image) {
-          // derive bucket and path similar to delete handler
-          const bucket = process.env.BACKBLAZE_BUCKET_PROMOTIONS || 'cedistream-promotions';
-          const marker = `/storage/v1/object/public/${bucket}/`;
+          // derive path from URL
           let path = null;
+          const marker = `/storage/v1/object/public/`;
           const idx = p.image.indexOf(marker);
-          if (idx !== -1) path = p.image.slice(idx + marker.length);
-          else {
-            const alt = `/${bucket}/`;
+          if (idx !== -1) {
+            const afterMarker = p.image.slice(idx + marker.length);
+            const parts = afterMarker.split('/');
+            if (parts.length > 1) path = parts.slice(1).join('/');
+          } else {
+            const alt = `/promotions/`;
             const idx2 = p.image.indexOf(alt);
-            if (idx2 !== -1) path = p.image.slice(idx2 + alt.length);
+            if (idx2 !== -1) path = p.image.slice(idx2 + 1);
           }
           if (path) {
             try {
               const { createBackblazeClient } = await import('./lib/backblaze.js');
               const b2 = createBackblazeClient();
-              await b2.from(bucket).remove([path]);
+              await b2.from('promotions').remove([path]);
             } catch (e) {
               console.warn('Failed to remove expired promotion image:', e.message || e);
             }

@@ -84,8 +84,9 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
     let coverUrl = null;
     if (byField.cover) {
       const ext = (byField.cover.originalname.split('.').pop() || 'jpg').toLowerCase();
-      const path = `albums/${userId}/${Date.now()}-cover.${ext}`;
-      coverUrl = await uploadToStorage(process.env.SUPABASE_BUCKET_ALBUMS || 'albums', path, byField.cover.buffer, byField.cover.mimetype);
+      // Store album covers in albums bucket (cedistream-album-covers)
+      const path = `album-covers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      coverUrl = await uploadToStorage('albums', path, byField.cover.buffer, byField.cover.mimetype || 'image/jpeg');
     }
 
     // create album row
@@ -112,14 +113,13 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
         const f = byField[s.audio];
         const ext = (f.originalname.split('.').pop() || 'mp3').toLowerCase();
         const path = `albums/${userId}/${album.id}/songs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        audioUrl = await uploadToStorage(process.env.SUPABASE_BUCKET_MEDIA || 'media', path, f.buffer, f.mimetype || 'audio/mpeg');
+        audioUrl = await uploadToStorage('media', path, f.buffer, f.mimetype || 'audio/mpeg');
       }
       if (s.preview && byField[s.preview]) {
         const f = byField[s.preview];
         const ext = (f.originalname.split('.').pop() || 'mp3').toLowerCase();
         const pathPrev = `albums/${userId}/${album.id}/previews/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const previewBucket = process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-        previewUrl = await uploadToStorage(previewBucket, pathPrev, f.buffer, f.mimetype || 'audio/mpeg');
+        previewUrl = await uploadToStorage('previews', pathPrev, f.buffer, f.mimetype || 'audio/mpeg');
       }
       const ins = await query(
         `INSERT INTO songs (user_id, album_id, title, price, duration, cover_image, audio_url, preview_url, track_number, status, published_at)
@@ -165,15 +165,13 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
 
     const vext = (videoFile.originalname.split('.').pop() || 'mp4').toLowerCase();
     const vpath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${vext}`;
-    const videoBucket = process.env.SUPABASE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-    const videoUrl = await uploadToStorage(videoBucket, vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4');
+    const videoUrl = await uploadToStorage('videos', vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4');
 
     let thumbUrl = null;
     if (thumbFile) {
       const text = (thumbFile.originalname.split('.').pop() || 'jpg').toLowerCase();
       const tpath = `thumbnails/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${text}`;
-      const thumbBucket = process.env.SUPABASE_BUCKET_THUMBNAILS || process.env.SUPABASE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-      thumbUrl = await uploadToStorage(thumbBucket, tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+      thumbUrl = await uploadToStorage('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
     }
 
     // optional preview file for video
@@ -182,8 +180,7 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
     if (previewField) {
       const pext = (previewField.originalname.split('.').pop() || 'mp4').toLowerCase();
       const ppath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}-preview.${pext}`;
-      const previewBucket = process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_VIDEOS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-      previewUrl = await uploadToStorage(previewBucket, ppath, previewField.buffer, previewField.mimetype || 'video/mp4');
+      previewUrl = await uploadToStorage('previews', ppath, previewField.buffer, previewField.mimetype || 'video/mp4');
     }
 
     const ins = await query(
@@ -214,28 +211,25 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     const coverFile = req.files?.cover?.[0];
     const previewFile = req.files?.preview?.[0];
 
-    // upload audio
+    // upload audio to media bucket (cedistream-audio-files)
     const aext = (audioFile.originalname.split('.').pop() || 'mp3').toLowerCase();
     const apath = `songs/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${aext}`;
-    const mediaBucket = process.env.SUPABASE_BUCKET_MEDIA || 'media';
-    const audioUrl = await uploadToStorage(mediaBucket, apath, audioFile.buffer, audioFile.mimetype || 'audio/mpeg');
+    const audioUrl = await uploadToStorage('media', apath, audioFile.buffer, audioFile.mimetype || 'audio/mpeg');
 
-    // optional cover
+    // optional cover (store in albums bucket = cedistream-album-covers)
     let coverUrl = null;
     if (coverFile) {
       const cext = (coverFile.originalname.split('.').pop() || 'jpg').toLowerCase();
-      const cpath = `songs/${userId}/covers/${Date.now()}-${Math.random().toString(36).slice(2)}.${cext}`;
-      const coverBucket = process.env.SUPABASE_BUCKET_ALBUMS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-      coverUrl = await uploadToStorage(coverBucket, cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
+      const cpath = `covers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${cext}`;
+      coverUrl = await uploadToStorage('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
     }
 
-    // optional preview
+    // optional preview (to previews bucket = cedistream-previews)
     let previewUrl = null;
     if (previewFile) {
       const pext = (previewFile.originalname.split('.').pop() || 'mp3').toLowerCase();
-      const ppath = `songs/${userId}/previews/${Date.now()}-${Math.random().toString(36).slice(2)}.${pext}`;
-      const previewBucket = process.env.SUPABASE_BUCKET_PREVIEWS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-      previewUrl = await uploadToStorage(previewBucket, ppath, previewFile.buffer, previewFile.mimetype || 'audio/mpeg');
+      const ppath = `previews/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${pext}`;
+      previewUrl = await uploadToStorage('previews', ppath, previewFile.buffer, previewFile.mimetype || 'audio/mpeg');
     }
 
     const ins = await query(
@@ -354,8 +348,7 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
     }
   const ext = 'jpg';
   const storagePath = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const bucket = process.env.SUPABASE_BUCKET_PROMOTIONS || process.env.SUPABASE_BUCKET_MEDIA || 'media';
-  const publicUrl = await uploadToStorage(bucket, storagePath, buffer, 'image/jpeg');
+  const publicUrl = await uploadToStorage('promotions', storagePath, buffer, 'image/jpeg');
   return res.json({ url: publicUrl, storagePath });
   } catch (err) {
     console.error('Promotions image upload error:', err);

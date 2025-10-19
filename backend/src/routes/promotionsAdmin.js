@@ -96,23 +96,24 @@ router.delete('/:id', authenticateToken, requireRole(['admin']), async (req, res
     // Attempt to remove image from storage if configured
     if ((storagePath || imageUrl)) {
       try {
-  const bucket = process.env.BACKBLAZE_BUCKET_PROMOTIONS || process.env.BACKBLAZE_BUCKET_MEDIA || 'media';
         const b2 = createBackblazeClient();
         if (storagePath) {
-          await b2.from(bucket).remove([storagePath]);
+          await b2.from('promotions').remove([storagePath]);
         } else {
           let path = null;
-          const marker = `/storage/v1/object/public/${bucket}/`;
+          const marker = `/storage/v1/object/public/`;
           const idx = imageUrl.indexOf(marker);
           if (idx !== -1) {
-            path = imageUrl.slice(idx + marker.length);
+            const afterMarker = imageUrl.slice(idx + marker.length);
+            const parts = afterMarker.split('/');
+            if (parts.length > 1) path = parts.slice(1).join('/');
           } else {
-            const alt = `/${bucket}/`;
+            const alt = `/promotions/`;
             const idx2 = imageUrl.indexOf(alt);
-            if (idx2 !== -1) path = imageUrl.slice(idx2 + alt.length);
+            if (idx2 !== -1) path = imageUrl.slice(idx2 + 1);
           }
           if (path) {
-            await b2.from(bucket).remove([path]);
+            await b2.from('promotions').remove([path]);
           }
         }
       } catch (e) {

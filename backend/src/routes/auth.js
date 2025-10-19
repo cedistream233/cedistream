@@ -245,11 +245,10 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
     const filePath = `profiles/${userId}/${Date.now()}.${ext}`;
 
-  // Use Backblaze per-feature bucket env var (profiles)
-  const bucket = process.env.BACKBLAZE_BUCKET_PROFILES || process.env.BACKBLAZE_BUCKET_NAME || 'cedistream-profiles';
+  // Use Backblaze for profile images (goes to profiles bucket)
     let imageUrl = null;
       try {
-        const b = b2.from(bucket);
+        const b = b2.from('profiles');
         const up = await b.upload(filePath, req.file.buffer, { contentType: req.file.mimetype || 'image/jpeg' });
         if (up.error) throw up.error;
         imageUrl = (await b.getPublicUrl(filePath)).data.publicUrl;
@@ -277,7 +276,7 @@ router.post('/profile/image', authenticateToken, upload.single('image'), async (
     // Delete the old object if it exists and is different from the new one
     if (prevPath && prevPath !== filePath) {
       try {
-        await b2.from(bucket).remove([prevPath]);
+        await b2.from('profiles').remove([prevPath]);
       } catch (e) {
         console.warn('Failed to delete previous profile image after upload (by path):', e?.message || e);
       }
@@ -300,7 +299,7 @@ router.delete('/profile/image', authenticateToken, async (req, res) => {
     const currentPath = result.rows[0]?.profile_image_path;
     if (currentPath) {
       try {
-        await b2.from(process.env.BACKBLAZE_BUCKET_PROFILES || process.env.BACKBLAZE_BUCKET_NAME || 'cedistream-profiles').remove([currentPath]);
+        await b2.from('profiles').remove([currentPath]);
       } catch (e) {
         console.warn('Failed to delete previous profile image (by path):', e?.message || e);
       }
