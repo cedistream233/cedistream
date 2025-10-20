@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { setPostAuthIntent } from '@/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true, mobileRow = false }) {
+export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true, mobileRow = false, desktopRow = false }) {
   const { updateMyUserData, user: authUser } = useAuth();
   // prefer cover_image, fallback to thumbnail
   const image = item.cover_image || item.thumbnail || null;
@@ -153,8 +153,9 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
         onKeyDown={onViewDetails ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (onViewDetails||(()=>{}))(); } }) : undefined}
         className={`group relative overflow-hidden bg-slate-900/50 border-purple-900/20 hover:border-purple-500/50 backdrop-blur-sm transition-all duration-300 ${onViewDetails ? 'cursor-pointer' : ''}`}
       >
-        <CardContent className={mobileRow ? "p-0 flex items-center gap-3 sm:block" : "p-0"}>
-          <div className={`relative overflow-hidden ${mobileRow ? 'w-28 h-20 flex-shrink-0 sm:w-full sm:h-auto sm:aspect-square' : 'aspect-square'}`}>
+        <CardContent className={mobileRow ? "p-0 flex items-center gap-3 sm:block" : (desktopRow ? "p-0 flex items-center gap-4" : "p-0")}>
+          {/* DesktopRow: YouTube-like horizontal item (thumbnail left, details right). mobileRow: compact on phones. Default: grid-style square thumbnail. */}
+          <div className={`relative overflow-hidden ${mobileRow ? 'w-28 h-20 flex-shrink-0 sm:w-full sm:h-auto sm:aspect-square' : (desktopRow ? 'w-56 h-32 flex-shrink-0 md:w-64 md:h-36 lg:w-72 lg:h-40' : 'w-full h-36 sm:h-32 md:h-28 lg:h-32')}`}>
             {image ? (
               <img
                 src={image}
@@ -171,7 +172,8 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
               </div>
             )}
             
-            <div className={mobileRow ? "hidden" : "absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300"}>
+            {/* Hide overlay for compact rows */}
+            <div className={(mobileRow || desktopRow) ? "hidden" : "absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300"}>
               {/* Locked badge + preview indicator */}
               <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
                 {!owned && (
@@ -319,8 +321,8 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
             </div>
           </div>
 
-          <div className={mobileRow ? "flex-1 p-3 sm:p-4" : "p-4"}>
-            <h3 className={`font-semibold text-white mb-0 ${mobileRow ? 'text-sm sm:text-base line-clamp-2 sm:truncate' : 'truncate'}`}>{title}</h3>
+          <div className={mobileRow ? "flex-1 p-3 sm:p-4" : (desktopRow ? 'flex-1 p-3' : 'p-3')}>
+            <h3 className={`font-semibold text-white mb-0 ${mobileRow ? 'text-sm sm:text-base line-clamp-2 sm:truncate' : (desktopRow ? 'text-base lg:text-lg line-clamp-2' : 'truncate text-sm')}`}>{title}</h3>
             <p className={`text-gray-400 mb-0 ${mobileRow ? 'text-xs sm:text-sm line-clamp-1 sm:truncate' : 'text-sm truncate'}`}>{creator}</p>
             {publishedDate && (
               <div className={`text-gray-400 ${mobileRow ? 'text-xs sm:text-sm mb-1 sm:mb-2' : 'text-sm mb-2'}`}>Published {publishedDate}</div>

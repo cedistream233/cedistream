@@ -80,9 +80,10 @@ export default function MyVideos() {
       <div className="bg-slate-900/50 border border-purple-900/20 rounded p-3 mb-4 grid grid-cols-2 md:grid-cols-2 gap-2">
         <input value={search} onChange={e=>{setPage(1);setSearch(e.target.value);}} placeholder="Search title" className="col-span-2 md:col-span-2 bg-slate-800 text-white text-sm rounded px-3 py-2 outline-none border border-slate-700"/>
       </div>
-      <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:gap-4 md:gap-6">
+      {/* Responsive list: grid of compact rows on small screens; on desktop show YouTube-style vertical list (thumbnail left, details right) */}
+      <div className="sm:hidden flex flex-col gap-3">
         {loading ? (
-          Array.from({length: 8}).map((_, i) => (
+          Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-40 bg-slate-800/40 rounded animate-pulse" />
           ))
         ) : (
@@ -101,6 +102,36 @@ export default function MyVideos() {
               onViewDetails={() => navigate(`/videos/${v.id}`)}
               showPwyw={false}
             />
+          ))
+        )}
+      </div>
+
+      {/* Desktop grid: YouTube channel-style thumbnails */}
+      <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {loading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="w-full bg-slate-800/40 rounded animate-pulse" style={{ paddingTop: '56.25%' }} />
+          ))
+        ) : (
+          items.map((v) => (
+            <Card key={`grid-${v.id}`} className="bg-slate-900/50 border-purple-900/20 cursor-pointer" onClick={() => navigate(`/videos/${v.id}`)}>
+              <CardContent className="p-0">
+                <div className="w-full relative rounded overflow-hidden" style={{ paddingTop: '56.25%' }}>
+                  {v.thumbnail ? (
+                    <img src={v.thumbnail} alt={v.title} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
+                      <Play className="w-10 h-10 text-purple-200" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <h3 className="text-white font-semibold text-sm line-clamp-2 mb-1">{v.title}</h3>
+                  <div className="text-xs text-gray-400">{v.creator || v.uploader}</div>
+                  {v.published_at && <div className="text-xs text-gray-500 mt-1">{new Date(v.published_at).toLocaleDateString()}</div>}
+                </div>
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
