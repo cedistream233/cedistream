@@ -374,6 +374,17 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
   try {
     if (isPrivateBucket(bucket)) {
+      // Try to generate a temporary signed URL so the browser can request the video
+      // directly (no Authorization header required). If signing fails, fall back
+      // to the server stream proxy which does require Authorization on requests.
+      try {
+        const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
+        const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
+        if (signedUrl) return res.json({ url: signedUrl });
+      } catch (err) {
+        console.warn('Failed to create signed URL for video playback, falling back to stream proxy', err?.message || err);
+      }
+
       const base = getAppBaseUrl(req);
       const encodedPath = encodeURIComponent(objectPath);
       const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
