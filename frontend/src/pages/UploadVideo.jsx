@@ -75,9 +75,10 @@ export default function UploadVideo() {
       });
       const data = JSON.parse(res.responseText || '{}');
       if (res.status < 200 || res.status >= 300) throw new Error(data.error || 'Upload failed');
-      setProgress(100);
-      setSuccess('Video published!');
-      setCreated(data);
+  setProgress(100);
+  setSuccess('Video published!');
+  // ensure PublishSuccessModal recognizes this as a video (so it builds the correct public URL)
+  setCreated({ ...data, type: 'video' });
       setShowSuccess(true);
       setTitle(''); setDescription(''); setPrice(''); setCategory(''); setReleaseDate(''); setThumbnail(null); setVideo(null); setPreview(null);
     } catch (e) {
@@ -231,10 +232,11 @@ export default function UploadVideo() {
         open={showSuccess}
         title="Video Published!"
         message="Your video is live. Share it or manage it in My Content."
+        compact={true}
         created={created}
         onManage={() => { setShowSuccess(false); window.location.href = '/dashboard?tab=content'; }}
-        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/videos?id=${encodeURIComponent(created.id)}`; }}
-        onShare={() => { if (navigator.share && created?.id) navigator.share({ title: created?.title || 'New video', url: `${window.location.origin}/videos?id=${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/videos?id=${created.id}`); }}
+        onView={() => { setShowSuccess(false); if (created?.id) window.location.href = `/videos/${encodeURIComponent(created.id)}`; }}
+        onShare={() => { if (navigator.share && created?.id) navigator.share({ title: created?.title || 'New video', url: `${window.location.origin}/videos/${created.id}` }).catch(()=>{}); else if (created?.id) navigator.clipboard.writeText(`${window.location.origin}/videos/${created.id}`); }}
         onUploadAnother={() => { setShowSuccess(false); window.location.href = '/upload/video'; }}
         onClose={() => setShowSuccess(false)}
       />

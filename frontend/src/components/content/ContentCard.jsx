@@ -233,7 +233,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
                     onClick={(e)=>{ e.stopPropagation();
                       if (type === 'song') window.location.href = `/songs/${item.id}?autoplay=1`;
                       else if (type === 'album') window.location.href = `/albums/${item.id}`;
-                      else if (type === 'video') window.location.href = `/videos?id=${item.id}`;
+                      else if (type === 'video') window.location.href = `/videos/${item.id}`;
                     }}
                     className={`flex-1 text-white ${
                       type === 'song' || type === 'video'

@@ -3,7 +3,7 @@ import { Video } from "@/entities/Video";
 import { User } from "@/entities/User";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ShoppingCart, Play, Clock, Calendar } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
@@ -13,8 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function VideoDetails() {
   const navigate = useNavigate();
-  const urlParams = new URLSearchParams(window.location.search);
-  const videoId = urlParams.get("id");
+  const { id: videoId } = useParams();
   const { updateMyUserData } = useAuth();
   
   const [video, setVideo] = useState(null);
@@ -27,6 +26,9 @@ export default function VideoDetails() {
   const localUser = React.useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null'); } catch { return null; }
   }, []);
+
+  // Derived flags for rendering
+  const noPreviewAvailable = !canAccess && mediaUrl === null;
   const getIdFromToken = (tok) => {
     try {
       const parts = String(tok || '').split('.');
@@ -61,10 +63,22 @@ export default function VideoDetails() {
   const loadVideo = async () => {
     setIsLoading(true);
     try {
-      const videos = await Video.list();
-      const foundVideo = videos.find(v => v.id === videoId);
+      // Try list first (fast path)
+      let foundVideo = null;
+      try {
+        const videos = await Video.list();
+        foundVideo = videos.find(v => v.id === videoId) || null;
+      } catch {
+        foundVideo = null;
+      }
+
+      // Fallback to fetching a single video if not in list
+      if (!foundVideo) {
+        try { foundVideo = await Video.get(videoId); } catch { foundVideo = null; }
+      }
+
       setVideo(foundVideo);
-      
+
       // Parallelize sales fetch for owners (non-blocking)
       if (foundVideo) {
         const ownerId = user?.id || localUser?.id || getIdFromToken(localStorage.getItem('token'));
@@ -83,7 +97,8 @@ export default function VideoDetails() {
 
   useEffect(() => {
     (async () => {
-      if (!video) return;
+      try {
+        if (!video) return;
 
       // First, check if a preview was pre-fetched and stored
       try {
@@ -112,6 +127,7 @@ export default function VideoDetails() {
       } catch (e) {
         setMediaUrl(null); setCanAccess(false);
       }
+      } catch (e) { /* swallow errors to avoid breaking render */ }
     })();
   }, [video?.id]);
 
@@ -306,7 +322,7 @@ export default function VideoDetails() {
           <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between">
               <span className="text-gray-400">Minimum price:</span>
-              <span className="text-3xl font-bold text-yellow-400">From GH₵ {video.price?.toFixed(2)}</span>
+              <span className="text-3xl font-bold text-yellow-400">From GH₵ {Number(video?.price ?? 0).toFixed(2)}</span>
             </div>
             {isOwner && (
               <div className="text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>

@@ -78,8 +78,8 @@ export default function UploadSong() {
       const data = JSON.parse(res.responseText || '{}');
       if (res.status < 200 || res.status >= 300) throw new Error(data.error || 'Upload failed');
       setProgress(100);
-      setSuccess('Song published!');
-      setCreated(data);
+  setSuccess('Song published!');
+  setCreated({ ...data, type: 'song' });
       setShowSuccess(true);
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setAudio(null); setPreview(null);
     } catch (e) {

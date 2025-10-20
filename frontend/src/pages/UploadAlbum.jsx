@@ -113,8 +113,8 @@ export default function UploadAlbum() {
       const data = JSON.parse(res.responseText || '{}');
       if (res.status < 200 || res.status >= 300) throw new Error(data.error || 'Upload failed');
       setProgress(100);
-      setSuccess('Album published!');
-      setCreated(data?.album || null);
+  setSuccess('Album published!');
+  setCreated({ ...(data?.album || null), type: 'album' });
       setShowSuccess(true);
       setTitle(''); setDescription(''); setPrice(''); setGenre(''); setReleaseDate(''); setCover(null); setTracks([]);
     } catch (e) {

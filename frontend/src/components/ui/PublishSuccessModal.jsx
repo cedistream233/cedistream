@@ -4,7 +4,7 @@ import { Button } from './button';
 import { CheckCircle2, Share2, ExternalLink } from 'lucide-react';
 
 export default function PublishSuccessModal({ open, onClose, title='Published!', message='Your content is now live.', onView, onShare, created = null, onManage, onUploadAnother, compact = false }) {
-  const url = created?.id ? `${window.location.origin}/${created.type === 'video' ? 'videos?id=' + created.id : created.type === 'song' ? `songs/${created.id}` : `albums/${created.id}`}` : null;
+  const url = created?.id ? `${window.location.origin}/${created.type === 'video' ? `videos/${created.id}` : created.type === 'song' ? `songs/${created.id}` : `albums/${created.id}`}` : null;
   return (
     <Dialog open={open}>
       <DialogContent className="bg-slate-900 text-white border border-green-900/30">

@@ -104,7 +104,7 @@ export default function Videos() {
   };
 
   const viewDetails = (id) => {
-    navigate(createPageUrl("VideoDetails") + `?id=${id}`);
+    navigate(`/videos/${id}`);
   };
 
   return (
