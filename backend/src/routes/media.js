@@ -330,7 +330,12 @@ router.get('/video/:id/preview', async (req, res) => {
 // Get signed URL for paid video playback
 router.get('/video/:id', authenticateToken, async (req, res) => {
   try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+    // Ensure Backblaze is configured and available. We no longer depend on Supabase for storage.
+    let b2;
+    try { b2 = createBackblazeClient(); } catch (err) {
+      console.error('Backblaze not configured for video playback', err?.message || err);
+      return res.status(500).json({ error: 'Storage not configured' });
+    }
     const userId = req.user.id;
     const { id } = req.params;
 
@@ -368,7 +373,6 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
   const { bucket, objectPath } = parseStorageUrl(video.video_url || '');
   if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
   try {
-    const b2 = createBackblazeClient();
     if (isPrivateBucket(bucket)) {
       const base = getAppBaseUrl(req);
       const encodedPath = encodeURIComponent(objectPath);
