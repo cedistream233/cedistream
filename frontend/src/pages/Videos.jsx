@@ -142,12 +142,13 @@ export default function Videos() {
           <p className="text-gray-400 text-lg">No videos found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-6">
           {filteredVideos.map((video) => (
             <ContentCard
               key={video.id}
               item={video}
               type="video"
+              mobileRow={true}
               onAddToCart={() => handleAddToCart(video)}
               onViewDetails={() => viewDetails(video.id)}
             />

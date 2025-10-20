@@ -1,219 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Lock } from 'lucide-react';
-import { setPostAuthIntent } from '@/utils';
+import React from 'react';
+import ContentCard from '@/components/content/ContentCard';
 
 export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails, showPwyw = true }) {
-  const image = item.cover_image || item.thumbnail || null;
-  const title = item.title;
-  const creator = item.artist || item.creator;
-  const price = item.price;
-  const [owned, setOwned] = useState(false);
-  // Optimistically show preview if metadata suggests it; null = unknown
-  const [hasPreview, setHasPreview] = useState(() => {
-    if (!item) return null;
-    return !!item.preview_url ? true : null;
-  });
-  const { updateMyUserData, user } = useAuth();
-
-  useEffect(() => {
-    try {
-      // Ownership precedence: server flag -> authenticated user purchases -> demo_user localStorage
-      if (typeof item?.owned_by_me === 'boolean') {
-        setOwned(Boolean(item.owned_by_me));
-      } else if (user && Array.isArray(user.purchases)) {
-        setOwned(user.purchases.some(p => p.item_id === item.id));
-      } else {
-        const u = JSON.parse(localStorage.getItem('demo_user') || 'null');
-        if (u && Array.isArray(u.purchases)) {
-          setOwned(u.purchases.some(p => p.item_id === item.id));
-        } else setOwned(false);
-      }
-    } catch { setOwned(false); }
-  }, [item?.id, item?.owned_by_me, user]);
-
-  useEffect(() => {
-    let aborted = false;
-    (async () => {
-      if (!item?.id) { setHasPreview(false); return; }
-      // If metadata contains preview_url for any type, we are done
-      if (Object.prototype.hasOwnProperty.call(item, 'preview_url')) {
-        setHasPreview(Boolean(item.preview_url));
-        return;
-      }
-
-      try {
-        if (type === 'song') {
-          const { Song } = await import('@/entities/Song');
-          const url = await Song.getPreviewUrl(item.id);
-          if (!aborted) setHasPreview(!!url);
-        } else if (type === 'video') {
-          const { Video } = await import('@/entities/Video');
-          const url = await Video.getPreviewUrl(item.id);
-          if (!aborted) setHasPreview(!!url);
-        } else {
-          setHasPreview(false);
-        }
-      } catch {
-        if (!aborted) setHasPreview(false);
-      }
-    })();
-    return () => { aborted = true; };
-  }, [item?.id, type, item?.preview_url]);
-
-  const getPublishedDate = () => {
-    const raw = item?.release_date || item?.published_at || item?.published_date || item?.released_at || item?.created_at || item?.created_date;
-    if (!raw) return null;
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  // Map row props to ContentCard shape and render as a mobileRow so songs match videos appearance on mobile
+  const cardItem = {
+    ...item,
+    cover_image: item.cover_image || item.thumbnail || null,
+    artist: item.artist || item.creator || item.uploader || null,
+    release_date: item.release_date || item.published_at || item.created_at || null,
   };
-  const publishedDate = getPublishedDate();
 
   return (
-    <div
-      onClick={onViewDetails}
-      className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition cursor-pointer"
-    >
-      <div className="flex items-center gap-3">
-        <div className="relative w-14 h-14 rounded-md overflow-hidden shrink-0">
-          {image ? (
-            <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900" />
-          )}
-          {/* Locked overlay: icon-only, always show when not owned (even if preview exists) */}
-          {!owned && type === 'song' && (
-            <div className="absolute top-1 left-1 p-1 rounded-full bg-black/60 border border-slate-700 text-gray-200">
-              <Lock className="w-3.5 h-3.5" />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="text-white font-medium truncate">{title}</div>
-          <div className="text-xs text-gray-400 truncate">{creator}</div>
-          {publishedDate && <div className="text-xs text-gray-400 mt-0.5">Published {publishedDate}</div>}
-          {showPwyw && (
-            <div className="text-[11px] text-gray-400 mt-0.5">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</div>
-          )}
-        </div>
-      </div>
-      <div className="pl-3 flex items-center gap-2">
-        {owned ? (
-          <button
-            onClick={(e)=>{ e.stopPropagation();
-              if (type === 'video') window.location.href = `/videos?id=${encodeURIComponent(item.id)}`;
-              else window.location.href = `/songs/${encodeURIComponent(item.id)}`;
-            }}
-            className={`px-3 py-2 rounded-md text-white text-sm ${
-              type === 'song' || type === 'video' 
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' 
-                : 'bg-slate-800 hover:bg-slate-700'
-            }`}
-          >
-            {type === 'song' || type === 'video' ? 'Play' : 'Open'}
-          </button>
-        ) : (
-          hasPreview !== false ? (
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  // attempt to prefetch preview URL using entity helpers and store for immediate use on details page
-                  if (type === 'song') {
-                    const { Song } = await import('@/entities/Song');
-                    const url = await Song.getPreviewUrl(item.id);
-                    if (url) { try { sessionStorage.setItem(`preview:${item.id}`, url); } catch {} }
-                  } else if (type === 'video') {
-                    const { Video } = await import('@/entities/Video');
-                    const url = await Video.getPreviewUrl(item.id);
-                    if (url) { try { sessionStorage.setItem(`preview:video:${item.id}`, url); } catch {} }
-                  }
-                } catch (err) {
-                  // ignore
-                }
-                // navigate to details; the details page will pick up sessionStorage preview if present
-                if (type === 'video') window.location.href = `/videos?id=${encodeURIComponent(item.id)}`;
-                else window.location.href = `/songs/${encodeURIComponent(item.id)}`;
-              }}
-              className="px-3 py-2 rounded-md bg-slate-800 text-gray-200 text-sm hover:bg-slate-700"
-            >
-              Preview
-            </button>
-          ) : null
-        )}
-        {!owned && (
-          <button
-            onClick={async (e) => {
-              e.stopPropagation();
-            try {
-              // if onAddToCart callback is provided, call it (page-level handlers may implement custom flows)
-              if (onAddToCart) return onAddToCart();
-
-              // If not authenticated, store intent and go to signup
-              const token = localStorage.getItem('token');
-              if (!token) {
-                const min = Number(price || 0);
-                setPostAuthIntent({
-                  action: 'add-to-cart',
-                  item: {
-                    item_type: type,
-                    item_id: item.id,
-                    title: title,
-                    price: min,
-                    min_price: min,
-                    image: item.cover_image || item.thumbnail || null,
-                  },
-                  redirect: '/cart'
-                });
-                window.location.href = '/signup';
-                return;
-              }
-
-              // construct cart item in the same shape other pages use
-              const cartItem = {
-                item_type: type,
-                item_id: item.id,
-                title: title,
-                price: Number(price || 0),
-                min_price: Number(price || 0),
-                image: item.cover_image || item.thumbnail || null,
-              };
-
-              // use current cart from localStorage user if available
-              const u = JSON.parse(localStorage.getItem('user') || 'null') || JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
-              const currentCart = (u?.cart) || [];
-              const exists = currentCart.some(i => i.item_id === item.id && i.item_type === type);
-              if (!exists) {
-                const updated = await (updateMyUserData ? updateMyUserData({ cart: [...currentCart, cartItem] }) : (async () => {
-                  const next = { ...(u||{}), cart: [...currentCart, cartItem] };
-                  localStorage.setItem('demo_user', JSON.stringify(next));
-                  localStorage.setItem('user', JSON.stringify(next));
-                  return next;
-                })());
-              }
-
-              // navigate to cart for checkout
-              window.location.href = '/cart';
-            } catch (err) {
-              console.error(err);
-              // fallback: try a simple localStorage update and redirect
-              try {
-                const u = JSON.parse(localStorage.getItem('demo_user') || 'null') || {};
-                u.cart = u.cart || [];
-                if (!u.cart.some(i => i.item_id === item.id)) u.cart.push({ item_type: type, item_id: item.id, title, price: Number(price||0) });
-                localStorage.setItem('demo_user', JSON.stringify(u));
-                localStorage.setItem('user', JSON.stringify(u));
-              } catch {}
-              window.location.href = '/cart';
-            }
-          }}
-          className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700"
-        >
-          Buy
-        </button>
-        )}
-      </div>
-    </div>
+    <ContentCard
+      item={cardItem}
+      type={type}
+      mobileRow={true}
+      onAddToCart={onAddToCart}
+      onViewDetails={onViewDetails}
+      showPwyw={showPwyw}
+    />
   );
 }

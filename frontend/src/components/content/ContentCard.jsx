@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { setPostAuthIntent } from '@/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true }) {
+export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true, mobileRow = false }) {
   const { updateMyUserData, user: authUser } = useAuth();
   // prefer cover_image, fallback to thumbnail
   const image = item.cover_image || item.thumbnail || null;
@@ -143,7 +143,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
 
   return (
     <motion.div
-      whileHover={{ y: -8 }}
+      whileHover={{ y: mobileRow ? 0 : -8 }}
       transition={{ duration: 0.3 }}
     >
       <Card
@@ -153,8 +153,8 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
         onKeyDown={onViewDetails ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (onViewDetails||(()=>{}))(); } }) : undefined}
         className={`group relative overflow-hidden bg-slate-900/50 border-purple-900/20 hover:border-purple-500/50 backdrop-blur-sm transition-all duration-300 ${onViewDetails ? 'cursor-pointer' : ''}`}
       >
-        <CardContent className="p-0">
-          <div className="relative aspect-square overflow-hidden">
+        <CardContent className={mobileRow ? "p-0 flex items-center gap-3 sm:block" : "p-0"}>
+          <div className={`relative overflow-hidden ${mobileRow ? 'w-28 h-20 flex-shrink-0 sm:w-full sm:h-auto sm:aspect-square' : 'aspect-square'}`}>
             {image ? (
               <img
                 src={image}
@@ -171,7 +171,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
               </div>
             )}
             
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className={mobileRow ? "hidden" : "absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-300"}>
               {/* Locked badge + preview indicator */}
               <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
                 {!owned && (
@@ -245,12 +245,14 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      onClick={(e)=>{ e.stopPropagation(); (onViewDetails||(()=>{}))(); }}
-                      className="flex-1 bg-white/90 text-black hover:bg-white"
-                    >
-                      View Details
-                    </Button>
+                    {!mobileRow && (
+                      <Button
+                        onClick={(e)=>{ e.stopPropagation(); (onViewDetails||(()=>{}))(); }}
+                        className="flex-1 bg-white/90 text-black hover:bg-white"
+                      >
+                        View Details
+                      </Button>
+                    )}
                     {type !== 'album' && (
                       <Button
                         onClick={async (e)=>{
@@ -317,26 +319,26 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
             </div>
           </div>
 
-          <div className="p-4">
-            <h3 className="font-semibold text-white truncate mb-0">{title}</h3>
-            <p className="text-sm text-gray-400 truncate mb-0">{creator}</p>
+          <div className={mobileRow ? "flex-1 p-3 sm:p-4" : "p-4"}>
+            <h3 className={`font-semibold text-white mb-0 ${mobileRow ? 'text-sm sm:text-base line-clamp-2 sm:truncate' : 'truncate'}`}>{title}</h3>
+            <p className={`text-gray-400 mb-0 ${mobileRow ? 'text-xs sm:text-sm line-clamp-1 sm:truncate' : 'text-sm truncate'}`}>{creator}</p>
             {publishedDate && (
-              <div className="text-sm text-gray-400 mb-2">Published {publishedDate}</div>
+              <div className={`text-gray-400 ${mobileRow ? 'text-xs sm:text-sm mb-1 sm:mb-2' : 'text-sm mb-2'}`}>Published {publishedDate}</div>
             )}
-            <div className="flex items-center justify-between">
-              {showPwyw ? (
-                <span className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
-              ) : (
-                // For albums we prefer the full-page AlbumDetails to show the published date at the top,
-                // avoid duplication in the card footer by showing price when available.
-                <span className="text-sm text-gray-300">{type === 'album' ? `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}` : (publishedDate ? `Published ${publishedDate}` : `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}`)}</span>
-              )}
-              {type === "album" && item.songs?.length > 0 && (
-                <span className="text-xs text-gray-500">
-                  {item.songs.length} tracks
-                </span>
-              )}
-            </div>
+            {!mobileRow && (
+              <div className="flex items-center justify-between">
+                {showPwyw ? (
+                  <span className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
+                ) : (
+                  <span className="text-sm text-gray-300">{type === 'album' ? `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}` : (publishedDate ? `Published ${publishedDate}` : `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}`)}</span>
+                )}
+                {type === "album" && item.songs?.length > 0 && (
+                  <span className="text-xs text-gray-500">
+                    {item.songs.length} tracks
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
