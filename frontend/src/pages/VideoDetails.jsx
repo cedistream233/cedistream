@@ -21,6 +21,7 @@ export default function VideoDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [canAccess, setCanAccess] = useState(false);
   const [mediaUrl, setMediaUrl] = useState(null);
+  const [hqUrl, setHqUrl] = useState(null);
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
   const [salesSummary, setSalesSummary] = useState({ count: 0, gross_total: 0, creator_total: 0 });
   const localUser = React.useMemo(() => {
@@ -107,11 +108,32 @@ export default function VideoDetails() {
       } catch {}
 
       const token = localStorage.getItem('token');
-      // If authorized, attempt to get full signed URL
+      // If authorized, attempt to get full signed URL(s)
       if (token) {
-        const res = await fetch(`/api/media/video/${video.id}`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const d = await res.json(); setCanAccess(true); setMediaUrl(d.url); return;
+        try {
+          const res = await fetch(`/api/media/video/${video.id}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (res.ok) {
+            const d = await res.json();
+            setCanAccess(true);
+            // backend returns { hq, sd, hq_signed, sd_signed }
+            // Prefer direct signed URLs only when they don't point at Backblaze's download host
+            // because some Backblaze download hosts don't return CORS headers for signed URLs.
+            const isBackblazeHost = (u) => typeof u === 'string' && u.includes('backblazeb2.com');
+            let chosen = null;
+            if (d) {
+              // prefer sd signed if it's safe
+              if (d.sd_signed && !isBackblazeHost(d.sd_signed)) chosen = d.sd_signed;
+              else if (d.sd) chosen = d.sd; // proxy
+              else if (d.hq_signed && !isBackblazeHost(d.hq_signed)) chosen = d.hq_signed;
+              else if (d.hq) chosen = d.hq;
+              else chosen = d.url || null;
+            }
+            setHqUrl(d?.hq || d?.hq_signed || null);
+            setMediaUrl(chosen);
+            return;
+          }
+        } catch (e) {
+          // ignore and fall back to preview
         }
       }
 
@@ -130,6 +152,8 @@ export default function VideoDetails() {
       } catch (e) { /* swallow errors to avoid breaking render */ }
     })();
   }, [video?.id]);
+
+  
 
   // fetch sales summary for owners
   useEffect(() => {

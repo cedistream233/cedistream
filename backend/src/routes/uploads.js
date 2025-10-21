@@ -183,11 +183,34 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
       previewUrl = await uploadToStorage('previews', ppath, previewField.buffer, previewField.mimetype || 'video/mp4');
     }
 
+    // Insert video row with status 'processing' while we create optimized files in background
     const ins = await query(
       `INSERT INTO videos (title, description, price, thumbnail, video_url, preview_url, category, release_date, user_id, status, published_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [title, description, parseFloat(price), thumbUrl, videoUrl, previewUrl, category, release_date || null, userId, 'published', new Date()]
+      [title, description, parseFloat(price), thumbUrl, videoUrl, previewUrl, category, release_date || null, userId, 'processing', new Date()]
     );
+
+    // Spawn background worker to post-process (transcode & upload sd/hq)
+    try {
+      const { spawn } = await import('child_process');
+      const node = process.execPath || 'node';
+      const script = path.join(process.cwd(), 'backend', 'scripts', 'postprocess-video.js');
+      // Write uploaded buffer to a temporary file for ffmpeg to read
+      const tmpDir = path.join(process.cwd(), 'tmp', 'uploads');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const tmpFile = path.join(tmpDir, `upload-${Date.now()}-${Math.random().toString(36).slice(2)}.${vext}`);
+      fs.writeFileSync(tmpFile, videoFile.buffer);
+
+      const child = spawn(node, [script, tmpFile, ins.rows[0].id], {
+        detached: true,
+        stdio: 'ignore',
+        env: { ...process.env }
+      });
+      child.unref();
+    } catch (e) {
+      console.error('Failed to spawn postprocess worker', e);
+    }
+
     return res.status(201).json(ins.rows[0]);
   } catch (err) {
     console.error('Video upload error:', err);

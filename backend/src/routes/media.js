@@ -405,7 +405,7 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const { id } = req.params;
 
-    const vRes = await query('SELECT id, user_id, video_url FROM videos WHERE id = $1', [id]);
+  const vRes = await query('SELECT id, user_id, video_url, video_url_sd FROM videos WHERE id = $1', [id]);
     if (!vRes.rows.length) return res.status(404).json({ error: 'Video not found' });
     const video = vRes.rows[0];
 
@@ -436,41 +436,49 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
     }
     if (!canAccess) return res.status(403).json({ error: 'Not purchased' });
 
-  const { bucket, objectPath } = parseStorageUrl(video.video_url || '');
-  if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
+  // Build response that can include both SD and HQ variants when available
+  const hqUrlRaw = video.video_url || null;
+  const sdUrlRaw = video.video_url_sd || null;
+  const out = { hq: null, sd: null };
   try {
-    if (isPrivateBucket(bucket)) {
-      // Try to generate a temporary signed URL so the browser can request the video
-      // directly (no Authorization header required). If signing fails, fall back
-      // to the server stream proxy which does require Authorization on requests.
+    // Helper to produce both a direct signed URL (if available) and a proxy URL fallback
+    async function makePlayable(rawUrl) {
+      if (!rawUrl) return { url: null, signed: null };
+      const { bucket, objectPath } = parseStorageUrl(rawUrl || '');
+      if (!bucket || !objectPath) return { url: null, signed: null };
       try {
-        const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
-        const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
-        if (signedUrl) {
-          if (shouldProxySignedUrl(signedUrl)) {
-            const base = getAppBaseUrl(req);
-            const encodedPath = encodeURIComponent(objectPath);
-            const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
-            const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
-            console.debug('[media] returning proxy stream URL for video', { id: video.id, bucket, path: objectPath });
-            return res.json({ url: streamUrl });
+        if (isPrivateBucket(bucket)) {
+          let signedUrl = null;
+          try {
+            const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
+            signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
+          } catch (err) {
+            console.warn('Failed to create signed URL, will fall back to proxy', err?.message || err);
+            signedUrl = null;
           }
-          console.debug('[media] returning direct signed URL for video', { id: video.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
-          return res.json({ url: signedUrl });
+          const base = getAppBaseUrl(req);
+          const encodedPath = encodeURIComponent(objectPath);
+          const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
+          const proxyUrl = `${base}/api/media/stream/${bucket}/${encodedPath}${signedUrl ? `?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}` : ''}`;
+          // Return both signed (if any) and proxy URL so frontend can prefer the direct signed URL when CORS allows it.
+          return { url: proxyUrl, signed: signedUrl };
         }
-      } catch (err) {
-        console.warn('Failed to create signed URL for video playback, falling back to stream proxy', err?.message || err);
+        const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
+        return { url: pub?.publicUrl || null, signed: pub?.publicUrl || null };
+      } catch (e) {
+        console.warn('makePlayable error', e?.message || e);
+        return { url: null, signed: null };
       }
-
-        const base = getAppBaseUrl(req);
-        const encodedPath = encodeURIComponent(objectPath);
-        // Provide a signed stream token so the <video> element can access without Authorization header
-        const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
-        const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
-        return res.json({ url: streamUrl });
     }
-    const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
-    return res.json({ url: pub.publicUrl });
+
+    const hqPlay = await makePlayable(hqUrlRaw);
+    const sdPlay = await makePlayable(sdUrlRaw || hqUrlRaw);
+    out.hq = hqPlay.url || null;
+    out.sd = sdPlay.url || null;
+    // include direct signed URLs when available so clients can try them first
+    out.hq_signed = hqPlay.signed || null;
+    out.sd_signed = sdPlay.signed || null;
+    return res.json(out);
   } catch (e) {
     console.error('Backblaze create signed url error', e);
     return res.status(500).json({ error: 'Failed to create playback URL' });
