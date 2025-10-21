@@ -7,6 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
+import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
 import VideoPlayer from '@/components/media/VideoPlayer';
 import TopSupporters from '@/components/content/TopSupporters';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +24,9 @@ export default function VideoDetails() {
   const [mediaUrl, setMediaUrl] = useState(null);
   const [hqUrl, setHqUrl] = useState(null);
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
+  const [priceEditModal, setPriceEditModal] = useState(false);
+  const [optimisticPrice, setOptimisticPrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
   const [salesSummary, setSalesSummary] = useState({ count: 0, gross_total: 0, creator_total: 0 });
   const localUser = React.useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user') || localStorage.getItem('demo_user') || 'null'); } catch { return null; }
@@ -223,6 +227,31 @@ export default function VideoDetails() {
     onModalCancel();
   };
 
+  const handlePriceEdit = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return; // require auth to edit
+    setPriceEditModal(true);
+  };
+
+  const handlePriceSave = async (newPrice) => {
+    setPriceLoading(true);
+    setOptimisticPrice(newPrice);
+    try {
+      const updated = await Video.update(video.id, { price: newPrice });
+      if (updated) {
+        setVideo(updated);
+        setPriceEditModal(false);
+      } else {
+        throw new Error('Failed to update price');
+      }
+    } catch (error) {
+      console.error('Video price update error:', error);
+    } finally {
+      setPriceLoading(false);
+      setOptimisticPrice(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -343,7 +372,7 @@ export default function VideoDetails() {
           <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between">
               <span className="text-gray-400">Minimum price:</span>
-              <span className="text-3xl font-bold text-yellow-400">From GH₵ {Number(video?.price ?? 0).toFixed(2)}</span>
+              <PriceDisplay price={video?.price} onEdit={handlePriceEdit} canEdit={isOwner} optimisticPrice={optimisticPrice} loading={priceLoading} />
             </div>
             {isOwner && (
               <div className="text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
@@ -378,6 +407,14 @@ export default function VideoDetails() {
       </div>
 
       <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
+      <PriceEditModal
+        isOpen={priceEditModal}
+        onClose={() => setPriceEditModal(false)}
+        currentPrice={video?.price}
+        onSave={handlePriceSave}
+        loading={priceLoading}
+        itemType="video"
+      />
     </div>
   );
 }
