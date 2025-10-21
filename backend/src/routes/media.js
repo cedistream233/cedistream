@@ -1,9 +1,27 @@
 import express from 'express';
+import crypto from 'crypto';
 import { createBackblazeClient } from '../lib/backblaze.js';
 import { authenticateToken } from '../lib/auth.js';
 import { query } from '../lib/database.js';
 
 const router = express.Router();
+
+// Simple in-memory caches to reduce DB load during streaming (multiple Range requests per playback)
+// Note: This resets on server restart. TTLs are intentionally short.
+const accessCache = new Map(); // key: `${userId}|${objectPath}` => { allowed: boolean, exp: number }
+const emailCache = new Map(); // key: userId => { email: string|null, exp: number }
+const ACCESS_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const EMAIL_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function cacheGet(map, key) {
+  const v = map.get(key);
+  if (!v) return null;
+  if (Date.now() > v.exp) { map.delete(key); return null; }
+  return v.value !== undefined ? v.value : (v.email ?? v);
+}
+function cacheSet(map, key, obj, ttl) {
+  map.set(key, { ...obj, exp: Date.now() + ttl });
+}
 
 // Cache for schema feature detection
 let HAS_PURCHASES_USER_EMAIL = null;
@@ -60,6 +78,21 @@ function getAppBaseUrl(req) {
   const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http');
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   return `${proto}://${host}`;
+}
+
+function shouldProxySignedUrl(signedUrl) {
+  // Short-lived safety: allow env override. By default we proxy signed URLs to avoid
+  // CORS problems when browsers fetch the Backblaze download host directly.
+  const alwaysProxy = String(process.env.BACKBLAZE_ALWAYS_PROXY || 'true').toLowerCase() === 'true';
+  if (alwaysProxy) return true;
+  if (!signedUrl) return false;
+  // Default Backblaze download host commonly doesn't include CORS allowing custom origins.
+  if (signedUrl.includes('backblazeb2.com') || signedUrl.includes('f003.backblazeb2.com')) {
+    // If a custom BACKBLAZE_PUBLIC_BASE is configured, allow using it directly
+    if (process.env.BACKBLAZE_PUBLIC_BASE && process.env.BACKBLAZE_PUBLIC_BASE.startsWith('http')) return false;
+    return true;
+  }
+  return false;
 }
 
 // Helper to parse Supabase storage public URL into { bucket, objectPath }
@@ -166,7 +199,18 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
       try {
         const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
         const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
-        if (signedUrl) return res.json({ url: signedUrl });
+        if (signedUrl) {
+          if (shouldProxySignedUrl(signedUrl)) {
+            const base = getAppBaseUrl(req);
+            const encodedPath = encodeURIComponent(objectPath);
+            const { st, sig } = signStreamToken(req.user.id, objectPath, 60 * 60);
+            const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
+            console.debug('[media] returning proxy stream URL for song', { id: song.id, bucket, path: objectPath });
+            return res.json({ url: streamUrl });
+          }
+          console.debug('[media] returning direct signed URL for song', { id: song.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+          return res.json({ url: signedUrl });
+        }
       } catch (err) {
         // If signed URL generation fails, fall back to stream proxy
         console.warn('Failed to create signed URL, falling back to stream proxy', err?.message || err);
@@ -219,7 +263,18 @@ router.get('/song/:id/preview', async (req, res) => {
                   try {
                     const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
                     const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
-                    if (signedUrl) return res.json({ url: signedUrl });
+                    if (signedUrl) {
+                      if (shouldProxySignedUrl(signedUrl)) {
+                        const base = getAppBaseUrl(req);
+                        const encodedPath = encodeURIComponent(objectPath);
+                        const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
+                        const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
+                        console.debug('[media] returning proxy stream URL for owner audio', { id: song.id, bucket, path: objectPath });
+                        return res.json({ url: streamUrl });
+                      }
+                      console.debug('[media] returning direct signed URL for owner audio', { id: song.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+                      return res.json({ url: signedUrl });
+                    }
                   } catch (err) {
                     console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
                   }
@@ -307,7 +362,18 @@ router.get('/video/:id/preview', async (req, res) => {
           try {
             const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
             const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
-            if (signedUrl) return res.json({ url: signedUrl });
+            if (signedUrl) {
+              if (shouldProxySignedUrl(signedUrl)) {
+                const base = getAppBaseUrl(req);
+                const encodedPath = encodeURIComponent(objectPath);
+                const { st, sig } = signStreamToken(req.user?.id || '0', objectPath, 60 * 60);
+                const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
+                console.debug('[media] returning proxy stream URL for video preview', { id: video.id, bucket, path: objectPath });
+                return res.json({ url: streamUrl });
+              }
+              console.debug('[media] returning direct signed URL for video preview', { id: video.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+              return res.json({ url: signedUrl });
+            }
           } catch (err) {
             console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
           }
@@ -380,15 +446,28 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
       try {
         const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
         const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
-        if (signedUrl) return res.json({ url: signedUrl });
+        if (signedUrl) {
+          if (shouldProxySignedUrl(signedUrl)) {
+            const base = getAppBaseUrl(req);
+            const encodedPath = encodeURIComponent(objectPath);
+            const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
+            const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
+            console.debug('[media] returning proxy stream URL for video', { id: video.id, bucket, path: objectPath });
+            return res.json({ url: streamUrl });
+          }
+          console.debug('[media] returning direct signed URL for video', { id: video.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+          return res.json({ url: signedUrl });
+        }
       } catch (err) {
         console.warn('Failed to create signed URL for video playback, falling back to stream proxy', err?.message || err);
       }
 
-      const base = getAppBaseUrl(req);
-      const encodedPath = encodeURIComponent(objectPath);
-      const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
-      return res.json({ url: streamUrl });
+        const base = getAppBaseUrl(req);
+        const encodedPath = encodeURIComponent(objectPath);
+        // Provide a signed stream token so the <video> element can access without Authorization header
+        const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
+        const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
+        return res.json({ url: streamUrl });
     }
     const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
     return res.json({ url: pub.publicUrl });
@@ -508,6 +587,77 @@ export default router;
 
 // Stream endpoint used for Backblaze private buckets. Path components are: /api/media/stream/:bucket/:encodedPath
 // Requires authentication unless content is public (previews)
+// Utilities for stream token signing (fallback when Authorization header can't be sent by browser video element)
+function base64url(input) {
+  return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+function signStreamToken(userId, objectPath, ttlSec = 3600) {
+  const secret = process.env.JWT_SECRET || 'change-me-secret';
+  const exp = Math.floor(Date.now() / 1000) + Math.max(60, Number(ttlSec || 3600));
+  const payload = `${userId}|${objectPath}|${exp}`;
+  const st = base64url(payload);
+  const sig = crypto.createHmac('sha256', secret).update(st).digest('hex');
+  return { st, sig };
+}
+function verifyStreamToken(st, sig) {
+  try {
+    const secret = process.env.JWT_SECRET || 'change-me-secret';
+    const expected = crypto.createHmac('sha256', secret).update(st).digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(String(sig || '')))) return null;
+    const raw = Buffer.from(String(st).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    const [userId, objectPath, expStr] = raw.split('|');
+    const exp = Number(expStr || '0');
+    if (!userId || !objectPath || !exp) return null;
+    if (Math.floor(Date.now() / 1000) > exp) return null;
+    return { userId, objectPath };
+  } catch {
+    return null;
+  }
+}
+
+router.options('/stream/:bucket/:encodedPath', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  return res.sendStatus(204);
+});
+
+router.head('/stream/:bucket/:encodedPath', async (req, res) => {
+  try {
+    const { bucket, encodedPath } = req.params;
+    const objectPath = decodeURIComponent(encodedPath);
+    const range = req.headers.range || 'bytes=0-1';
+    const b2 = createBackblazeClient();
+    const downloader = b2.from(bucket);
+    const result = await downloader.downloadStream(objectPath, range);
+    if (result.error) return res.status(404).end();
+
+    const headers = result.headers || {};
+    // Try to set a useful Content-Type. If B2 doesn't provide it, infer from extension.
+    let contentType = headers['content-type'] || 'application/octet-stream';
+    if (!headers['content-type']) {
+      const ext = String(objectPath).split('.').pop()?.toLowerCase();
+      if (ext === 'mp4') contentType = 'video/mp4';
+      else if (ext === 'webm') contentType = 'video/webm';
+      else if (ext === 'ogg' || ext === 'ogv') contentType = 'video/ogg';
+    }
+    res.setHeader('Content-Type', contentType);
+    if (headers['content-length']) res.setHeader('Content-Length', headers['content-length']);
+    if (headers['content-range']) res.setHeader('Content-Range', headers['content-range']);
+  if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
+  else res.setHeader('Accept-Ranges', 'bytes');
+    // Make streaming responses permissive for CORS to allow browser video playback from any origin.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type, X-Content-Duration');
+    console.debug('[media] HEAD stream', { bucket, path: objectPath, status: result.status || 206 });
+    res.status(result.status || 206).end();
+  } catch (e) {
+    return res.status(500).end();
+  }
+});
+
 router.get('/stream/:bucket/:encodedPath', async (req, res) => {
   try {
     const { bucket, encodedPath } = req.params;
@@ -519,30 +669,63 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
     if (!isPreview) {
       // Require authentication for non-preview content
       const auth = req.headers['authorization'];
-      if (!auth || !auth.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
+      let userIdFromAuth = null;
+      if (auth && auth.startsWith('Bearer ')) {
+        try {
+          const token = auth.split(' ')[1];
+          const { verifyToken } = await import('../lib/auth.js');
+          const decoded = verifyToken(token);
+          userIdFromAuth = decoded?.id || null;
+        } catch (authError) {
+          // ignore here; we'll check for signed stream token next
+        }
       }
-      
+
+      // If no Authorization header or invalid, try signed stream token query
+      if (!userIdFromAuth) {
+        const st = req.query.st;
+        const sig = req.query.sig;
+        const verified = (st && sig) ? verifyStreamToken(st, sig) : null;
+        if (!verified) {
+          console.warn('[media] stream token verification failed', { st: !!st, sig: !!sig, bucket, path: objectPath });
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        if (verified.objectPath !== objectPath) {
+          console.warn('[media] stream token path mismatch', { expected: objectPath, got: verified.objectPath });
+          return res.status(403).json({ error: 'Token path mismatch' });
+        }
+        userIdFromAuth = verified.userId;
+        console.debug('[media] stream token verified', { userId: userIdFromAuth, bucket, path: objectPath });
+      }
+
       try {
-        const token = auth.split(' ')[1];
-        const { verifyToken } = await import('../lib/auth.js');
-        const decoded = verifyToken(token);
-        const userId = decoded?.id;
-        
+        const userId = userIdFromAuth;
         if (!userId) {
+          console.warn('[media] no userId after auth check', { bucket, path: objectPath });
           return res.status(401).json({ error: 'Invalid token' });
         }
-        
-        // Load user email for legacy purchase checks
-        let userEmail = null;
-        try {
-          const ur = await query('SELECT email FROM users WHERE id = $1', [userId]);
-          userEmail = ur.rows?.[0]?.email || null;
-        } catch {}
-        
-        // Verify access (ownership or purchase)
-        const hasAccess = await verifyStreamAccess(userId, userEmail, objectPath);
+
+        // Load user email for legacy purchase checks (cached)
+        let userEmail = cacheGet(emailCache, String(userId)) || null;
+        if (userEmail === null) {
+          try {
+            const ur = await query('SELECT email FROM users WHERE id = $1', [userId]);
+            userEmail = ur.rows?.[0]?.email || null;
+            cacheSet(emailCache, String(userId), { email: userEmail }, EMAIL_TTL_MS);
+          } catch {
+            userEmail = null;
+          }
+        }
+
+        // Verify access (ownership or purchase) with short-lived cache per objectPath
+        const cacheKey = `${userId}|${objectPath}`;
+        let hasAccess = cacheGet(accessCache, cacheKey);
+        if (hasAccess === null || hasAccess === undefined) {
+          hasAccess = await verifyStreamAccess(userId, userEmail, objectPath);
+          cacheSet(accessCache, cacheKey, { value: !!hasAccess }, ACCESS_TTL_MS);
+        }
         if (!hasAccess) {
+          console.warn('[media] access denied after ownership check', { userId, bucket, path: objectPath });
           return res.status(403).json({ error: 'Access denied' });
         }
       } catch (authError) {
@@ -553,32 +736,98 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
     
     // Stream the content
     const range = req.headers.range || null;
+    // Verbose diagnostics logging to help debug playback issues
+    console.debug('[media] incoming stream request', {
+      bucket,
+      path: objectPath,
+      origin: req.headers.origin || null,
+      range,
+      isPreview,
+      ip: req.ip || req.headers['x-forwarded-for'] || null
+    });
     const b2 = createBackblazeClient();
     const downloader = b2.from(bucket);
-    const result = await downloader.downloadStream(objectPath, range);
+  const result = await downloader.downloadStream(objectPath, range);
     
     if (result.error) {
+      console.error('[media] stream download error', { bucket, path: objectPath, error: result.error });
       return res.status(404).json({ error: 'Not found' });
     }
     
-    // Set headers forwarded from B2 if present
+  // Set headers forwarded from B2 if present
     const headers = result.headers || {};
-    if (headers['content-type']) res.setHeader('Content-Type', headers['content-type']);
-    if (headers['content-length']) res.setHeader('Content-Length', headers['content-length']);
-    if (headers['content-range']) res.setHeader('Content-Range', headers['content-range']);
-    if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
+    console.debug('[media] stream response headers from storage', { bucket, path: objectPath, headers });
     
-    // Enable CORS for streaming endpoint
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // Determine the correct status code
+    let statusCode = result.status || 200;
+    
+    // If client requested a Range but upstream didn't provide Content-Range, try to synthesize one
+    if (range && !headers['content-range'] && headers['content-length']) {
+      try {
+        const total = Number(headers['content-length']);
+        if (!Number.isNaN(total) && total > 0) {
+          // assume start at 0 for a 'bytes=0-' or similar
+          const startMatch = String(range).match(/bytes=(\d+)-/);
+          const start = startMatch ? Number(startMatch[1]) : 0;
+          const end = total - start > 0 ? total - 1 : total;
+          const remaining = total - start;
+          const cr = `bytes ${start}-${end}/${total}`;
+          res.setHeader('Content-Range', cr);
+          res.setHeader('Content-Length', String(remaining));
+          statusCode = 206; // Force 206 for partial content
+          console.debug('[media] synthesized Content-Range', { bucket, path: objectPath, ContentRange: cr, remaining });
+        }
+      } catch (e) {
+        console.warn('[media] failed to synthesize Content-Range', e?.message || e);
+      }
+    }
+    
+    res.setHeader('Content-Type', headers['content-type'] || 'application/octet-stream');
+    if (headers['content-length'] && !range) res.setHeader('Content-Length', headers['content-length']);
+    if (headers['content-range']) {
+      res.setHeader('Content-Range', headers['content-range']);
+      statusCode = 206; // Backblaze sent proper range response
+    }
+    if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
+    else res.setHeader('Accept-Ranges', 'bytes');
+    
+    // Aggressive caching and buffering settings for smooth playback
+    res.setHeader('Cache-Control', isPreview ? 'public, max-age=86400, immutable' : 'public, max-age=3600, stale-while-revalidate=86400');
+    res.setHeader('X-Content-Duration', headers['x-content-duration'] || '');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    
+    // Enable browser caching with ETag if available
+    if (headers['etag']) res.setHeader('ETag', headers['etag']);
+    if (headers['last-modified']) res.setHeader('Last-Modified', headers['last-modified']);
+
+    // Make streaming responses permissive for CORS to allow browser video playback from any origin.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type, X-Content-Duration');
+    
+    console.debug('[media] GET stream', { bucket, path: objectPath, status: statusCode });
     
     // Stream the body
     const body = result.data;
+    res.status(statusCode);
     if (body && typeof body.pipe === 'function') {
+      // log when piping starts and attach error handler
+      try {
+        body.on && body.on('error', (err) => {
+          console.error('[media] stream body error', { bucket, path: objectPath, err: err && err.message });
+          // try to end response gracefully
+          if (!res.headersSent) res.status(500).end();
+        });
+      } catch (e) {}
+      console.debug('[media] piping stream to response', { bucket, path: objectPath });
       return body.pipe(res);
     }
     // Fallback: body as Buffer
-    if (Buffer.isBuffer(body)) return res.end(body);
+    if (Buffer.isBuffer(body)) {
+      console.debug('[media] sending buffer', { bucket, path: objectPath, size: body.length });
+      return res.end(body);
+    }
+    console.error('[media] no valid body to stream', { bucket, path: objectPath });
     res.status(500).end();
   } catch (e) {
     console.error('media stream error', e);

@@ -221,23 +221,77 @@ export function createBackblazeClient() {
         },
 
         downloadStream: async (path, rangeHeader) => {
+          // Stream directly by file name to avoid an extra list API call on every request.
+          // This reduces latency and pressure on B2 transaction caps, improving playback smoothness.
           await ensureAuth();
-          const objectPrefix = buildObjectPath(path);
-          const list = await b2.listFileNames({ bucketId: await getBucketId(physicalBucket), prefix: objectPrefix, maxFileCount: 1 });
-          if (!list.data.files || list.data.files.length === 0) return { error: 'not_found' };
-          const file = list.data.files[0];
-          const fileId = file.fileId;
+          const fileName = buildObjectPath(path);
+          const B2_DEBUG = process.env.B2_DEBUG === 'true';
+          
           try {
-            const opts = { fileId };
-            if (rangeHeader) opts.range = rangeHeader;
-            const resp = await b2.downloadFileById(opts);
-            return { error: null, data: resp.data, headers: resp.headers || {}, info: file };
+            const opts = { 
+              bucketName: physicalBucket, 
+              fileName,
+              responseType: 'stream',  // Critical: tell axios to return a stream
+            };
+            
+            // Add Range header through axios config
+            if (rangeHeader) {
+              opts.axios = {
+                headers: { 'Range': rangeHeader },
+                // Prevent axios from auto-decompressing which can break Range requests
+                decompress: false
+              };
+            }
+            
+            if (B2_DEBUG && rangeHeader) console.log('[B2] Range request:', rangeHeader);
+            
+            const resp = await b2.downloadFileByName(opts);
+            
+            if (B2_DEBUG) {
+              console.log('[B2] Response status:', resp.status);
+              console.log('[B2] Response headers:', { 
+                'content-length': resp.headers['content-length'],
+                'content-range': resp.headers['content-range'],
+                'accept-ranges': resp.headers['accept-ranges']
+              });
+            }
+            
+            return {
+              error: null,
+              data: resp.data,
+              headers: resp.headers || {},
+              status: resp.status,
+              info: { fileName, bucketName: physicalBucket }
+            };
           } catch (err) {
+            // As a fallback (rare), try by id if name fails due to eventual consistency on rename
             try {
-              const fallback = await b2.downloadFileById({ fileId });
-              return { error: null, data: fallback.data, headers: fallback.headers || {}, info: file };
+              const list = await b2.listFileNames({ bucketId: await getBucketId(physicalBucket), prefix: fileName, maxFileCount: 1 });
+              if (!list.data.files || list.data.files.length === 0) return { error: 'not_found' };
+              const file = list.data.files[0];
+              const fileId = file.fileId;
+              const opts = { 
+                fileId,
+                responseType: 'stream',  // Critical: tell axios to return a stream
+              };
+              
+              if (rangeHeader) {
+                opts.axios = {
+                  headers: { 'Range': rangeHeader },
+                  decompress: false
+                };
+              }
+              
+              const resp = await b2.downloadFileById(opts);
+              return {
+                error: null,
+                data: resp.data,
+                headers: resp.headers || {},
+                status: resp.status,
+                info: file
+              };
             } catch (e) {
-              return { error: e };
+              return { error: err };
             }
           }
         },

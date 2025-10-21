@@ -270,7 +270,8 @@ export default function VideoDetails() {
                       alt={video.title}
                       className="w-full rounded-2xl shadow-2xl"
                     />
-                    {!canAccess && (
+                    {/* Only show Locked badge if NOT owner and not accessible */}
+                    {(!isOwner && !canAccess) && (
                       <div className="absolute top-3 left-3 text-[11px] uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded">Locked</div>
                     )}
                     <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -329,14 +330,30 @@ export default function VideoDetails() {
             )}
           </div>
 
-          <Button
-            onClick={handleAddToCart}
-            size="lg"
-            className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
-          >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            <span>{canAccess ? 'Support again' : 'Add to Cart'}</span>
-          </Button>
+          {/* If the viewer is the owner, show a Play button / owner CTA. Otherwise show Add to Cart. */}
+          {isOwner ? (
+            <Button
+              onClick={() => {
+                // Try to auto-play if possible
+                const player = document.querySelector('video');
+                if (player) player.play().catch(()=>{});
+              }}
+              size="lg"
+              className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-green-600 hover:bg-green-700 text-lg flex items-center"
+            >
+              <Play className="w-5 h-5 mr-2" />
+              <span>Play (owner)</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={handleAddToCart}
+              size="lg"
+              className="w-full md:w-auto px-6 md:px-8 py-4 md:py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-lg flex items-center"
+            >
+              <ShoppingCart className="w-5 h-5 mr-2" />
+              <span>{canAccess ? 'Support again' : 'Add to Cart'}</span>
+            </Button>
+          )}
         </div>
       </div>
 
