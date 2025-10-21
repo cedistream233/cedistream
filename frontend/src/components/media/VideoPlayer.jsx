@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 
 export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false }) {
   const ref = useRef(null);
@@ -9,50 +9,151 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
+  // buffering: true when playback is actually stalled (not just UI progress)
   const [buffering, setBuffering] = useState(false);
+  // readyState & networkState exposed for debug
   const [readyState, setReadyState] = useState(0);
   const [networkState, setNetworkState] = useState(0);
+  // derived: video is considered "ready" for center play when readyState >= 3 (HAVE_FUTURE_DATA)
+  const [isReady, setIsReady] = useState(false);
   const [playError, setPlayError] = useState(null);
   const hideTimer = useRef(null);
+  const bufferingCheckInterval = useRef(null);
+  const lastPlayProgress = useRef({ time: 0, timestamp: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const v = ref.current; if (!v) return;
-  const onLoaded = () => { setDuration(v.duration || 0); setReadyState(v.readyState || 0); setNetworkState(v.networkState || 0); };
-    const onTime = () => setCurrent(v.currentTime || 0);
+    const onLoaded = () => {
+      setDuration(v.duration || 0);
+      setReadyState(v.readyState || 0);
+      setNetworkState(v.networkState || 0);
+      setIsReady((v.readyState || 0) >= 3);
+    };
+    const onTime = () => {
+      setCurrent(v.currentTime || 0);
+      // record progress to help detect stuck playback
+      lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() };
+    };
     const onEnd = () => setPlaying(false);
-    const onWaiting = () => setBuffering(true);
-    const onCanPlay = () => setBuffering(false);
-  const onProgress = () => { try { setReadyState(v.readyState || 0); setNetworkState(v.networkState || 0); } catch(e){} };
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onPlaying = () => setBuffering(false);
+    const onWaiting = () => {
+      // native waiting usually indicates buffering
+      setBuffering(true);
+    };
+    const onCanPlay = () => {
+      setBuffering(false);
+      setIsReady(true);
+    };
+    const onCanPlayThrough = () => {
+      setBuffering(false);
+      setIsReady(true);
+    };
+    const onStalled = () => {
+      // browser couldn't fetch data
+      setBuffering(true);
+    };
+    const onProgress = () => {
+      try {
+        setReadyState(v.readyState || 0);
+        setNetworkState(v.networkState || 0);
+      } catch (e) {}
+      // if data buffered past currentTime, we may not be buffering
+      try {
+        const buffered = v.buffered;
+        const t = v.currentTime || 0;
+        let bufferedAhead = 0;
+        for (let i = 0; i < (buffered?.length || 0); i++) {
+          if (t >= buffered.start(i) && t <= buffered.end(i)) {
+            bufferedAhead = buffered.end(i) - t;
+            break;
+          }
+        }
+        // if we have >0.5s buffered ahead consider not buffering
+        if (bufferedAhead > 0.5) setBuffering(false);
+      } catch (e) {}
+    };
+    const onPlay = () => {
+      setPlaying(true);
+      // start periodic check to detect stalled playback even if no waiting fired
+      if (bufferingCheckInterval.current) clearInterval(bufferingCheckInterval.current);
+      bufferingCheckInterval.current = setInterval(() => {
+        const now = Date.now();
+        const last = lastPlayProgress.current;
+        // if playing and time hasn't advanced >0.25s in 1500ms, probably buffering
+        if (v && !v.paused && playing) {
+          const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
+          const since = now - (last.timestamp || 0);
+          if (since > 1500 && timeAdvanced < 0.25) {
+            setBuffering(true);
+          } else {
+            setBuffering(false);
+          }
+        }
+      }, 700);
+    };
+    const onPause = () => {
+      setPlaying(false);
+      // paused -> not buffering
+      setBuffering(false);
+      if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+    };
+    const onPlaying = () => {
+      setBuffering(false);
+      setPlaying(true);
+    };
+  // removed PiP handlers
+    const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     
     v.addEventListener('loadedmetadata', onLoaded);
-  v.addEventListener('timeupdate', onTime);
+    v.addEventListener('timeupdate', onTime);
     v.addEventListener('ended', onEnd);
     v.addEventListener('waiting', onWaiting);
     v.addEventListener('canplay', onCanPlay);
-  v.addEventListener('progress', onProgress);
-  v.addEventListener('play', onPlay);
-  v.addEventListener('pause', onPause);
+    v.addEventListener('canplaythrough', onCanPlayThrough);
+    v.addEventListener('stalled', onStalled);
+    v.addEventListener('progress', onProgress);
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
     v.addEventListener('playing', onPlaying);
+  // (PiP removed)
+  document.addEventListener('fullscreenchange', onFullscreenChange);
     
     return () => {
       v.removeEventListener('loadedmetadata', onLoaded);
-        v.removeEventListener('timeupdate', onTime);
+      v.removeEventListener('timeupdate', onTime);
       v.removeEventListener('ended', onEnd);
       v.removeEventListener('waiting', onWaiting);
       v.removeEventListener('canplay', onCanPlay);
-        v.removeEventListener('progress', onProgress);
+      v.removeEventListener('canplaythrough', onCanPlayThrough);
+      v.removeEventListener('stalled', onStalled);
+      v.removeEventListener('progress', onProgress);
       v.removeEventListener('play', onPlay);
       v.removeEventListener('pause', onPause);
       v.removeEventListener('playing', onPlaying);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
     };
   }, []);
+
+  // toggle a class on container when entering/exiting fullscreen to help with layout
+  useEffect(() => {
+    const el = containerRef.current; if (!el) return;
+    if (isFullscreen) {
+      el.classList.add('is-fullscreen');
+    } else {
+      el.classList.remove('is-fullscreen');
+    }
+  }, [isFullscreen]);
+
+  // PiP/speed menu removed
 
   useEffect(() => {
     const v = ref.current; if (!v) return; setPlaying(false); setCurrent(0);
     try { v.load?.(); } catch {}
+    // clear any existing buffering interval when source changes
+    if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+    // reset fullscreen flag
+    setIsFullscreen(!!document.fullscreenElement);
   }, [src]);
 
   useEffect(() => {
@@ -95,7 +196,17 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const onSeek = (e) => { const v = ref.current; if (!v) return; v.currentTime = Number(e.target.value); setCurrent(Number(e.target.value)); };
   const toggleMute = () => { const v = ref.current; if (!v) return; v.muted = !v.muted; setMuted(v.muted); };
   const enterFullscreen = () => { const el = containerRef.current; if (!el) return; if (el.requestFullscreen) el.requestFullscreen(); };
-  const skip = (sec) => { const v = ref.current; if (!v) return; v.currentTime = Math.max(0, Math.min((v.currentTime||0)+sec, duration||0)); };
+  // skip buttons removed to increase seek bar space on mobile
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        const el = containerRef.current; if (!el) return; await el.requestFullscreen();
+      }
+    } catch (e) { console.warn('fullscreen toggle failed', e); }
+  };
+  // PiP and speed controls removed
 
   const onContainerTap = (ev) => {
     const target = ev.target;
@@ -104,25 +215,92 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       showControlsTemporarily();
       return;
     }
-    showControlsTemporarily();
+    // single tap: if controls hidden -> show them, otherwise toggle play
+    if (!controlsVisible) {
+      showControlsTemporarily();
+      return;
+    }
+    // controls visible -> toggle playback
     togglePlay();
   };
 
   const progressPercent = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
-    <div ref={containerRef} className="relative bg-black rounded-xl overflow-hidden select-none group">
+    <div ref={containerRef} className="relative bg-black rounded-xl overflow-hidden select-none group" onMouseMove={showControlsTemporarily} onTouchStart={showControlsTemporarily} onClick={onContainerTap}>
       <video
         ref={ref}
         src={src || undefined}
         poster={poster}
-        className="w-full h-auto block"
+        className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-auto block cedi-video"}
         preload="auto"
         playsInline
-        controls
+        // removed native controls to avoid browser center-play overlay
         crossOrigin="anonymous"
         controlsList="nodownload"
       />
+
+      {/* hide native center play overlays where possible (vendor prefixed selectors) */}
+      <style>{`
+        .cedi-video::-webkit-media-controls-overlay-play-button { display: none !important; }
+        .cedi-video::-webkit-media-controls-start-playback-button { display: none !important; }
+        /* Firefox uses different controls; attempt to hide large play button */
+        .cedi-video::-moz-loading { display: none !important; }
+        /* fullscreen container/video fixes */
+        .is-fullscreen { width: 100% !important; height: 100% !important; }
+        .is-fullscreen .cedi-video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
+      `}</style>
+
+      {/* custom center play overlay: only show when video is ready and not buffering */}
+      {controlsVisible && (!playing) && isReady && !buffering && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-auto px-4">
+          <button
+            aria-label="Play"
+            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+            className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-black/60 flex items-center justify-center shadow-lg"
+          >
+            <Play className="w-6 h-6 md:w-8 md:h-8 text-white" />
+          </button>
+        </div>
+      )}
+
+      {/* small buffering spinner (only when actually buffering) */}
+      {buffering && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <div className="w-12 h-12 border-4 border-t-transparent border-white/80 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Responsive modern control bar (mobile-friendly) */}
+      {controlsVisible && (
+        <div className="absolute left-0 right-0 bottom-0 z-40 bg-gradient-to-t from-black/80 to-transparent p-1 md:p-3 flex items-center md:gap-3 gap-1">
+          <div className="flex items-center gap-1 md:gap-3 flex-none">
+            <button onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} className="p-1 md:p-2 touch-manipulation">
+              {playing ? <Pause className="w-5 h-5 text-white" /> : <Play className="w-5 h-5 text-white" />}
+            </button>
+          </div>
+
+          <div className="flex-1 flex items-center gap-2 md:gap-3 mx-1">
+            <div className="text-xs text-white/90 hidden md:block w-24">{format(current)} / {format(duration)}</div>
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              step="0.01"
+              value={current}
+              onChange={onSeek}
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 md:gap-3 flex-none">
+            <button onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="p-1 md:p-2">
+              {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+            </button>
+            <button onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'} className="p-1 md:p-2"><Maximize2 className="w-5 h-5 text-white" /></button>
+          </div>
+        </div>
+      )}
 
       {/* Debug panel (enable via URL ?debugVideo=1) */}
       {typeof window !== 'undefined' && window.location.search.includes('debugVideo=1') && (
