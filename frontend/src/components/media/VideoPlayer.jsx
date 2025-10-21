@@ -8,6 +8,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const [muted, setMuted] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
+  const [bufferedPercent, setBufferedPercent] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   // buffering: true when playback is actually stalled (not just UI progress)
   const [buffering, setBuffering] = useState(false);
@@ -21,6 +22,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const bufferingCheckInterval = useRef(null);
   const lastPlayProgress = useRef({ time: 0, timestamp: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // avoid concurrent play/pause races
+  const playInProgressRef = useRef(false);
+  const pauseRequestedRef = useRef(false);
 
   useEffect(() => {
     const v = ref.current; if (!v) return;
@@ -29,11 +33,33 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setReadyState(v.readyState || 0);
       setNetworkState(v.networkState || 0);
       setIsReady((v.readyState || 0) >= 3);
+      // compute initial buffered percent
+      try {
+        const d = v.duration || 0;
+        if (d > 0 && v.buffered && v.buffered.length > 0) {
+          const end = v.buffered.end(v.buffered.length - 1);
+          setBufferedPercent(Math.min(100, (end / d) * 100));
+        } else {
+          setBufferedPercent(0);
+        }
+      } catch (e) {}
     };
     const onTime = () => {
       setCurrent(v.currentTime || 0);
       // record progress to help detect stuck playback
       lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() };
+      // update buffered percent as time moves (in case progress events are sparse)
+      try {
+        const d = v.duration || 0;
+        if (d > 0 && v.buffered && v.buffered.length > 0) {
+          // find the buffered range that contains or is after current time
+          let end = 0;
+          for (let i = 0; i < v.buffered.length; i++) {
+            end = Math.max(end, v.buffered.end(i));
+          }
+          setBufferedPercent(Math.min(100, (end / d) * 100));
+        }
+      } catch (e) {}
     };
     const onEnd = () => setPlaying(false);
     const onWaiting = () => {
@@ -70,6 +96,14 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         }
         // if we have >0.5s buffered ahead consider not buffering
         if (bufferedAhead > 0.5) setBuffering(false);
+        // update buffered percent for UI
+        try {
+          const d = v.duration || 0;
+          if (d > 0) {
+            const bufferedEnd = buffered.end(buffered.length - 1);
+            setBufferedPercent(Math.min(100, (bufferedEnd / d) * 100));
+          }
+        } catch (e) {}
       } catch (e) {}
     };
     const onPlay = () => {
@@ -168,33 +202,72 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
   const togglePlay = async () => {
     const v = ref.current; if (!v) { console.debug('[VideoPlayer] no video element'); return; }
-    console.debug('[VideoPlayer] togglePlay', { playing, src: v.currentSrc || src, paused: v.paused, readyState: v.readyState, currentTime: v.currentTime });
-    if (playing) { try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause failed', e); } return; }
+    console.debug('[VideoPlayer] togglePlay', { playing, src: v.currentSrc || src, paused: v.paused, readyState: v.readyState, currentTime: v.currentTime, playInProgress: playInProgressRef.current });
+
+    // If currently playing, request a pause. If a play is in progress, mark pauseRequested and return —
+    // we'll pause once the in-flight play resolves to avoid aborting the play promise.
+    if (playing) {
+      if (playInProgressRef.current) {
+        pauseRequestedRef.current = true;
+        console.debug('[VideoPlayer] pause requested while play in progress — deferring pause');
+        return;
+      }
+      try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause failed', e); }
+      return;
+    }
+
+    // If a play is already in progress, ignore subsequent play requests
+    if (playInProgressRef.current) { console.debug('[VideoPlayer] play already in progress — ignoring'); return; }
+
+    playInProgressRef.current = true;
+    pauseRequestedRef.current = false;
     try {
       await v.play();
-      setPlaying(true);
-      setPlayError(null);
-      console.debug('[VideoPlayer] play succeeded');
+      // If user asked to pause while play was pending, honor it now
+      if (pauseRequestedRef.current) {
+        try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause after play resolved failed', e); }
+      } else {
+        setPlaying(true);
+        setPlayError(null);
+        console.debug('[VideoPlayer] play succeeded');
+      }
     } catch (err) {
       console.warn('[VideoPlayer] play() failed', err);
-      try { setPlayError(err?.message || String(err)); } catch(e){}
+      try { setPlayError(err?.message || String(err)); } catch (e) {}
       // Retry muted (user clicked) — some browsers allow a user gesture to play if muted
       try {
-        v.muted = true;
-        await v.play();
-        setPlaying(true);
-        setPlayError('Playback started muted (muted retry)');
-        setMuted(true);
-        console.debug('[VideoPlayer] play succeeded after muted retry');
-        return;
+        // If a pause was requested while we were attempting to play, don't attempt a muted retry
+        if (pauseRequestedRef.current) {
+          console.debug('[VideoPlayer] muted retry skipped because pause was requested');
+        } else {
+          v.muted = true;
+          await v.play();
+          if (pauseRequestedRef.current) {
+            try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause after muted retry failed', e); }
+          } else {
+            setPlaying(true);
+            setPlayError('Playback started muted (muted retry)');
+            setMuted(true);
+            console.debug('[VideoPlayer] play succeeded after muted retry');
+          }
+        }
       } catch (err2) {
         console.warn('[VideoPlayer] muted retry failed', err2);
       }
+    } finally {
+      playInProgressRef.current = false;
+      pauseRequestedRef.current = false;
     }
   };
   const format = (t) => { if (!isFinite(t)) return '0:00'; const m = Math.floor(t/60); const s = Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`; };
   const onSeek = (e) => { const v = ref.current; if (!v) return; v.currentTime = Number(e.target.value); setCurrent(Number(e.target.value)); };
-  const toggleMute = () => { const v = ref.current; if (!v) return; v.muted = !v.muted; setMuted(v.muted); };
+  const toggleMute = () => {
+    const v = ref.current; if (!v) return;
+    // toggling mute shouldn't interrupt playback attempts. Just update muted state.
+    const newMuted = !v.muted;
+    try { v.muted = newMuted; } catch (e) { console.warn('[VideoPlayer] toggleMute failed', e); }
+    setMuted(newMuted);
+  };
   const enterFullscreen = () => { const el = containerRef.current; if (!el) return; if (el.requestFullscreen) el.requestFullscreen(); };
   // skip buttons removed to increase seek bar space on mobile
   const toggleFullscreen = async () => {
@@ -287,17 +360,26 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             </button>
           </div>
 
-          <div className="flex-1 flex items-center gap-2 md:gap-3 mx-1">
-            <div className="text-xs text-white/90 hidden md:block w-24">{format(current)} / {format(duration)}</div>
-            <input
-              type="range"
-              min={0}
-              max={duration || 0}
-              step="0.01"
-              value={current}
-              onChange={onSeek}
-              className="w-full"
-            />
+          <div className="flex-1 flex flex-col gap-1 mx-1">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/90 hidden md:block w-24">{format(current)} / {format(duration)}</div>
+            </div>
+            <div className="relative w-full h-2 md:h-3 rounded overflow-hidden bg-white/10">
+              {/* buffered bar (light) */}
+              <div className="absolute left-0 top-0 bottom-0 bg-white/30" style={{ width: `${bufferedPercent}%` }} />
+              {/* played bar (accent) */}
+              <div className="absolute left-0 top-0 bottom-0 bg-purple-500" style={{ width: `${progressPercent}%` }} />
+              {/* transparent range input for interaction */}
+              <input
+                type="range"
+                min={0}
+                max={duration || 0}
+                step="0.01"
+                value={current}
+                onChange={onSeek}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-1 md:gap-3 flex-none">
