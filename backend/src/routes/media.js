@@ -6,6 +6,10 @@ import { query } from '../lib/database.js';
 
 const router = express.Router();
 
+// Toggle verbose media logging with env var MEDIA_DEBUG=true
+const MEDIA_DEBUG = String(process.env.MEDIA_DEBUG || 'false').toLowerCase() === 'true';
+function mediaDebug(...args) { if (MEDIA_DEBUG) console.debug(...args); }
+
 // Simple in-memory caches to reduce DB load during streaming (multiple Range requests per playback)
 // Note: This resets on server restart. TTLs are intentionally short.
 const accessCache = new Map(); // key: `${userId}|${objectPath}` => { allowed: boolean, exp: number }
@@ -205,10 +209,10 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
             const encodedPath = encodeURIComponent(objectPath);
             const { st, sig } = signStreamToken(req.user.id, objectPath, 60 * 60);
             const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
-            console.debug('[media] returning proxy stream URL for song', { id: song.id, bucket, path: objectPath });
+            mediaDebug('[media] returning proxy stream URL for song', { id: song.id, bucket, path: objectPath });
             return res.json({ url: streamUrl });
           }
-          console.debug('[media] returning direct signed URL for song', { id: song.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+          mediaDebug('[media] returning direct signed URL for song', { id: song.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
           return res.json({ url: signedUrl });
         }
       } catch (err) {
@@ -269,10 +273,10 @@ router.get('/song/:id/preview', async (req, res) => {
                         const encodedPath = encodeURIComponent(objectPath);
                         const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
                         const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
-                        console.debug('[media] returning proxy stream URL for owner audio', { id: song.id, bucket, path: objectPath });
+                        mediaDebug('[media] returning proxy stream URL for owner audio', { id: song.id, bucket, path: objectPath });
                         return res.json({ url: streamUrl });
                       }
-                      console.debug('[media] returning direct signed URL for owner audio', { id: song.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+                      mediaDebug('[media] returning direct signed URL for owner audio', { id: song.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
                       return res.json({ url: signedUrl });
                     }
                   } catch (err) {
@@ -368,10 +372,10 @@ router.get('/video/:id/preview', async (req, res) => {
                 const encodedPath = encodeURIComponent(objectPath);
                 const { st, sig } = signStreamToken(req.user?.id || '0', objectPath, 60 * 60);
                 const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
-                console.debug('[media] returning proxy stream URL for video preview', { id: video.id, bucket, path: objectPath });
+                mediaDebug('[media] returning proxy stream URL for video preview', { id: video.id, bucket, path: objectPath });
                 return res.json({ url: streamUrl });
               }
-              console.debug('[media] returning direct signed URL for video preview', { id: video.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
+              mediaDebug('[media] returning direct signed URL for video preview', { id: video.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
               return res.json({ url: signedUrl });
             }
           } catch (err) {
@@ -659,7 +663,7 @@ router.head('/stream/:bucket/:encodedPath', async (req, res) => {
     // Make streaming responses permissive for CORS to allow browser video playback from any origin.
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type, X-Content-Duration');
-    console.debug('[media] HEAD stream', { bucket, path: objectPath, status: result.status || 206 });
+  mediaDebug('[media] HEAD stream', { bucket, path: objectPath, status: result.status || 206 });
     res.status(result.status || 206).end();
   } catch (e) {
     return res.status(500).end();
@@ -703,7 +707,7 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
           return res.status(403).json({ error: 'Token path mismatch' });
         }
         userIdFromAuth = verified.userId;
-        console.debug('[media] stream token verified', { userId: userIdFromAuth, bucket, path: objectPath });
+        mediaDebug('[media] stream token verified', { userId: userIdFromAuth, bucket, path: objectPath });
       }
 
       try {
@@ -745,7 +749,7 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
     // Stream the content
     const range = req.headers.range || null;
     // Verbose diagnostics logging to help debug playback issues
-    console.debug('[media] incoming stream request', {
+    mediaDebug('[media] incoming stream request', {
       bucket,
       path: objectPath,
       origin: req.headers.origin || null,
@@ -764,7 +768,7 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
     
   // Set headers forwarded from B2 if present
     const headers = result.headers || {};
-    console.debug('[media] stream response headers from storage', { bucket, path: objectPath, headers });
+  mediaDebug('[media] stream response headers from storage', { bucket, path: objectPath, headers });
     
     // Determine the correct status code
     let statusCode = result.status || 200;
@@ -783,7 +787,7 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
           res.setHeader('Content-Range', cr);
           res.setHeader('Content-Length', String(remaining));
           statusCode = 206; // Force 206 for partial content
-          console.debug('[media] synthesized Content-Range', { bucket, path: objectPath, ContentRange: cr, remaining });
+          mediaDebug('[media] synthesized Content-Range', { bucket, path: objectPath, ContentRange: cr, remaining });
         }
       } catch (e) {
         console.warn('[media] failed to synthesize Content-Range', e?.message || e);
@@ -813,7 +817,7 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type, X-Content-Duration');
     
-    console.debug('[media] GET stream', { bucket, path: objectPath, status: statusCode });
+  mediaDebug('[media] GET stream', { bucket, path: objectPath, status: statusCode });
     
     // Stream the body
     const body = result.data;
@@ -827,12 +831,12 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
           if (!res.headersSent) res.status(500).end();
         });
       } catch (e) {}
-      console.debug('[media] piping stream to response', { bucket, path: objectPath });
+  mediaDebug('[media] piping stream to response', { bucket, path: objectPath });
       return body.pipe(res);
     }
     // Fallback: body as Buffer
     if (Buffer.isBuffer(body)) {
-      console.debug('[media] sending buffer', { bucket, path: objectPath, size: body.length });
+  mediaDebug('[media] sending buffer', { bucket, path: objectPath, size: body.length });
       return res.end(body);
     }
     console.error('[media] no valid body to stream', { bucket, path: objectPath });

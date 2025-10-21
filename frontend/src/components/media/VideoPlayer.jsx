@@ -94,9 +94,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             break;
           }
         }
-        // if we have >0.5s buffered ahead consider not buffering
-        if (bufferedAhead > 0.5) setBuffering(false);
-        // update buffered percent for UI
+        // Only clear buffering here if we both have buffered data ahead AND playback time has advanced recently.
+        // This prevents hiding the spinner when bytes are buffered but playback is stalled.
         try {
           const d = v.duration || 0;
           if (d > 0) {
@@ -104,6 +103,14 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             setBufferedPercent(Math.min(100, (bufferedEnd / d) * 100));
           }
         } catch (e) {}
+
+        // If we have >0.5s buffered ahead and the player's time has advanced in the last 1s, consider not buffering
+        const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+        const since = Date.now() - (last.timestamp || 0);
+        const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
+        if (bufferedAhead > 0.5 && (timeAdvanced > 0.1 || since < 1100)) {
+          setBuffering(false);
+        }
       } catch (e) {}
     };
     const onPlay = () => {
@@ -112,14 +119,16 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       if (bufferingCheckInterval.current) clearInterval(bufferingCheckInterval.current);
       bufferingCheckInterval.current = setInterval(() => {
         const now = Date.now();
-        const last = lastPlayProgress.current;
-        // if playing and time hasn't advanced >0.25s in 1500ms, probably buffering
-        if (v && !v.paused && playing) {
+        const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+        // If the element exists and is not paused, check whether time advanced recently.
+        if (v && !v.paused) {
           const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
           const since = now - (last.timestamp || 0);
+          // If time hasn't advanced enough within the threshold, we're likely buffering/stalled
           if (since > 1500 && timeAdvanced < 0.25) {
             setBuffering(true);
           } else {
+            // playback is progressing -> not buffering
             setBuffering(false);
           }
         }
@@ -202,14 +211,13 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
   const togglePlay = async () => {
     const v = ref.current; if (!v) { console.debug('[VideoPlayer] no video element'); return; }
-    console.debug('[VideoPlayer] togglePlay', { playing, src: v.currentSrc || src, paused: v.paused, readyState: v.readyState, currentTime: v.currentTime, playInProgress: playInProgressRef.current });
+  // debug logs removed to reduce console noise in production
 
     // If currently playing, request a pause. If a play is in progress, mark pauseRequested and return —
     // we'll pause once the in-flight play resolves to avoid aborting the play promise.
     if (playing) {
       if (playInProgressRef.current) {
-        pauseRequestedRef.current = true;
-        console.debug('[VideoPlayer] pause requested while play in progress — deferring pause');
+  pauseRequestedRef.current = true;
         return;
       }
       try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause failed', e); }
@@ -217,7 +225,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     }
 
     // If a play is already in progress, ignore subsequent play requests
-    if (playInProgressRef.current) { console.debug('[VideoPlayer] play already in progress — ignoring'); return; }
+  if (playInProgressRef.current) { return; }
 
     playInProgressRef.current = true;
     pauseRequestedRef.current = false;
@@ -225,34 +233,32 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       await v.play();
       // If user asked to pause while play was pending, honor it now
       if (pauseRequestedRef.current) {
-        try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause after play resolved failed', e); }
+        try { v.pause(); setPlaying(false); } catch (e) { /* keep minimal logging */ }
       } else {
         setPlaying(true);
         setPlayError(null);
-        console.debug('[VideoPlayer] play succeeded');
       }
     } catch (err) {
-      console.warn('[VideoPlayer] play() failed', err);
+      // play() failed (e.g., user gesture required) - surface to UI but avoid noisy console logs
       try { setPlayError(err?.message || String(err)); } catch (e) {}
       // Retry muted (user clicked) — some browsers allow a user gesture to play if muted
       try {
         // If a pause was requested while we were attempting to play, don't attempt a muted retry
         if (pauseRequestedRef.current) {
-          console.debug('[VideoPlayer] muted retry skipped because pause was requested');
+          // skip muted retry if a pause was requested
         } else {
           v.muted = true;
           await v.play();
           if (pauseRequestedRef.current) {
-            try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause after muted retry failed', e); }
+            try { v.pause(); setPlaying(false); } catch (e) { /* silent */ }
           } else {
             setPlaying(true);
             setPlayError('Playback started muted (muted retry)');
             setMuted(true);
-            console.debug('[VideoPlayer] play succeeded after muted retry');
           }
         }
       } catch (err2) {
-        console.warn('[VideoPlayer] muted retry failed', err2);
+        /* muted retry failed - handled via UI state (playError) */
       }
     } finally {
       playInProgressRef.current = false;
@@ -362,14 +368,26 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
           <div className="flex-1 flex flex-col gap-1 mx-1">
             <div className="flex items-center justify-between">
-              <div className="text-xs text-white/90 hidden md:block w-24">{format(current)} / {format(duration)}</div>
+              <div className="text-xs text-white/90 w-20 md:w-24">{format(current)} / {format(duration)}</div>
             </div>
-            <div className="relative w-full h-2 md:h-3 rounded overflow-hidden bg-white/10">
+            <div className="relative w-full h-1 md:h-1.5 rounded overflow-visible bg-white/10">
               {/* buffered bar (light) */}
-              <div className="absolute left-0 top-0 bottom-0 bg-white/30" style={{ width: `${bufferedPercent}%` }} />
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 w-full rounded bg-white/30 overflow-hidden">
+                <div className="h-full bg-white/30" style={{ width: `${bufferedPercent}%` }} />
+              </div>
               {/* played bar (accent) */}
-              <div className="absolute left-0 top-0 bottom-0 bg-purple-500" style={{ width: `${progressPercent}%` }} />
-              {/* transparent range input for interaction */}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 rounded bg-purple-500" style={{ width: `${progressPercent}%` }} />
+
+              {/* visible thumb indicator (matches played progress). pointer-events none so the underlying range handles input */}
+              <div
+                aria-hidden
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none"
+                style={{ left: `${progressPercent}%` }}
+              >
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-white border-2 border-purple-600 shadow-lg" />
+              </div>
+
+              {/* transparent range input for interaction; keep it full-height to have a good touch target */}
               <input
                 type="range"
                 min={0}
@@ -377,7 +395,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
                 step="0.01"
                 value={current}
                 onChange={onSeek}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                className="absolute left-0 top-0 w-full h-6 md:h-8 opacity-0 cursor-pointer"
+                aria-label="Seek"
               />
             </div>
           </div>
