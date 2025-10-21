@@ -227,12 +227,19 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const progressPercent = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
-    <div ref={containerRef} className="relative bg-black rounded-xl overflow-hidden select-none group" onMouseMove={showControlsTemporarily} onTouchStart={showControlsTemporarily} onClick={onContainerTap}>
+    <div
+      ref={containerRef}
+      className="relative bg-black rounded-xl overflow-hidden select-none group"
+      onMouseMove={showControlsTemporarily}
+      onTouchStart={showControlsTemporarily}
+      onClick={onContainerTap}
+      style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
+    >
       <video
         ref={ref}
         src={src || undefined}
         poster={poster}
-        className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-auto block cedi-video"}
+        className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-full object-cover cedi-video"}
         preload="auto"
         playsInline
         // removed native controls to avoid browser center-play overlay
