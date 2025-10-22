@@ -1,9 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
 
-export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false }) {
+export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false, onReady, suppressLoadingUI=false }) {
   const ref = useRef(null);
   const containerRef = useRef(null);
+  // show an immediate loading overlay when the source changes so users know
+  // the video is loading and they shouldn't click expecting instant playback
+  // Initialize from `src` so the overlay renders on the very first paint when
+  // the component mounts with a src (avoids a render-frame delay where the
+  // poster could be clickable before effects run).
+  const [sourceLoading, setSourceLoading] = useState(Boolean(src));
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -33,6 +39,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setReadyState(v.readyState || 0);
       setNetworkState(v.networkState || 0);
       setIsReady((v.readyState || 0) >= 3);
+  // loaded metadata -> we have enough info to hide the source loading UI
+  setSourceLoading(false);
+  try { onReady && onReady(); } catch (e) {}
       // compute initial buffered percent
       try {
         const d = v.duration || 0;
@@ -69,10 +78,14 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     const onCanPlay = () => {
       setBuffering(false);
       setIsReady(true);
+      setSourceLoading(false);
+      try { onReady && onReady(); } catch (e) {}
     };
     const onCanPlayThrough = () => {
       setBuffering(false);
       setIsReady(true);
+      setSourceLoading(false);
+      try { onReady && onReady(); } catch (e) {}
     };
     const onStalled = () => {
       // browser couldn't fetch data
@@ -115,6 +128,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     };
     const onPlay = () => {
       setPlaying(true);
+      // playback started -> hide source-loading overlay if still visible
+      setSourceLoading(false);
+      try { onReady && onReady(); } catch (e) {}
       // start periodic check to detect stalled playback even if no waiting fired
       if (bufferingCheckInterval.current) clearInterval(bufferingCheckInterval.current);
       bufferingCheckInterval.current = setInterval(() => {
@@ -192,12 +208,42 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
   useEffect(() => {
     const v = ref.current; if (!v) return; setPlaying(false); setCurrent(0);
+    // mark source as loading immediately when src changes so the overlay
+    // is visible while the browser fetches metadata / first bytes.
+    if (src) setSourceLoading(true);
     try { v.load?.(); } catch {}
     // clear any existing buffering interval when source changes
     if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
     // reset fullscreen flag
     setIsFullscreen(!!document.fullscreenElement);
   }, [src]);
+
+  // Ensure the loading overlay is shown as soon as `src` changes even if the
+  // video element ref isn't mounted yet. The other effect that calls
+  // ref.current may return early if the ref isn't ready, so this guarantees
+  // immediate feedback to the user.
+  useEffect(() => {
+    if (src) {
+      setSourceLoading(true);
+    } else {
+      setSourceLoading(false);
+    }
+    // no cleanup required
+  }, [src]);
+
+  // On mount, immediately show the loading overlay (so users don't see a
+  // clickable poster while the signed URL / src is being fetched). If the
+  // video element is already ready, clear the overlay immediately to avoid
+  // flicker.
+  useEffect(() => {
+    setSourceLoading(true);
+    const v = ref.current;
+    if (v && (v.readyState >= 3 || v.readyState > 0)) {
+      // already have metadata/ready data, hide overlay
+      setSourceLoading(false);
+    }
+    // no cleanup
+  }, []);
 
   useEffect(() => {
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
@@ -325,6 +371,18 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         crossOrigin="anonymous"
         controlsList="nodownload"
       />
+
+      {/* Immediate blocking loading overlay shown when sourceLoading is true.
+          It's modern (semi-transparent backdrop + spinner + subtle text) and
+          prevents clicks while the video is fetching initial data. */}
+      {sourceLoading && !suppressLoadingUI && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 border-4 border-t-transparent border-white/90 rounded-full animate-spin" />
+            <div className="text-sm text-white/90">Loading video…</div>
+          </div>
+        </div>
+      )}
 
       {/* hide native center play overlays where possible (vendor prefixed selectors) */}
       <style>{`

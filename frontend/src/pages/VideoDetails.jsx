@@ -23,6 +23,7 @@ export default function VideoDetails() {
   const [canAccess, setCanAccess] = useState(false);
   const [mediaUrl, setMediaUrl] = useState(null);
   const [hqUrl, setHqUrl] = useState(null);
+  const [mediaFetching, setMediaFetching] = useState(false);
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
   const [priceEditModal, setPriceEditModal] = useState(false);
   const [optimisticPrice, setOptimisticPrice] = useState(null);
@@ -83,6 +84,9 @@ export default function VideoDetails() {
       }
 
       setVideo(foundVideo);
+  // indicate we're about to fetch the media URL / preview so the UI
+  // can show a loading overlay immediately and prevent premature clicks
+  if (foundVideo) setMediaFetching(true);
 
       // Parallelize sales fetch for owners (non-blocking)
       if (foundVideo) {
@@ -104,6 +108,8 @@ export default function VideoDetails() {
     (async () => {
       try {
         if (!video) return;
+        // we are starting the media URL fetch flow; ensure UI shows a loader
+        setMediaFetching(true);
 
       // First, check if a preview was pre-fetched and stored
       try {
@@ -154,6 +160,13 @@ export default function VideoDetails() {
         setMediaUrl(null); setCanAccess(false);
       }
       } catch (e) { /* swallow errors to avoid breaking render */ }
+      finally {
+        // If mediaUrl hasn't been set by the fetch flow above, keep mediaFetching
+        // false only if mediaUrl was resolved; otherwise leave it (the inner
+        // branches set mediaUrl and will implicitly clear). To be safe, clear
+        // mediaFetching here if a mediaUrl was set synchronously in the flow.
+        if (mediaUrl) setMediaFetching(false);
+      }
     })();
   }, [video?.id]);
 
@@ -314,7 +327,7 @@ export default function VideoDetails() {
           ) : (
             <div className="w-full rounded-lg overflow-hidden bg-black/60">
               {mediaUrl ? (
-                <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} />
+                <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} onReady={() => setMediaFetching(false)} suppressLoadingUI={true} />
               ) : (
                 video.thumbnail ? (
                   <div className="relative group">
@@ -323,6 +336,14 @@ export default function VideoDetails() {
                       alt={video.title}
                       className="w-full rounded-2xl shadow-2xl"
                     />
+                    {mediaFetching && (
+                      <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto rounded-2xl">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 border-4 border-t-transparent border-white/90 rounded-full animate-spin" />
+                          <div className="text-sm text-white/90">Loading video…</div>
+                        </div>
+                      </div>
+                    )}
                     {/* Only show Locked badge if NOT owner and not accessible */}
                     {(!isOwner && !canAccess) && (
                       <div className="absolute top-3 left-3 text-[11px] uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded">Locked</div>
