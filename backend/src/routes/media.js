@@ -800,8 +800,12 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
       res.setHeader('Content-Range', headers['content-range']);
       statusCode = 206; // Backblaze sent proper range response
     }
-    if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
-    else res.setHeader('Accept-Ranges', 'bytes');
+  if (headers['accept-ranges']) res.setHeader('Accept-Ranges', headers['accept-ranges']);
+  else res.setHeader('Accept-Ranges', 'bytes');
+  // Explicitly advertise range support consistently so browsers can plan Range requests
+  // even when upstream storage omits the header. This helps with seeking and reuse of
+  // buffered ranges during replay.
+  res.setHeader('Accept-Ranges', res.getHeader('Accept-Ranges') || 'bytes');
     
     // Aggressive caching and buffering settings for smooth playback
     res.setHeader('Cache-Control', isPreview ? 'public, max-age=86400, immutable' : 'public, max-age=3600, stale-while-revalidate=86400');

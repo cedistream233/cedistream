@@ -132,23 +132,33 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
       // start periodic check to detect stalled playback even if no waiting fired
+      // Be tolerant: prefer the browser readyState when available and use a
+      // slightly larger observation window to avoid flapping on transient stalls.
       if (bufferingCheckInterval.current) clearInterval(bufferingCheckInterval.current);
       bufferingCheckInterval.current = setInterval(() => {
         const now = Date.now();
         const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-        // If the element exists and is not paused, check whether time advanced recently.
-        if (v && !v.paused) {
+        if (!v) return;
+
+        // If the browser reports HAVE_FUTURE_DATA (3) or better, assume playback
+        // has sufficient data and avoid showing buffering spinner.
+        if ((v.readyState || 0) >= 3) {
+          setBuffering(false);
+          return;
+        }
+
+        if (!v.paused) {
           const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
           const since = now - (last.timestamp || 0);
-          // If time hasn't advanced enough within the threshold, we're likely buffering/stalled
-          if (since > 1500 && timeAdvanced < 0.25) {
+          // Use a larger window to reduce false positives; require less time
+          // advancement to consider playback progressing.
+          if (since > 2500 && timeAdvanced < 0.15) {
             setBuffering(true);
           } else {
-            // playback is progressing -> not buffering
             setBuffering(false);
           }
         }
-      }, 700);
+      }, 1000);
     };
     const onPause = () => {
       setPlaying(false);

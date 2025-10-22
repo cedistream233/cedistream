@@ -1,5 +1,7 @@
 import B2 from 'backblaze-b2';
 import { Readable } from 'stream';
+import http from 'http';
+import https from 'https';
 import crypto from 'crypto';
 
 // Simple Backblaze B2 client wrapper exposing minimal API used by the app.
@@ -49,6 +51,11 @@ export function createBackblazeClient() {
 
   const b2 = new B2({ applicationKeyId: accountId, applicationKey: appKey });
   let downloadBase = null;
+
+  // Reuse HTTP(S) connections for follow-up Range requests to reduce latency.
+  // These agents are passed to axios via opts.axios so backblaze SDK reuses sockets.
+  const httpAgent = new http.Agent({ keepAlive: true, keepAliveMsecs: 10000, maxSockets: 100 });
+  const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 10000, maxSockets: 100 });
 
   async function ensureAuth() {
     if (b2.authorized) return;
@@ -245,6 +252,10 @@ export function createBackblazeClient() {
             
             if (B2_DEBUG && rangeHeader) console.log('[B2] Range request:', rangeHeader);
             
+            // Provide axios options to use keep-alive agents for lower latency
+            if (!opts.axios) opts.axios = {};
+            opts.axios.httpAgent = httpAgent;
+            opts.axios.httpsAgent = httpsAgent;
             const resp = await b2.downloadFileByName(opts);
             
             if (B2_DEBUG) {
@@ -282,6 +293,9 @@ export function createBackblazeClient() {
                 };
               }
               
+              if (!opts.axios) opts.axios = {};
+              opts.axios.httpAgent = httpAgent;
+              opts.axios.httpsAgent = httpsAgent;
               const resp = await b2.downloadFileById(opts);
               return {
                 error: null,
