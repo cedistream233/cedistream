@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
 
 export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false }) {
   const ref = useRef(null);
@@ -405,7 +405,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             <button onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} className="p-1 md:p-2">
               {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
             </button>
-            <button onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'} className="p-1 md:p-2"><Maximize2 className="w-5 h-5 text-white" /></button>
+            <button onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'} className="p-1 md:p-2">{isFullscreen ? <Minimize2 className="w-5 h-5 text-white" /> : <Maximize2 className="w-5 h-5 text-white" />}</button>
           </div>
         </div>
       )}
