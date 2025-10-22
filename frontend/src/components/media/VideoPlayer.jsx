@@ -207,14 +207,45 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // PiP/speed menu removed
 
   useEffect(() => {
-    const v = ref.current; if (!v) return; setPlaying(false); setCurrent(0);
-    // mark source as loading immediately when src changes so the overlay
-    // is visible while the browser fetches metadata / first bytes.
+    const v = ref.current; if (!v) return;
+    // When source changes, prefer seeking to 0 if the browser already has
+    // the same resolved source to avoid forcing a full reload which causes
+    // re-buffering. Only call load() when the effective source actually
+    // changes.
+    setPlaying(false);
+    setCurrent(0);
+    const resolveSame = (el, newSrc) => {
+      try {
+        if (!newSrc) return false;
+        // el.currentSrc may be absolute; compare resolved hrefs when possible
+        const a = el.currentSrc || el.src || '';
+        // try URL resolution fallback
+        try {
+          const left = new URL(a, window.location.href).href;
+          const right = new URL(newSrc, window.location.href).href;
+          return left === right;
+        } catch (e) {
+          return String(a) === String(newSrc);
+        }
+      } catch (e) { return false; }
+    };
+
     if (src) setSourceLoading(true);
-    try { v.load?.(); } catch {}
-    // clear any existing buffering interval when source changes
+
+    const isSame = resolveSame(v, src);
+    if (isSame) {
+      // Avoid reinitializing the element — seek to start so buffered data can be reused
+      try { if (typeof v.currentTime !== 'undefined') v.currentTime = 0; } catch (e) {}
+      // clear any existing buffering interval when source changes
+      if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+      setIsFullscreen(!!document.fullscreenElement);
+      return;
+    }
+
+    // Different source: allow the browser to load the new resource. Calling
+    // load() is fine here because the src actually changed.
+    try { v.load && v.load(); } catch (e) {}
     if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
-    // reset fullscreen flag
     setIsFullscreen(!!document.fullscreenElement);
   }, [src]);
 

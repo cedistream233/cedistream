@@ -95,14 +95,35 @@ export default function AudioPlayer({
   useEffect(() => {
     if (!audioRef.current) return;
     const wasPlaying = playing;
-    audioRef.current.src = src || '';
-    // when src changes, start loading metadata
-    if (src) {
-      try { setAudioLoading(true); } catch (e) {}
-      try { audioRef.current.load(); } catch (e) {}
+
+    const el = audioRef.current;
+    const resolveSame = (el, newSrc) => {
+      try {
+        if (!newSrc) return false;
+        const a = el.src || '';
+        try {
+          const left = new URL(a, window.location.href).href;
+          const right = new URL(newSrc, window.location.href).href;
+          return left === right;
+        } catch (e) {
+          return String(a) === String(newSrc);
+        }
+      } catch (e) { return false; }
+    };
+
+    const isSame = resolveSame(el, src);
+    el.src = src || '';
+    if (isSame) {
+      // reuse buffer by seeking to start instead of calling load()
+      try { if (typeof el.currentTime !== 'undefined') el.currentTime = 0; } catch (e) {}
     } else {
-      // if there is no src, preserve external loading prop
-      if (!loading) setAudioLoading(false);
+      // when src changes to a new resource, start loading metadata
+      if (src) {
+        try { setAudioLoading(true); } catch (e) {}
+        try { el.load(); } catch (e) {}
+      } else {
+        if (!loading) setAudioLoading(false);
+      }
     }
     // Apply loop for single-track loop mode
     audioRef.current.loop = loopMode === 'one';
