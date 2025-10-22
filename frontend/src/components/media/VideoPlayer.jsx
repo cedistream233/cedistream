@@ -73,29 +73,60 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     const onEnd = () => setPlaying(false);
     const onWaiting = () => {
       // native waiting usually indicates buffering
-      setBuffering(true);
+        // native waiting often fires for very short stalls; debounce to avoid
+        // showing the spinner for brief network hiccups. We'll set a short
+        // timeout and only mark buffering if the waiting state persists.
+        if (bufferingCheckInterval.current) { /* reuse */ }
+        // schedule a gentle check after a short delay
+        const waitId = setTimeout(() => {
+          // if the player still reports readyState < 3 and hasn't progressed,
+          // treat as buffering
+          try {
+            if (ref.current && (ref.current.readyState || 0) < 3) {
+              // only mark buffering if no recent progress
+              const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+              if (Date.now() - (last.timestamp || 0) > 700) {
+                setBuffering(true);
+              }
+            }
+          } catch (e) {}
+        }, 350);
+        // attach to ref so we can clear if canplay/playing fires
+        try { ref.current._waitingDebounce = waitId; } catch (e) {}
     };
     const onCanPlay = () => {
       setBuffering(false);
       setIsReady(true);
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
+    // clear any waiting debounce timers
+    try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
     };
     const onCanPlayThrough = () => {
       setBuffering(false);
       setIsReady(true);
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
+    try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
     };
     const onStalled = () => {
       // browser couldn't fetch data
-      setBuffering(true);
+        // browser couldn't fetch data — treat similarly to waiting but keep it
+        // debounced to avoid false positives for short stalls.
+        setTimeout(() => {
+          try {
+            if (ref.current && (ref.current.readyState || 0) < 3) {
+              setBuffering(true);
+            }
+          } catch (e) {}
+        }, 500);
     };
     const onProgress = () => {
       try {
         setReadyState(v.readyState || 0);
         setNetworkState(v.networkState || 0);
       } catch (e) {}
+
       // if data buffered past currentTime, we may not be buffering
       try {
         const buffered = v.buffered;
@@ -107,8 +138,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             break;
           }
         }
-        // Only clear buffering here if we both have buffered data ahead AND playback time has advanced recently.
-        // This prevents hiding the spinner when bytes are buffered but playback is stalled.
+        // update buffered percent
         try {
           const d = v.duration || 0;
           if (d > 0) {
@@ -117,15 +147,20 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
           }
         } catch (e) {}
 
-        // If we have >0.5s buffered ahead and the player's time has advanced in the last 1s, consider not buffering
-        const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-        const since = Date.now() - (last.timestamp || 0);
-        const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
-        if (bufferedAhead > 0.5 && (timeAdvanced > 0.1 || since < 1100)) {
-          setBuffering(false);
-        }
+        // If we have >0.8s buffered ahead and the player's time has advanced
+        // recently, clear buffering. Use a slightly larger headroom to avoid
+        // flipping on brief gaps.
+        try {
+          const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+          const since = Date.now() - (last.timestamp || 0);
+          const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
+          if (bufferedAhead > 0.8 && (timeAdvanced > 0.05 || since < 1200)) {
+            setBuffering(false);
+          }
+        } catch (e) {}
       } catch (e) {}
     };
+
     const onPlay = () => {
       setPlaying(true);
       // playback started -> hide source-loading overlay if still visible
@@ -150,10 +185,23 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         if (!v.paused) {
           const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
           const since = now - (last.timestamp || 0);
-          // Use a larger window to reduce false positives; require less time
-          // advancement to consider playback progressing.
-          if (since > 2500 && timeAdvanced < 0.15) {
-            setBuffering(true);
+          // Use a more tolerant window: only show buffering if we haven't seen
+          // any progress for a longer period and readyState is low.
+          if (since > 3000 && timeAdvanced < 0.12) {
+            // double-check buffered ranges: only mark buffering if there's
+            // effectively no buffered data ahead (<200ms)
+            let bufferedAhead = 0;
+            try {
+              const t = v.currentTime || 0;
+              for (let i = 0; i < (v.buffered?.length || 0); i++) {
+                if (t >= v.buffered.start(i) && t <= v.buffered.end(i)) {
+                  bufferedAhead = v.buffered.end(i) - t;
+                  break;
+                }
+              }
+            } catch (e) { bufferedAhead = 0; }
+            if (bufferedAhead < 0.2) setBuffering(true);
+            else setBuffering(false);
           } else {
             setBuffering(false);
           }
