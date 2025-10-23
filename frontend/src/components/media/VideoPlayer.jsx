@@ -121,13 +121,33 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
           } catch (e) {}
         }, 500);
     };
+    // helper: compute adaptive thresholds based on duration
+    function getAdaptiveThresholds(duration) {
+      // duration in seconds. For very short clips, we use smaller headroom and
+      // shorter detection windows. For longer clips we remain conservative.
+      if (!isFinite(duration) || duration <= 0) {
+        return { bufferedHeadroom: 0.8, stalledWindowMs: 3000, progressTolerance: 0.12 };
+      }
+      if (duration <= 8) {
+        // tiny clips: be very forgiving
+        return { bufferedHeadroom: 0.12, stalledWindowMs: 900, progressTolerance: 0.05 };
+      } else if (duration <= 30) {
+        // short clips: small headroom, faster detection
+        return { bufferedHeadroom: 0.25, stalledWindowMs: 1500, progressTolerance: 0.08 };
+      } else if (duration <= 90) {
+        // medium clips
+        return { bufferedHeadroom: 0.6, stalledWindowMs: 2500, progressTolerance: 0.1 };
+      }
+      // long clips
+      return { bufferedHeadroom: 0.8, stalledWindowMs: 3000, progressTolerance: 0.12 };
+    }
+
     const onProgress = () => {
       try {
         setReadyState(v.readyState || 0);
         setNetworkState(v.networkState || 0);
       } catch (e) {}
 
-      // if data buffered past currentTime, we may not be buffering
       try {
         const buffered = v.buffered;
         const t = v.currentTime || 0;
@@ -138,7 +158,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             break;
           }
         }
-        // update buffered percent
+
+        // update buffered percent (existing behavior)
         try {
           const d = v.duration || 0;
           if (d > 0) {
@@ -147,17 +168,18 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
           }
         } catch (e) {}
 
-        // If we have >0.8s buffered ahead and the player's time has advanced
-        // recently, clear buffering. Use a slightly larger headroom to avoid
-        // flipping on brief gaps.
-        try {
-          const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-          const since = Date.now() - (last.timestamp || 0);
-          const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
-          if (bufferedAhead > 0.8 && (timeAdvanced > 0.05 || since < 1200)) {
-            setBuffering(false);
-          }
-        } catch (e) {}
+        // adaptive thresholds
+        const d = v.duration || 0;
+        const { bufferedHeadroom, stalledWindowMs, progressTolerance } = getAdaptiveThresholds(d);
+        const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+        const since = Date.now() - (last.timestamp || 0);
+        const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
+
+        // If we have enough buffered ahead for this clip and playback has made progress,
+        // clear buffering. Using adaptive headroom prevents false positives on short clips.
+        if (bufferedAhead > bufferedHeadroom && (timeAdvanced > progressTolerance || since < stalledWindowMs)) {
+          setBuffering(false);
+        }
       } catch (e) {}
     };
 
@@ -171,25 +193,25 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // slightly larger observation window to avoid flapping on transient stalls.
       if (bufferingCheckInterval.current) clearInterval(bufferingCheckInterval.current);
       bufferingCheckInterval.current = setInterval(() => {
+        if (!v) return;
         const now = Date.now();
         const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-        if (!v) return;
 
-        // If the browser reports HAVE_FUTURE_DATA (3) or better, assume playback
-        // has sufficient data and avoid showing buffering spinner.
-        if ((v.readyState || 0) >= 3) {
-          setBuffering(false);
-          return;
-        }
+        // If browser reports a healthy readyState, treat as not buffering
+        if ((v.readyState || 0) >= 3) { setBuffering(false); return; }
 
+        // tolerance adapts to duration
+        const d = v.duration || 0;
+        const { bufferedHeadroom, stalledWindowMs, progressTolerance } = getAdaptiveThresholds(d);
+
+        // if not paused, check if time made progress recently
         if (!v.paused) {
           const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
           const since = now - (last.timestamp || 0);
-          // Use a more tolerant window: only show buffering if we haven't seen
-          // any progress for a longer period and readyState is low.
-          if (since > 3000 && timeAdvanced < 0.12) {
-            // double-check buffered ranges: only mark buffering if there's
-            // effectively no buffered data ahead (<200ms)
+
+          // only mark buffering when there's been little progress for a longer than allowed window
+          if (since > stalledWindowMs && timeAdvanced < progressTolerance) {
+            // double-check buffered ranges: only mark buffering if bufferedAhead is tiny
             let bufferedAhead = 0;
             try {
               const t = v.currentTime || 0;
@@ -200,13 +222,14 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
                 }
               }
             } catch (e) { bufferedAhead = 0; }
-            if (bufferedAhead < 0.2) setBuffering(true);
+
+            if (bufferedAhead < Math.min(0.2, bufferedHeadroom)) setBuffering(true);
             else setBuffering(false);
           } else {
             setBuffering(false);
           }
         }
-      }, 1000);
+      }, 700);
     };
     const onPause = () => {
       setPlaying(false);

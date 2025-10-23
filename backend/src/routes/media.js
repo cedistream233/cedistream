@@ -86,8 +86,10 @@ function getAppBaseUrl(req) {
 
 function shouldProxySignedUrl(signedUrl) {
   // Short-lived safety: allow env override. By default we proxy signed URLs to avoid
-  // CORS problems when browsers fetch the Backblaze download host directly.
-  const alwaysProxy = String(process.env.BACKBLAZE_ALWAYS_PROXY || 'true').toLowerCase() === 'true';
+  // CORS problems historically forced proxying, but modern Backblaze/CDN setups
+  // typically support CORS. Default to NOT proxying so media can be served
+  // directly from storage/CDN (better for streaming and range requests).
+  const alwaysProxy = String(process.env.BACKBLAZE_ALWAYS_PROXY || 'false').toLowerCase() === 'true';
   if (alwaysProxy) return true;
   if (!signedUrl) return false;
   // Default Backblaze download host commonly doesn't include CORS allowing custom origins.
@@ -778,16 +780,23 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
       try {
         const total = Number(headers['content-length']);
         if (!Number.isNaN(total) && total > 0) {
-          // assume start at 0 for a 'bytes=0-' or similar
-          const startMatch = String(range).match(/bytes=(\d+)-/);
-          const start = startMatch ? Number(startMatch[1]) : 0;
-          const end = total - start > 0 ? total - 1 : total;
-          const remaining = total - start;
+          // parse range header bytes=START-END or bytes=START-
+          const m = String(range).match(/bytes=(\d+)-(\d*)/);
+          const start = m ? Number(m[1]) : 0;
+          let end = (m && m[2]) ? Number(m[2]) : (total - 1);
+          if (isNaN(end) || end >= total) end = total - 1;
+          if (start > end || start >= total) {
+            // unsatisfiable
+            res.setHeader('Content-Range', `bytes */${total}`);
+            res.status(416).end();
+            return;
+          }
+          const chunkSize = (end - start) + 1;
           const cr = `bytes ${start}-${end}/${total}`;
           res.setHeader('Content-Range', cr);
-          res.setHeader('Content-Length', String(remaining));
+          res.setHeader('Content-Length', String(chunkSize));
           statusCode = 206; // Force 206 for partial content
-          mediaDebug('[media] synthesized Content-Range', { bucket, path: objectPath, ContentRange: cr, remaining });
+          mediaDebug('[media] synthesized Content-Range', { bucket, path: objectPath, ContentRange: cr, chunkSize });
         }
       } catch (e) {
         console.warn('[media] failed to synthesize Content-Range', e?.message || e);
@@ -831,18 +840,29 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
       try {
         body.on && body.on('error', (err) => {
           console.error('[media] stream body error', { bucket, path: objectPath, err: err && err.message });
-          // try to end response gracefully
-          if (!res.headersSent) res.status(500).end();
+          // If client already disconnected, don't attempt to write a 500
+          try { if (!res.headersSent && !res.writableEnded) res.status(500).end(); } catch (e) {}
         });
       } catch (e) {}
-  mediaDebug('[media] piping stream to response', { bucket, path: objectPath });
+
+      // Clean up if client disconnects: destroy upstream stream to free resources
+      req.on('close', () => {
+        mediaDebug('[media] client disconnected, destroying upstream stream', { bucket, path: objectPath });
+        try { if (body && typeof body.destroy === 'function') body.destroy(); } catch (e) {}
+      });
+
+      mediaDebug('[media] piping stream to response', { bucket, path: objectPath });
       return body.pipe(res);
     }
+
     // Fallback: body as Buffer
     if (Buffer.isBuffer(body)) {
-  mediaDebug('[media] sending buffer', { bucket, path: objectPath, size: body.length });
+      mediaDebug('[media] sending buffer', { bucket, path: objectPath, size: body.length });
+      // Ensure Content-Length is set for full responses
+      try { if (!range && !res.getHeader('Content-Length')) res.setHeader('Content-Length', String(body.length)); } catch (e) {}
       return res.end(body);
     }
+
     console.error('[media] no valid body to stream', { bucket, path: objectPath });
     res.status(500).end();
   } catch (e) {
