@@ -70,7 +70,18 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         }
       } catch (e) {}
     };
-    const onEnd = () => setPlaying(false);
+    const onEnd = () => {
+      setPlaying(false);
+      // Seek to 0 so that repeating the same video reuses buffered data instead
+      // of causing a full reload in some browsers.
+      try {
+        if (ref.current && typeof ref.current.currentTime !== 'undefined') {
+          ref.current.currentTime = 0;
+          setCurrent(0);
+          lastPlayProgress.current = { time: 0, timestamp: Date.now() };
+        }
+      } catch (e) {}
+    };
     const onWaiting = () => {
       // native waiting usually indicates buffering
         // native waiting often fires for very short stalls; debounce to avoid
@@ -397,6 +408,14 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     playInProgressRef.current = true;
     pauseRequestedRef.current = false;
     try {
+      // If the element is in ended state, seek to 0 so replay reuses buffered data
+      try {
+        if (v.ended && typeof v.currentTime !== 'undefined') {
+          v.currentTime = 0;
+          setCurrent(0);
+          lastPlayProgress.current = { time: 0, timestamp: Date.now() };
+        }
+      } catch (e) {}
       await v.play();
       // If user asked to pause while play was pending, honor it now
       if (pauseRequestedRef.current) {
