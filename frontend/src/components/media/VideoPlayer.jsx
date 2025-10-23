@@ -529,10 +529,23 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         </div>
       )}
 
-      {/* small buffering spinner (only when actually buffering) */}
-      {buffering && (
+      {/* buffering UI:
+          - For short clips (<=30s) show a subtle inline pulse bar at the bottom
+            so playback doesn't feel blocked.
+          - For longer clips keep the centered spinner so users see an explicit
+            buffering state. */}
+      {buffering && duration > 30 && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 border-4 border-t-transparent border-white/80 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* subtle inline pulse for short previews */}
+      {buffering && duration > 0 && duration <= 30 && (
+        <div className="absolute left-0 right-0 bottom-0 z-40 p-2 pointer-events-none">
+          <div className="h-1 rounded-full bg-white/20 overflow-hidden">
+            <div className="h-full bg-white/50 animate-[pulse_1.6s_infinite]" style={{ width: '20%' }} />
+          </div>
         </div>
       )}
 
