@@ -11,6 +11,12 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from Vite's dist folder
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// Health check endpoint for uptime monitors and platform health checks
+app.get('/health', (req, res) => {
+  // lightweight response used by uptime monitors (UptimeRobot, etc.)
+  res.status(200).send('OK');
+});
+
 // Fallback to index.html for client-side routing (SPA)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
