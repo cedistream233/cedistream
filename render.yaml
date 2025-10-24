@@ -7,13 +7,18 @@ services:
     repo: https://github.com/cedistream233/cedistream.git
     branch: master
     rootDir: frontend
-    buildCommand: "npm install && npm run build"
-    startCommand: "npm start"
+    # Use prefix-based commands so build runs correctly even if Render runs from repo root.
+    buildCommand: "npm ci --prefix frontend && npm run build --prefix frontend"
+    startCommand: "npm start --prefix frontend"
     env:
+      # Preferred Vite-exposed variable (will be embedded at build time)
+      VITE_API_URL:
+        type: env
+        value: "https://cedistreambackend.onrender.com"
+      # legacy/alias variables (optional)
       VITE_BACKEND_URL:
         type: env
-        value: "https://cedistreambackend.onrender.com" # backend URL used by frontend (VITE_BACKEND_URL)
-      # legacy alias (safe to keep)
+        value: "https://cedistreambackend.onrender.com"
       VITE_API_BASE:
         type: env
         value: "https://cedistreambackend.onrender.com"
