@@ -635,6 +635,9 @@ router.options('/stream/:bucket/:encodedPath', (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type, Accept');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
+  // Allow cross-origin embedding of streamed media even when platform adds
+  // restrictive CORP/COOP headers. This explicitly permits cross-origin use.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   return res.sendStatus(204);
 });
 
@@ -665,6 +668,9 @@ router.head('/stream/:bucket/:encodedPath', async (req, res) => {
     // Make streaming responses permissive for CORS to allow browser video playback from any origin.
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type, X-Content-Duration');
+    // Ensure the response can be embedded/fetched cross-origin even if the
+    // hosting platform injects stricter CORP/COOP defaults.
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   mediaDebug('[media] HEAD stream', { bucket, path: objectPath, status: result.status || 206 });
     res.status(result.status || 206).end();
   } catch (e) {
@@ -829,6 +835,9 @@ router.get('/stream/:bucket/:encodedPath', async (req, res) => {
     // Make streaming responses permissive for CORS to allow browser video playback from any origin.
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range, Content-Type, X-Content-Duration');
+  // Ensure the response can be embedded/fetched cross-origin even if the
+  // hosting platform injects stricter CORP/COOP defaults.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     
   mediaDebug('[media] GET stream', { bucket, path: objectPath, status: statusCode });
     
