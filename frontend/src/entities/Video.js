@@ -1,3 +1,5 @@
+import { config } from '@/utils/config';
+
 export const VideoSchema = {
   name: "Video",
   type: "object",
@@ -36,17 +38,18 @@ const mapOrder = (orderBy) => {
 export const Video = {
   async list(orderBy = '-created_date') {
     const { orderBy: field, direction } = mapOrder(orderBy);
-    const res = await fetch(`/api/videos?orderBy=${encodeURIComponent(field)}&direction=${encodeURIComponent(direction)}`);
+    const res = await fetch(`${config.backendUrl}/api/videos?orderBy=${encodeURIComponent(field)}&direction=${encodeURIComponent(direction)}`);
     if (!res.ok) return [];
     return res.json();
   },
   async get(id) {
-    const res = await fetch(`/api/videos/${encodeURIComponent(id)}`);
+    const res = await fetch(`${config.backendUrl}/api/videos/${encodeURIComponent(id)}`);
     if (!res.ok) return null;
     return res.json();
   },
   async getPreviewUrl(id) {
-    const url = `/api/media/video/${encodeURIComponent(id)}/preview`;
+    const path = `/api/media/video/${encodeURIComponent(id)}/preview`;
+    const url = `${config.backendUrl}${path}`;
     try {
       let res = await fetch(url);
       if (res.status === 404) return null;

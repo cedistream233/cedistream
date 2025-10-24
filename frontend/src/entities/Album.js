@@ -1,3 +1,5 @@
+import { config } from '@/utils/config';
+
 export const AlbumSchema = {
   name: "Album",
   type: "object",
@@ -48,18 +50,18 @@ const mapOrder = (orderBy) => {
 export const Album = {
   async list(orderBy = '-created_date') {
     const { orderBy: field, direction } = mapOrder(orderBy);
-    const res = await fetch(`/api/albums?orderBy=${encodeURIComponent(field)}&direction=${encodeURIComponent(direction)}`);
+    const res = await fetch(`${config.backendUrl}/api/albums?orderBy=${encodeURIComponent(field)}&direction=${encodeURIComponent(direction)}`);
     if (!res.ok) return [];
     return res.json();
   },
   async get(id) {
-    const res = await fetch(`/api/albums/${encodeURIComponent(id)}`);
+    const res = await fetch(`${config.backendUrl}/api/albums/${encodeURIComponent(id)}`);
     if (!res.ok) return null;
     return res.json();
   },
   async update(id, patch = {}) {
     const token = localStorage.getItem('token');
-    const res = await fetch(`/api/albums/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${config.backendUrl}/api/albums/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
       body: JSON.stringify(patch)

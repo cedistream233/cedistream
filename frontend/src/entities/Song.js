@@ -1,5 +1,8 @@
+import { config } from '@/utils/config';
+
 async function getPreviewUrl(id) {
-  const url = `/api/media/song/${encodeURIComponent(id)}/preview`;
+  const path = `/api/media/song/${encodeURIComponent(id)}/preview`;
+  const url = `${config.backendUrl}${path}`;
   try {
     let res = await fetch(url);
     // If 404, treat as 'no preview' and return null (not an error)
@@ -16,13 +19,21 @@ async function getPreviewUrl(id) {
     return null;
   }
 }
+
 async function getSignedUrl(id, token) {
-  const res = await fetch(`/api/media/song/${id}`, {
-    headers: { Authorization: token ? `Bearer ${token}` : '' }
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.url || null;
+  const path = `/api/media/song/${id}`;
+  const url = `${config.backendUrl}${path}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: token ? `Bearer ${token}` : '' }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.url || null;
+  } catch (err) {
+    console.warn('getSignedUrl failed:', err?.message || err);
+    return null;
+  }
 }
 export const SongSchema = {
   name: "Song",
