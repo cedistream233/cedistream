@@ -196,6 +196,20 @@ app.use('/api/promotions', promotionsRouter);
 // Admin CRUD for promotions mounted under /api/admin/promotions
 app.use('/api/admin/promotions', promotionsAdminRouter);
 
+// serve frontend static files (adjust if your build dir differs)
+const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
+app.use(express.static(frontendDist));
+
+// IMPORTANT: place this after all API routes so client-side routes resolve to index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendDist, 'index.html'), (err) => {
+    if (err) {
+      console.error('Error sending index.html for route', req.url, err);
+      res.status(err.status || 500).end();
+    }
+  });
+});
+
 app.use((err, req, res, next) => {
   console.error(err);
   
@@ -211,9 +225,24 @@ app.use((err, req, res, next) => {
   }
 });
 
-// Handle 404 routes
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+// Handle unmatched API routes and non-GET requests with a JSON 404.
+// Note: GET requests for client-side routes are handled by the SPA catch-all
+// (app.get('*') above) which serves index.html. This middleware intentionally
+// only returns 404s for API namespace or for non-GET methods.
+app.use((req, res, next) => {
+  // If it's an API route, always return JSON 404
+  if (req.originalUrl && req.originalUrl.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+
+  // Non-GET requests to non-API routes should get a JSON 404 as well
+  if (req.method !== 'GET') {
+    return res.status(404).json({ error: 'Route not found' });
+  }
+
+  // For GETs (non-API), let the SPA catch-all (which is earlier) handle them.
+  // If the SPA catch-all didn't match (very unlikely), fall through to next.
+  return next();
 });
 
 // Background job: mark pending purchases older than N minutes as failed
