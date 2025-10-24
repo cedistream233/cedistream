@@ -20,3 +20,22 @@ import { config } from './config.js';
     return originalFetch(input, init);
   };
 })();
+
+// Also patch XMLHttpRequest.open so legacy XHR usages (e.g. file uploads) that call
+// `xhr.open(method, '/api/...')` get rewritten to the backend URL in production.
+(function patchXHR() {
+  if (typeof window === 'undefined' || typeof window.XMLHttpRequest === 'undefined') return;
+  try {
+    const XHR = window.XMLHttpRequest;
+    const originalOpen = XHR.prototype.open;
+    XHR.prototype.open = function(method, url) {
+      try {
+        if (typeof url === 'string' && url.startsWith('/api/')) {
+          const absolute = `${config.backendUrl}${url}`;
+          return originalOpen.apply(this, [method, absolute, ...Array.prototype.slice.call(arguments, 2)]);
+        }
+      } catch (e) { /* ignore and fall back */ }
+      return originalOpen.apply(this, arguments);
+    };
+  } catch (e) { /* ignore patch failure */ }
+})();
