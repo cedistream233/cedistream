@@ -114,7 +114,6 @@ export default function Creator() {
                       release_date: song.release_date || song.published_at || song.created_at || null,
                       owned_by_me: song.owned_by_me,
                     }}
-                    type="song"
                     onAddToCart={() => {
                       (async () => {
                         const token = localStorage.getItem('token');
@@ -204,7 +203,7 @@ export default function Creator() {
                     owned_by_me: video.owned_by_me,
                   }}
                   type="video"
-                  onViewDetails={() => { window.location.href = `/videos?id=${encodeURIComponent(video.id)}`; }}
+                  onViewDetails={() => { window.location.href = `/videos/${encodeURIComponent(video.id)}`; }}
                   showPwyw={false}
                 />
               ))}

@@ -15,9 +15,9 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
     if (e) e.stopPropagation();
     if (onViewDetails) return onViewDetails();
     // fallback: navigate by type
-    if (type === 'song') window.location.href = `/songs/${encodeURIComponent(item.id)}`;
-    else if (type === 'album') window.location.href = `/albums/${encodeURIComponent(item.id)}`;
-    else if (type === 'video') window.location.href = `/videos?id=${encodeURIComponent(item.id)}`;
+  if (type === 'song') window.location.href = `/songs/${encodeURIComponent(item.id)}`;
+  else if (type === 'album') window.location.href = `/albums/${encodeURIComponent(item.id)}`;
+  else if (type === 'video') window.location.href = `/videos/${encodeURIComponent(item.id)}`;
   };
 
   const handleAdd = (e) => {

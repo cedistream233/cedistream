@@ -7,7 +7,6 @@ import Layout from './Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
 import Albums from './pages/Albums.jsx';
-import Videos from './pages/Videos.jsx';
 import AlbumDetails from './pages/AlbumDetails.jsx';
 import VideoDetails from './pages/VideoDetails.jsx';
 import Cart from './pages/Cart.jsx';
@@ -50,7 +49,6 @@ export default function App() {
   <Route path="/albums" element={withLayout(Albums, 'Albums')} />
   <Route path="/songs" element={withLayout(Albums, 'Songs')} />
   <Route path="/songs/:id" element={withLayout(SongDetails, 'SongDetails')} />
-        <Route path="/videos" element={withLayout(Videos, 'Videos')} />
         <Route path="/albums/:id" element={withLayout(AlbumDetails, 'AlbumDetails')} />
         <Route path="/videos/:id" element={withLayout(VideoDetails, 'VideoDetails')} />
   <Route path="/creators/:handle" element={withLayout(Creator, 'Creator')} />
