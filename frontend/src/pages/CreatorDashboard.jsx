@@ -73,6 +73,7 @@ export default function CreatorDashboard() {
   const [withdrawSummary, setWithdrawSummary] = useState({ available: 0, minWithdrawal: 10, transferFee: 1.0, currency: 'GHS' });
   const [withdrawHistory, setWithdrawHistory] = useState([]);
   const [successModal, setSuccessModal] = useState({ open: false, message: '' });
+  const [errorModal, setErrorModal] = useState({ open: false, message: '' });
   
   // Guard to prevent concurrent/duplicate fetchDashboardData calls (avoid 429 rate limit)
   const fetchingDashboard = useRef(false);
@@ -776,6 +777,18 @@ export default function CreatorDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Error modal after failed request */}
+      <Dialog open={errorModal.open} onOpenChange={() => setErrorModal({ open: false, message: '' })}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white sm:max-w-sm">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-lg font-semibold text-red-400">Error</DialogTitle>
+            <DialogDescription className="text-gray-400">{errorModal.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setErrorModal({ open: false, message: '' })} className="bg-red-600 hover:bg-red-700 text-white">OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
       <ConfirmModal
         isOpen={showRemoveConfirm}
@@ -849,7 +862,7 @@ export default function CreatorDashboard() {
                   setWithdrawAmount(''); setMomo(''); setMomo2('');
                   setSuccessModal({ open: true, message: 'Withdrawal request submitted. You will receive funds within 24 hours.' });
                 } catch (e) {
-                  alert(e.message || 'Withdrawal failed');
+                  setErrorModal({ open: true, message: e.message || 'Withdrawal failed' });
                 } finally {
                   setWithdrawing(false);
                 }
