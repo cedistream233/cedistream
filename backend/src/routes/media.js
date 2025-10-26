@@ -364,32 +364,23 @@ router.get('/video/:id/preview', async (req, res) => {
     if (bucket && objectPath) {
       try {
         const b2 = createBackblazeClient();
-        if (isPrivateBucket(bucket)) {
-          try {
-            const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
-            const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
-            if (signedUrl) {
-              if (shouldProxySignedUrl(signedUrl)) {
-                const base = getAppBaseUrl(req);
-                const encodedPath = encodeURIComponent(objectPath);
-                const { st, sig } = signStreamToken(req.user?.id || '0', objectPath, 60 * 60);
-                const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
-                mediaDebug('[media] returning proxy stream URL for video preview', { id: video.id, bucket, path: objectPath });
-                return res.json({ url: streamUrl });
-              }
-              mediaDebug('[media] returning direct signed URL for video preview', { id: video.id, bucket, masked: signedUrl && signedUrl.split('?')[0] });
-              return res.json({ url: signedUrl });
-            }
-          } catch (err) {
-            console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
-          }
-          const base = getAppBaseUrl(req);
-          const encodedPath = encodeURIComponent(objectPath);
+        // For previews we prefer returning a proxied streaming URL so browsers
+        // always receive permissive CORS headers. Direct public Backblaze URLs
+        // sometimes lack Access-Control-Allow-Origin which causes playback to fail
+        // in cross-origin contexts. Proxying ensures consistent headers for previews.
+        const base = getAppBaseUrl(req);
+        const encodedPath = encodeURIComponent(objectPath);
+        // Include a short-lived signed stream token when possible so the stream
+        // endpoint can verify intent even if the request lacks an Authorization header.
+        try {
+          const { st, sig } = signStreamToken(req.user?.id || '0', objectPath, 60 * 60);
+          const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
+          mediaDebug('[media] returning proxy stream URL for video preview', { id: video.id, bucket, path: objectPath });
+          return res.json({ url: streamUrl });
+        } catch (err) {
           const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
           return res.json({ url: streamUrl });
         }
-        const { data: pub } = await b2.from(bucket).getPublicUrl(objectPath);
-        if (pub?.publicUrl) return res.json({ url: pub.publicUrl });
       } catch (e) { /* fall back */ }
     }
     return res.json({ url: preview });

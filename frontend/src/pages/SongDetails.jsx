@@ -101,15 +101,15 @@ export default function SongDetails() {
           return;
         }
 
-        // no prefetched preview; prefer metadata.preview_url then fall back to network
+        // no prefetched preview; prefer backend preview endpoint (which may
+        // return a proxied URL with CORS headers) and fall back to metadata
         let prev = null;
-        if (Object.prototype.hasOwnProperty.call(song, 'preview_url')) {
-          prev = song.preview_url || null; // explicit knowledge: may be null
-        } else {
-          try { prev = await Song.getPreviewUrl(song.id); } catch (e) { prev = null; }
+        try { prev = await Song.getPreviewUrl(song.id); } catch (e) { prev = null; }
+        if (!prev && Object.prototype.hasOwnProperty.call(song, 'preview_url')) {
+          prev = song.preview_url || null;
         }
 
-  setPreviewUrl(prev || null);
+        setPreviewUrl(prev || null);
   setFullUrl(full || null);
 
         if (full) {

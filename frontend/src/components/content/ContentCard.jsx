@@ -37,21 +37,23 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
     async function loadPreview() {
       if (!item?.id || !(item?.audio_url || item?.is_song)) return;
 
-      // If backend included preview_url on the item metadata, use it immediately
-      if (Object.prototype.hasOwnProperty.call(item, 'preview_url')) {
-        // Only accept explicit preview_url; never use raw audio_url for playback
-        setPreviewUrl(item.preview_url || null);
-        return;
-      }
-
+      // Prefer backend preview endpoint (may return a proxy URL with correct CORS)
       setLoadingPreview(true);
       try {
         const { Song } = await import('@/entities/Song');
         const url = await Song.getPreviewUrl(item.id);
-        setPreviewUrl(url || null);
+        if (url) { setPreviewUrl(url); return; }
       } catch {
+        // ignore and fall back to metadata below
+      }
+
+      // Fallback: use explicit preview_url metadata only if present
+      if (Object.prototype.hasOwnProperty.call(item, 'preview_url')) {
+        setPreviewUrl(item.preview_url || null);
+      } else {
         setPreviewUrl(null);
-      } finally { setLoadingPreview(false); }
+      }
+      setLoadingPreview(false);
     }
   loadPreview();
     (async () => {

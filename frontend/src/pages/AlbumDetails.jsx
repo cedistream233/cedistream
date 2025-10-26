@@ -453,7 +453,10 @@ export default function AlbumDetails() {
                 showPreviewBadge={( () => {
                   const sid = album.songs[currentIndex]?.id;
                   const hasFull = !!trackFullUrls[sid];
-                  return !isOwner && !hasFull;
+                  const hasPreview = !!trackPreviewUrls[sid] || Boolean(album.songs[currentIndex]?.preview_url);
+                  // Only show the preview badge to non-owners who haven't purchased, and only
+                  // when the current track actually has a preview and there is no full URL.
+                  return !isOwner && !purchased && !hasFull && !!hasPreview;
                 })()}
                 previewCapSeconds={(!isOwner && !purchased) ? 30 : undefined}
                 onEnded={() => { if (loopMode === 'all') onNext(); }}
@@ -489,7 +492,8 @@ export default function AlbumDetails() {
                     <div className="text-xs text-gray-400">
                       {(() => {
                         const hasFull = !!trackFullUrls[song.id];
-                        const hasPreview = !!trackPreviewUrls[song.id];
+                        // consider both seeded map and inline metadata (song.preview_url)
+                        const hasPreview = !!trackPreviewUrls[song.id] || Boolean(song?.preview_url);
                         // If we're globally fetching audio and the album actually has previews,
                         // show Loading... while those previews are being fetched. If the album
                         // has no previews at all, show 'Locked' instead (no preview uploaded).
@@ -499,6 +503,10 @@ export default function AlbumDetails() {
                         }
                         if (purchased) {
                           return hasFull ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Loading...';
+                        }
+                        // If the album contains at least one preview, show 'No preview' for tracks that lack one.
+                        if (albumHasAnyPreview) {
+                          return hasPreview ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No preview';
                         }
                         return hasPreview ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Locked';
                       })()}

@@ -147,18 +147,24 @@ export default function VideoDetails() {
         }
       }
 
-      // fallback to preview; prefer metadata.preview_url; if explicitly null, skip fetch
-      if (Object.prototype.hasOwnProperty.call(video, 'preview_url')) {
-        setMediaUrl(video.preview_url || null); setCanAccess(false); return;
-      }
+      // fallback to preview: prefer backend preview endpoint (which may return
+      // a proxied URL with correct CORS headers) over the raw metadata
+      // preview_url which can be a direct Backblaze URL lacking CORS.
       try {
         const { Video: VideoEntity } = await import('@/entities/Video');
         const prevUrl = await VideoEntity.getPreviewUrl(video.id);
-        if (prevUrl) { setMediaUrl(prevUrl); setCanAccess(false); }
-        else { setMediaUrl(null); setCanAccess(false); }
+        if (prevUrl) {
+          setMediaUrl(prevUrl); setCanAccess(false); return;
+        }
       } catch (e) {
-        setMediaUrl(null); setCanAccess(false);
+        // ignore and fallback to metadata below
       }
+
+      // If backend preview lookup failed, fall back to raw metadata if it exists
+      if (Object.prototype.hasOwnProperty.call(video, 'preview_url')) {
+        setMediaUrl(video.preview_url || null); setCanAccess(false); return;
+      }
+      setMediaUrl(null); setCanAccess(false);
       } catch (e) { /* swallow errors to avoid breaking render */ }
       finally {
         // If mediaUrl hasn't been set by the fetch flow above, keep mediaFetching
