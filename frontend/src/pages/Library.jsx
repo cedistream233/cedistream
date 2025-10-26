@@ -6,10 +6,8 @@ import { Song } from "@/entities/Song";
 import { Card } from "@/components/ui/card";
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Music, Video as VideoIcon, Download, Play } from "lucide-react";
-import PurchasedSongRow from '@/components/content/PurchasedSongRow';
-import PurchasedAlbumRow from '@/components/content/PurchasedAlbumRow';
-import PurchasedVideoRow from '@/components/content/PurchasedVideoRow';
+import { Music, Video as VideoIcon, Download, Play, Search } from "lucide-react";
+import ContentRow from '@/components/content/ContentRow';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,6 +16,12 @@ export default function Library() {
   const [purchases, setPurchases] = useState([]);
   const [purchasedItems, setPurchasedItems] = useState({ albums: [], songs: [], videos: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  const q = (search || '').trim().toLowerCase();
+  const filteredAlbums = q ? purchasedItems.albums.filter(a => ((a.title||'').toLowerCase().includes(q) || (a.artist||'').toLowerCase().includes(q))) : purchasedItems.albums;
+  const filteredSongs = q ? purchasedItems.songs.filter(s => ((s.title||'').toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q))) : purchasedItems.songs;
+  const filteredVideos = q ? purchasedItems.videos.filter(v => ((v.title||'').toLowerCase().includes(q) || (v.creator||'').toLowerCase().includes(q))) : purchasedItems.videos;
 
   useEffect(() => {
     loadLibrary();
@@ -82,7 +86,28 @@ export default function Library() {
       <h1 className="text-4xl font-bold text-white mb-2">My Library</h1>
       <p className="text-gray-400 mb-8">Access your purchased content anytime</p>
 
+      {/* Search bar: filters library lists by title and artist/creator */}
+      <div className="mb-6 flex items-center gap-4">
+        <div className="relative w-full max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="w-4 h-4 text-gray-400" />
+          </div>
+          <input
+            aria-label="Search your library"
+            placeholder="Search your library (title, artist or creator)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-3 py-2 rounded-md bg-slate-800/60 text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600"
+          />
+        </div>
+        {search ? (
+          <button onClick={() => setSearch('')} className="text-sm text-gray-400 hover:text-white">Clear</button>
+        ) : null}
+      </div>
+
       <Tabs defaultValue="albums" className="w-full">
+        {/* compute filters for rendering */}
+        
         <TabsList className="bg-slate-900/50 mb-8">
           <TabsTrigger value="albums" className="flex items-center gap-2">
             <Music className="w-4 h-4" />
@@ -99,48 +124,100 @@ export default function Library() {
         </TabsList>
 
   <TabsContent value="albums">
-          {purchasedItems.albums.length === 0 ? (
+          {(!q && purchasedItems.albums.length === 0) ? (
             <div className="text-center py-16">
               <Music className="w-24 h-24 mx-auto text-gray-600 mb-6" />
               <p className="text-gray-400 text-lg">No albums purchased yet</p>
             </div>
+          ) : (filteredAlbums.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-gray-400 text-lg">No results</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {purchasedItems.albums.map((album) => (
-                <PurchasedAlbumRow key={album.id} album={album} />
+            <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
+              {filteredAlbums.map((album) => (
+                <ContentRow
+                  key={album.id}
+                  noCard={true}
+                  item={{
+                    id: album.id,
+                    title: album.title,
+                    artist: album.artist || '',
+                    cover_image: album.cover_image || album.thumbnail,
+                    owned_by_me: true,
+                    songs: album.songs,
+                  }}
+                  type="album"
+                  onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`}
+                  showPwyw={false}
+                />
               ))}
             </div>
-          )}
+          ))}
         </TabsContent>
 
         <TabsContent value="songs">
-          {purchasedItems.songs.length === 0 ? (
+          {(!q && purchasedItems.songs.length === 0) ? (
             <div className="text-center py-16">
               <Music className="w-24 h-24 mx-auto text-gray-600 mb-6" />
               <p className="text-gray-400 text-lg">No songs purchased yet</p>
             </div>
+          ) : (filteredSongs.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-gray-400 text-lg">No results</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {purchasedItems.songs.map((song) => (
-                <PurchasedSongRow key={song.id} song={song} />
+            <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
+              {filteredSongs.map((song) => (
+                <ContentRow
+                  key={song.id}
+                  noCard={true}
+                  item={{
+                    id: song.id,
+                    title: song.title,
+                    artist: song.artist || '',
+                    cover_image: song.cover_image,
+                    owned_by_me: true,
+                  }}
+                  type="song"
+                  onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
+                  showPwyw={false}
+                />
               ))}
             </div>
-          )}
+          ))}
         </TabsContent>
 
         <TabsContent value="videos">
-          {purchasedItems.videos.length === 0 ? (
+          {(!q && purchasedItems.videos.length === 0) ? (
             <div className="text-center py-16">
               <VideoIcon className="w-24 h-24 mx-auto text-gray-600 mb-6" />
               <p className="text-gray-400 text-lg">No videos purchased yet</p>
             </div>
+          ) : (filteredVideos.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-gray-400 text-lg">No results</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {purchasedItems.videos.map((video) => (
-                <PurchasedVideoRow key={video.id} video={video} />
+            <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
+              {filteredVideos.map((video) => (
+                <ContentRow
+                  key={video.id}
+                  noCard={true}
+                  item={{
+                    id: video.id,
+                    title: video.title,
+                    artist: video.creator || '',
+                    cover_image: video.cover_image || video.thumbnail,
+                    owned_by_me: true,
+                  }}
+                  type="video"
+                  onViewDetails={() => window.location.href = `/videos/${encodeURIComponent(video.id)}`}
+                  showPwyw={false}
+                />
               ))}
             </div>
-          )}
+          ))}
         </TabsContent>
       </Tabs>
     </div>
