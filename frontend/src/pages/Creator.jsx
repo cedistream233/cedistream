@@ -20,15 +20,15 @@ export default function Creator() {
       try {
         const token = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        
+
         const res = await fetch(`/api/creators/${encodeURIComponent(id)}`, { headers });
         const data = res.ok ? await res.json() : null;
         setCreator(data);
-        
+
         const res2 = await fetch(`/api/creators/${encodeURIComponent(id)}/content`, { headers });
         const data2 = res2.ok ? await res2.json() : { albums: [], videos: [], songs: [] };
         setContent(data2);
-        
+
         // Use songs from the content endpoint (now includes owned_by_me)
         // Filter to only show standalone singles (exclude songs that are part of albums)
         const onlySingles = Array.isArray(data2.songs) ? data2.songs.filter(s => !s.album_id) : [];
@@ -64,60 +64,62 @@ export default function Creator() {
         ))}
       </div>
 
-      <div className="space-y-10">
+      <div className="space-y-6">
         {tab === 'songs' && (
           <section>
             <h2 className="text-xl text-white mb-4">Singles</h2>
-            {singles.length === 0 ? (
-              <div className="text-gray-400">No singles yet</div>
-            ) : (
-              <div className="space-y-3">
-                {singles.map((song) => (
-                  <ContentRow
-                    key={song.id}
-                    item={{
-                      id: song.id,
-                      title: song.title,
-                      artist: song.artist,
-                      price: song.price,
-                      cover_image: song.cover_image,
-                      release_date: song.release_date || song.published_at || song.created_at || null,
-                      owned_by_me: song.owned_by_me, // pass server flag
-                    }}
-                    type="song"
-                    onAddToCart={() => {
-                      (async () => {
-                        const token = localStorage.getItem('token');
-                        const min = Number(song.price || 0);
-                        if (!token) {
-                          setPostAuthIntent({
-                            action: 'add-to-cart',
-                            item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
-                            redirect: '/cart'
-                          });
-                          window.location.href = '/signup';
-                          return;
-                        }
-                        try {
-                          const uRaw = localStorage.getItem('user');
-                          const u = uRaw ? JSON.parse(uRaw) : {};
-                          const cart = Array.isArray(u.cart) ? u.cart : [];
-                          const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
-                          if (!exists) {
-                            const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
-                            localStorage.setItem('user', JSON.stringify(next));
-                            try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
-                          }
-                        } catch {}
-                        window.location.href = '/cart';
-                      })();
-                    }}
-                    onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
-                    showPwyw={false}
-                  />
-                ))}
-              </div>
-            )}
+                {singles.length === 0 ? (
+                  <div className="text-gray-400">No singles yet</div>
+                ) : (
+                  <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
+                    {singles.map((song) => (
+                      <ContentRow
+                        key={song.id}
+                        noCard={true}
+                        item={{
+                          id: song.id,
+                          title: song.title,
+                          // hide artist on creator listing rows
+                          artist: '',
+                          price: song.price,
+                          cover_image: song.cover_image,
+                          release_date: song.release_date || song.published_at || song.created_at || null,
+                          owned_by_me: song.owned_by_me,
+                        }}
+                        type="song"
+                        onAddToCart={() => {
+                          (async () => {
+                            const token = localStorage.getItem('token');
+                            const min = Number(song.price || 0);
+                            if (!token) {
+                              setPostAuthIntent({
+                                action: 'add-to-cart',
+                                item: { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image },
+                                redirect: '/cart'
+                              });
+                              window.location.href = '/signup';
+                              return;
+                            }
+                            try {
+                              const uRaw = localStorage.getItem('user');
+                              const u = uRaw ? JSON.parse(uRaw) : {};
+                              const cart = Array.isArray(u.cart) ? u.cart : [];
+                              const exists = cart.some(i => i.item_id === song.id && i.item_type === 'song');
+                              if (!exists) {
+                                const next = { ...u, cart: [...cart, { item_type: 'song', item_id: song.id, title: song.title, price: min, min_price: min, image: song.cover_image }] };
+                                localStorage.setItem('user', JSON.stringify(next));
+                                try { localStorage.setItem('demo_user', JSON.stringify(next)); } catch {}
+                              }
+                            } catch {}
+                            window.location.href = '/cart';
+                          })();
+                        }}
+                        onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
+                        showPwyw={false}
+                      />
+                    ))}
+                  </div>
+                )}
           </section>
         )}
 
@@ -126,18 +128,24 @@ export default function Creator() {
           {content.albums.length === 0 ? (
             <div className="text-gray-400">No albums yet</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {content.albums.map((album) => (
-                <ContentCard 
-                  key={album.id} 
-                  item={{ 
-                    ...album, 
+            <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
+              {content.albums.map((album) => (
+                <ContentRow
+                  key={album.id}
+                  noCard={true}
+                  item={{
+                    id: album.id,
+                    title: album.title,
+                    artist: '',
+                    price: album.price,
+                    cover_image: album.cover_image || album.thumbnail,
                     release_date: album.release_date || album.published_at || album.created_at || null,
-                    owned_by_me: album.owned_by_me // pass server flag
-                  }} 
-                  type="album" 
-                  onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`} 
-                  showPwyw={false} 
+                    owned_by_me: album.owned_by_me,
+                    songs: album.songs,
+                  }}
+                  type="album"
+                  onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`}
+                  showPwyw={false}
                 />
               ))}
             </div>
@@ -149,14 +157,19 @@ export default function Creator() {
           {content.videos.length === 0 ? (
             <div className="text-gray-400">No videos yet</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
               {content.videos.map((video) => (
-                <ContentCard
+                <ContentRow
                   key={video.id}
-                  item={{ 
-                    ...video, 
+                  noCard={true}
+                  item={{
+                    id: video.id,
+                    title: video.title,
+                    artist: '',
+                    price: video.price,
+                    cover_image: video.cover_image || video.thumbnail,
                     release_date: video.release_date || video.published_at || video.created_at || null,
-                    owned_by_me: video.owned_by_me // pass server flag
+                    owned_by_me: video.owned_by_me,
                   }}
                   type="video"
                   onViewDetails={() => { window.location.href = `/videos?id=${encodeURIComponent(video.id)}`; }}

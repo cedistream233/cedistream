@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { setPostAuthIntent } from '@/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true, mobileRow = false, desktopRow = false }) {
+export default function ContentCard({ item, type, onAddToCart, onViewDetails, showPwyw = true, mobileRow = false, desktopRow = false, compact = false }) {
   const { updateMyUserData, user: authUser } = useAuth();
   // prefer cover_image, fallback to thumbnail
   const image = item.cover_image || item.thumbnail || null;
@@ -157,7 +157,7 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
       >
         <CardContent className={mobileRow ? "p-0 flex items-center gap-3 sm:block" : (desktopRow ? "p-0 flex items-center gap-4" : "p-0")}>
           {/* DesktopRow: YouTube-like horizontal item (thumbnail left, details right). mobileRow: compact on phones. Default: grid-style square thumbnail. */}
-          <div className={`relative overflow-hidden ${mobileRow ? 'w-28 h-20 flex-shrink-0 sm:w-full sm:h-auto sm:aspect-square' : (desktopRow ? 'w-56 h-32 flex-shrink-0 md:w-64 md:h-36 lg:w-72 lg:h-40' : 'w-full h-36 sm:h-32 md:h-28 lg:h-32')}`}>
+          <div className={`relative overflow-hidden ${mobileRow ? 'w-28 h-20 flex-shrink-0 sm:w-full sm:h-auto sm:aspect-square' : (desktopRow ? 'w-56 h-32 flex-shrink-0 md:w-64 md:h-36 lg:w-72 lg:h-40' : (compact ? 'w-full h-20 sm:h-20 md:h-24 lg:h-24' : 'w-full h-36 sm:h-32 md:h-28 lg:h-32'))}`}>
             {image ? (
               <img
                 src={image}
@@ -323,21 +323,22 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
             </div>
           </div>
 
-          <div className={mobileRow ? "flex-1 p-3 sm:p-4" : (desktopRow ? 'flex-1 p-3' : 'p-3')}>
-            <h3 className={`font-semibold text-white mb-0 ${mobileRow ? 'text-sm sm:text-base line-clamp-2 sm:truncate' : (desktopRow ? 'text-base lg:text-lg line-clamp-2' : 'truncate text-sm')}`}>{title}</h3>
-            <p className={`text-gray-400 mb-0 ${mobileRow ? 'text-xs sm:text-sm line-clamp-1 sm:truncate' : 'text-sm truncate'}`}>{creator}</p>
+          <div className={mobileRow ? "flex-1 p-3 sm:p-4" : (desktopRow ? 'flex-1 p-3' : (compact ? 'p-2' : 'p-3'))}>
+            <h3 className={`font-semibold text-white mb-0 ${mobileRow ? 'text-sm sm:text-base line-clamp-2 sm:truncate' : (desktopRow ? 'text-base lg:text-lg line-clamp-2' : (compact ? 'text-sm line-clamp-2' : 'truncate text-sm'))}`}>{title}</h3>
+            <p className={`text-gray-400 mb-0 ${mobileRow ? 'text-xs sm:text-sm line-clamp-1 sm:truncate' : (compact ? 'text-xs truncate' : 'text-sm truncate')}`}>{creator}</p>
             {publishedDate && (
-              <div className={`text-gray-400 ${mobileRow ? 'text-xs sm:text-sm mb-1 sm:mb-2' : 'text-sm mb-2'}`}>Published {publishedDate}</div>
+              <div className={`text-gray-400 ${mobileRow ? 'text-xs sm:text-sm mb-1 sm:mb-2' : (compact ? 'text-xs mb-1' : 'text-sm mb-2')}`}>Published {publishedDate}</div>
             )}
             {!mobileRow && (
               <div className="flex items-center justify-between">
                 {showPwyw ? (
-                  <span className="text-sm text-gray-300">Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
+                  <span className={`${compact ? 'text-xs' : 'text-sm'} text-gray-300`}>Pay what you want • Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
                 ) : (
-                  <span className="text-sm text-gray-300">{type === 'album' ? `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}` : (publishedDate ? `Published ${publishedDate}` : `Min GH₵ ${parseFloat(price)?.toFixed(2) || '0.00'}`)}</span>
+                  // Always show price/min info in the bottom row. The published date is already shown above
+                  <span className={`${compact ? 'text-xs' : 'text-sm'} text-gray-300`}>Min GH₵ {parseFloat(price)?.toFixed(2) || '0.00'}</span>
                 )}
                 {type === "album" && item.songs?.length > 0 && (
-                  <span className="text-xs text-gray-500">
+                  <span className={`text-xs text-gray-500 ${compact ? 'hidden' : ''}`}>
                     {item.songs.length} tracks
                   </span>
                 )}
