@@ -25,13 +25,17 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const [isReady, setIsReady] = useState(false);
   const [playError, setPlayError] = useState(null);
   const hideTimer = useRef(null);
-  const bufferingCheckInterval = useRef(null);
+  const bufferingMonitor = useRef(null);
   const lastPlayProgress = useRef({ time: 0, timestamp: 0 });
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  // avoid concurrent play/pause races
+  // tracking in-flight play/pause operations to avoid races
   const playInProgressRef = useRef(false);
   const pauseRequestedRef = useRef(false);
-
+  // track whether the most recent pause was explicitly requested by the user
+  // (as opposed to an automatic browser pause during buffering). When
+  // userPausedRef.current is true we should clear buffering UI; when false
+  // we should leave buffering state alone so the spinner stays visible.
+  const userPausedRef = useRef(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     const v = ref.current; if (!v) return;
     const onLoaded = () => {
@@ -39,9 +43,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setReadyState(v.readyState || 0);
       setNetworkState(v.networkState || 0);
       setIsReady((v.readyState || 0) >= 3);
-  // loaded metadata -> we have enough info to hide the source loading UI
-  setSourceLoading(false);
-  try { onReady && onReady(); } catch (e) {}
+      // loaded metadata -> we have enough info to hide the source loading UI
+      setSourceLoading(false);
+      try { onReady && onReady(); } catch (e) {}
       // compute initial buffered percent
       try {
         const d = v.duration || 0;
@@ -53,10 +57,25 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         }
       } catch (e) {}
     };
+
     const onTime = () => {
       setCurrent(v.currentTime || 0);
-      // record progress to help detect stuck playback
-      lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() };
+      // quick detection: use the previous recorded progress to decide if
+      // playback has stalled. Record the new progress after the check so
+      // we don't compare against the just-updated timestamp.
+      try {
+        const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+        const now = Date.now();
+        const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
+        // For very short clips, be aggressive: if playback made almost no progress
+        // for > 350ms while not paused, consider this buffering. Use a small
+        // progress tolerance to avoid marking normal playback as buffering.
+        if (v && !v.paused && (now - (last.timestamp || 0) > 350) && timeAdvanced < 0.06) {
+          setBuffering(true);
+        }
+        // record progress after evaluation
+        lastPlayProgress.current = { time: v.currentTime || 0, timestamp: now };
+      } catch (e) {}
       // update buffered percent as time moves (in case progress events are sparse)
       try {
         const d = v.duration || 0;
@@ -70,6 +89,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         }
       } catch (e) {}
     };
+
     const onEnd = () => {
       setPlaying(false);
       // Seek to 0 so that repeating the same video reuses buffered data instead
@@ -82,56 +102,59 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         }
       } catch (e) {}
     };
+
     const onWaiting = () => {
       // native waiting usually indicates buffering
-        // native waiting often fires for very short stalls; debounce to avoid
-        // showing the spinner for brief network hiccups. We'll set a short
-        // timeout and only mark buffering if the waiting state persists.
-        if (bufferingCheckInterval.current) { /* reuse */ }
-        // schedule a gentle check after a short delay
-        const waitId = setTimeout(() => {
-          // if the player still reports readyState < 3 and hasn't progressed,
-          // treat as buffering
-          try {
-            if (ref.current && (ref.current.readyState || 0) < 3) {
-              // only mark buffering if no recent progress
-              const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-              if (Date.now() - (last.timestamp || 0) > 700) {
-                setBuffering(true);
-              }
+      // Show buffering immediately so short stalls are visible to users.
+      // Keep the existing debounce check for a secondary verification to
+      // avoid false positives in some edge cases.
+      try { setBuffering(true); } catch (e) {}
+      if (bufferingMonitor.current) { /* reuse */ }
+      // clear any existing debounce timer
+      try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
+      // schedule a gentle check after a short delay to re-evaluate longer stalls
+      const waitId = setTimeout(() => {
+        try {
+          if (ref.current && (ref.current.readyState || 0) < 3) {
+            const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+            if (Date.now() - (last.timestamp || 0) > 700) {
+              setBuffering(true);
             }
-          } catch (e) {}
-        }, 350);
-        // attach to ref so we can clear if canplay/playing fires
-        try { ref.current._waitingDebounce = waitId; } catch (e) {}
+          }
+        } catch (e) {}
+      }, 350);
+      try { ref.current._waitingDebounce = waitId; } catch (e) {}
     };
+
     const onCanPlay = () => {
       setBuffering(false);
       setIsReady(true);
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
-    // clear any waiting debounce timers
-    try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
+      // clear any waiting debounce timers
+      try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
     };
+
     const onCanPlayThrough = () => {
       setBuffering(false);
       setIsReady(true);
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
-    try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
+      try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
     };
+
     const onStalled = () => {
-      // browser couldn't fetch data
-        // browser couldn't fetch data — treat similarly to waiting but keep it
-        // debounced to avoid false positives for short stalls.
-        setTimeout(() => {
-          try {
-            if (ref.current && (ref.current.readyState || 0) < 3) {
-              setBuffering(true);
-            }
-          } catch (e) {}
-        }, 500);
+      // browser couldn't fetch data — treat similarly to waiting but keep it
+      // debounced to avoid false positives for short stalls.
+      setTimeout(() => {
+        try {
+          if (ref.current && (ref.current.readyState || 0) < 3) {
+            setBuffering(true);
+          }
+        } catch (e) {}
+      }, 500);
     };
+
     // helper: compute adaptive thresholds based on duration
     function getAdaptiveThresholds(duration) {
       // duration in seconds.
@@ -183,8 +206,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         } catch (e) {}
 
         // adaptive thresholds
-  const d = v.duration || 0;
-  const { bufferedHeadroom, stalledWindowMs, progressTolerance, absoluteHeadroomSeconds } = getAdaptiveThresholds(d);
+        const d = v.duration || 0;
+        const { bufferedHeadroom, stalledWindowMs, progressTolerance, absoluteHeadroomSeconds } = getAdaptiveThresholds(d);
         const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
         const since = Date.now() - (last.timestamp || 0);
         const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
@@ -205,78 +228,91 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // playback started -> hide source-loading overlay if still visible
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
-      // start periodic check to detect stalled playback even if no waiting fired
-      // Be tolerant: prefer the browser readyState when available and use a
-      // slightly larger observation window to avoid flapping on transient stalls.
-      if (bufferingCheckInterval.current) clearInterval(bufferingCheckInterval.current);
-      bufferingCheckInterval.current = setInterval(() => {
-        if (!v) return;
-        const now = Date.now();
-        const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-
-        // If browser reports a healthy readyState, treat as not buffering
-        if ((v.readyState || 0) >= 3) { setBuffering(false); return; }
-
-        // tolerance adapts to duration
-  const d = v.duration || 0;
-  const { bufferedHeadroom, stalledWindowMs, progressTolerance, absoluteHeadroomSeconds } = getAdaptiveThresholds(d);
-
-        // if not paused, check if time made progress recently
-        if (!v.paused) {
+      // initialize lastPlayProgress so the monitor has a baseline immediately
+      lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() };
+      // start a short monitor loop that checks real progress and buffered headroom.
+      // This is intentionally frequent (250ms) so we detect short stalls on tiny clips.
+      if (bufferingMonitor.current) clearInterval(bufferingMonitor.current);
+      bufferingMonitor.current = setInterval(() => {
+        try {
+          // If the element is gone or ended, clear buffering and stop
+          if (!v || v.ended) { setBuffering(false); return; }
+          // If playback is paused due to a user request, clear buffering and stop.
+          // If the pause was automatic, do NOT clear buffering here so the spinner
+          // remains visible while the browser recovers.
+          if (v.paused && userPausedRef.current) { setBuffering(false); return; }
+          const now = Date.now();
+          const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
           const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
-          const since = now - (last.timestamp || 0);
 
-          // only mark buffering when there's been little progress for a longer than allowed window
-          if (since > stalledWindowMs && timeAdvanced < progressTolerance) {
-            // double-check buffered ranges: only mark buffering if bufferedAhead is tiny
-            let bufferedAhead = 0;
-            try {
-              const t = v.currentTime || 0;
-              for (let i = 0; i < (v.buffered?.length || 0); i++) {
-                if (t >= v.buffered.start(i) && t <= v.buffered.end(i)) {
-                  bufferedAhead = v.buffered.end(i) - t;
-                  break;
-                }
+          // compute bufferedAhead for current playback position
+          let bufferedAhead = 0;
+          try {
+            const t = v.currentTime || 0;
+            for (let i = 0; i < (v.buffered?.length || 0); i++) {
+              if (t >= v.buffered.start(i) && t <= v.buffered.end(i)) {
+                bufferedAhead = v.buffered.end(i) - t;
+                break;
               }
-            } catch (e) { bufferedAhead = 0; }
+            }
+          } catch (e) { bufferedAhead = 0; }
 
-            // Use absolute-second headroom when available for short clips; otherwise
-            // use the smaller of a fixed 0.2s and fractional headroom.
-            const headroomThreshold = typeof absoluteHeadroomSeconds === 'number' ? absoluteHeadroomSeconds : Math.min(0.2, bufferedHeadroom);
-            if (bufferedAhead < headroomThreshold) setBuffering(true);
-            else setBuffering(false);
-          } else {
+          // Use a conservative headroom for clearing buffering; for tiny clips we
+          // prefer a larger absolute headroom, otherwise a small fractional headroom.
+          const d = v.duration || 0;
+          const { bufferedHeadroom, absoluteHeadroomSeconds } = getAdaptiveThresholds(d);
+          const headroomThreshold = typeof absoluteHeadroomSeconds === 'number' ? absoluteHeadroomSeconds : Math.min(0.2, bufferedHeadroom);
+
+          // If we've made progress recently OR have decent bufferedAhead, clear buffering.
+          if (timeAdvanced > 0.06 || bufferedAhead > headroomThreshold) {
             setBuffering(false);
+            return;
           }
-        }
-      }, 700);
+
+          // If no meaningful progress for > 400ms and buffered ahead is tiny, mark buffering true.
+          if ((now - (last.timestamp || 0) > 400) && timeAdvanced < 0.06 && bufferedAhead < headroomThreshold) {
+            setBuffering(true);
+          }
+        } catch (e) {}
+      }, 250);
     };
     const onPause = () => {
       setPlaying(false);
-      // paused -> not buffering
-      setBuffering(false);
-      if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+      // If this pause was explicitly requested by the user, clear buffering
+      // UI and stop the monitor. If it's an automatic pause (browser stalled),
+      // keep buffering state intact so the spinner stays visible.
+      if (userPausedRef.current) {
+        setBuffering(false);
+        if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
+        userPausedRef.current = false;
+      } else {
+        // auto-pause: leave buffering state as-is (don't clear spinner).
+      }
     };
     const onPlaying = () => {
       setBuffering(false);
       setPlaying(true);
     };
-  // removed PiP handlers
+    // removed PiP handlers
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     
     v.addEventListener('loadedmetadata', onLoaded);
-    v.addEventListener('timeupdate', onTime);
+  const onSeeking = () => { try { setBuffering(true); } catch (e) {} };
+  const onSuspend = () => { try { setBuffering(true); } catch (e) {} };
+  v.addEventListener('timeupdate', onTime);
     v.addEventListener('ended', onEnd);
     v.addEventListener('waiting', onWaiting);
     v.addEventListener('canplay', onCanPlay);
     v.addEventListener('canplaythrough', onCanPlayThrough);
     v.addEventListener('stalled', onStalled);
     v.addEventListener('progress', onProgress);
+  v.addEventListener('seeking', onSeeking);
+  v.addEventListener('suspend', onSuspend);
     v.addEventListener('play', onPlay);
     v.addEventListener('pause', onPause);
     v.addEventListener('playing', onPlaying);
-  // (PiP removed)
-  document.addEventListener('fullscreenchange', onFullscreenChange);
+    // (PiP removed)
+    document.addEventListener('fullscreenchange', onFullscreenChange);
     
     return () => {
       v.removeEventListener('loadedmetadata', onLoaded);
@@ -285,13 +321,15 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       v.removeEventListener('waiting', onWaiting);
       v.removeEventListener('canplay', onCanPlay);
       v.removeEventListener('canplaythrough', onCanPlayThrough);
-      v.removeEventListener('stalled', onStalled);
+  v.removeEventListener('stalled', onStalled);
       v.removeEventListener('progress', onProgress);
+  v.removeEventListener('seeking', onSeeking);
+  v.removeEventListener('suspend', onSuspend);
       v.removeEventListener('play', onPlay);
       v.removeEventListener('pause', onPause);
       v.removeEventListener('playing', onPlaying);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
-      if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+      if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
     };
   }, []);
 
@@ -338,7 +376,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // Avoid reinitializing the element — seek to start so buffered data can be reused
       try { if (typeof v.currentTime !== 'undefined') v.currentTime = 0; } catch (e) {}
       // clear any existing buffering interval when source changes
-      if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+      if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
       setIsFullscreen(!!document.fullscreenElement);
       return;
     }
@@ -346,7 +384,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     // Different source: allow the browser to load the new resource. Calling
     // load() is fine here because the src actually changed.
     try { v.load && v.load(); } catch (e) {}
-    if (bufferingCheckInterval.current) { clearInterval(bufferingCheckInterval.current); bufferingCheckInterval.current = null; }
+    if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
     setIsFullscreen(!!document.fullscreenElement);
   }, [src]);
 
@@ -398,15 +436,17 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   pauseRequestedRef.current = true;
         return;
       }
-      try { v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause failed', e); }
+      try { userPausedRef.current = true; v.pause(); setPlaying(false); } catch (e) { console.warn('[VideoPlayer] pause failed', e); }
       return;
     }
 
     // If a play is already in progress, ignore subsequent play requests
   if (playInProgressRef.current) { return; }
 
-    playInProgressRef.current = true;
-    pauseRequestedRef.current = false;
+  playInProgressRef.current = true;
+  pauseRequestedRef.current = false;
+  // a fresh play request resets the user-paused flag
+  userPausedRef.current = false;
     try {
       // If the element is in ended state, seek to 0 so replay reuses buffered data
       try {
@@ -419,7 +459,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       await v.play();
       // If user asked to pause while play was pending, honor it now
       if (pauseRequestedRef.current) {
-        try { v.pause(); setPlaying(false); } catch (e) { /* keep minimal logging */ }
+        try { userPausedRef.current = true; v.pause(); setPlaying(false); } catch (e) { /* keep minimal logging */ }
       } else {
         setPlaying(true);
         setPlayError(null);
@@ -436,7 +476,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
           v.muted = true;
           await v.play();
           if (pauseRequestedRef.current) {
-            try { v.pause(); setPlaying(false); } catch (e) { /* silent */ }
+            try { userPausedRef.current = true; v.pause(); setPlaying(false); } catch (e) { /* silent */ }
           } else {
             setPlaying(true);
             setPlayError('Playback started muted (muted retry)');
@@ -548,23 +588,12 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         </div>
       )}
 
-      {/* buffering UI:
-          - For short clips (<=30s) show a subtle inline pulse bar at the bottom
-            so playback doesn't feel blocked.
-          - For longer clips keep the centered spinner so users see an explicit
-            buffering state. */}
-      {buffering && duration > 30 && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+      {/* Buffering spinner: show a clear loading circle whenever the player
+          is in a buffering state so users see explicit feedback. Honor the
+          suppressLoadingUI prop to allow parent to hide overlays when needed. */}
+      {buffering && !suppressLoadingUI && (
+        <div className="absolute inset-0 z-[9999] flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 border-4 border-t-transparent border-white/80 rounded-full animate-spin" />
-        </div>
-      )}
-
-      {/* subtle inline pulse for short previews */}
-      {buffering && duration > 0 && duration <= 30 && (
-        <div className="absolute left-0 right-0 bottom-0 z-40 p-2 pointer-events-none">
-          <div className="h-1 rounded-full bg-white/20 overflow-hidden">
-            <div className="h-full bg-white/50 animate-[pulse_1.6s_infinite]" style={{ width: '20%' }} />
-          </div>
         </div>
       )}
 
@@ -629,7 +658,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
           <div>paused: {String(ref.current?.paused ?? true)}</div>
           <div>currentTime: {Number(ref.current?.currentTime ?? 0).toFixed(2)}</div>
           <div style={{maxWidth:300,wordBreak:'break-all'}}>src: {ref.current?.currentSrc || src}</div>
-          <div>buffered: {Array.from({length: ref.current?.buffered?.length || 0}).map((_,i)=>`${ref.current.buffered.start(i).toFixed(1)}-${ref.current.buffered.end(i).toFixed(1)}`).join(', ')}</div>
+            <div>buffered: {Array.from({length: ref.current?.buffered?.length || 0}).map((_,i)=>`${ref.current.buffered.start(i).toFixed(1)}-${ref.current.buffered.end(i).toFixed(1)}`).join(', ')}</div>
+            <div>buffering: {String(buffering)}</div>
           <div style={{color: playError ? 'salmon' : 'inherit'}}>playError: {playError || 'none'}</div>
         </div>
       )}

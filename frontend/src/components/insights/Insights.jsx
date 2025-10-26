@@ -10,7 +10,7 @@ export default function Insights({ creatorId, token }) {
   const [viewsSeries, setViewsSeries] = useState([]);
   const [revenueSeries, setRevenueSeries] = useState([]);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
-  const [range, setRange] = useState('7'); // '7' | '14'
+  const [range, setRange] = useState('all'); // '7' | '14' | 'all'
   const [total, setTotal] = useState(0);
   const [totalSales, setTotalSales] = useState(0);
 
@@ -21,7 +21,9 @@ export default function Insights({ creatorId, token }) {
       setLoading(true);
       try {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`/api/creators/${creatorId}/analytics?range=${range}`, { headers });
+  // If range is 'all' omit the range param so the backend returns all-time data.
+  const url = range && range !== 'all' ? `/api/creators/${creatorId}/analytics?range=${range}` : `/api/creators/${creatorId}/analytics`;
+  const res = await fetch(url, { headers });
         if (!res.ok) throw new Error('Failed to load insights');
         const data = await res.json();
         if (!mounted) return;
@@ -123,11 +125,12 @@ export default function Insights({ creatorId, token }) {
       <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <CardTitle className="text-white">{range === '7' ? 'Last 7 days' : 'Last 14 days'}</CardTitle>
+            <CardTitle className="text-white">{range === '7' ? 'Last 7 days' : range === '14' ? 'Last 14 days' : 'All time'}</CardTitle>
             <Tabs value={range} onValueChange={setRange} className="w-auto">
               <TabsList className="bg-slate-800/70">
                 <TabsTrigger value="7" className="data-[state=active]:bg-purple-600">7d</TabsTrigger>
                 <TabsTrigger value="14" className="data-[state=active]:bg-purple-600">14d</TabsTrigger>
+                <TabsTrigger value="all" className="data-[state=active]:bg-purple-600">All</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>

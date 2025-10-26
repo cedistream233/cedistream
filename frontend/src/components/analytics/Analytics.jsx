@@ -43,7 +43,7 @@ export default function Analytics({ creatorId, token }) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{overview.viewsThisMonth.toLocaleString()}</div>
-            <p className="text-gray-400 text-sm mt-2">Daily views for the last 30 days</p>
+            <p className="text-gray-400 text-sm mt-2">Daily views (All time)</p>
             <div style={{ width: '100%', height: 160 }} className="mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={viewsSeries}>
@@ -64,7 +64,7 @@ export default function Analytics({ creatorId, token }) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">GH₵ {Number(overview.monthlyRevenue || 0).toFixed(2)}</div>
-            <p className="text-gray-400 text-sm mt-2">Daily revenue for the last 30 days</p>
+            <p className="text-gray-400 text-sm mt-2">Daily revenue (All time)</p>
             <div style={{ width: '100%', height: 160 }} className="mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueSeries}>
@@ -83,7 +83,7 @@ export default function Analytics({ creatorId, token }) {
       {/* Combined larger area for more detail */}
       <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-white">Detailed (Last 30 days)</CardTitle>
+          <CardTitle className="text-white">Detailed (All time)</CardTitle>
         </CardHeader>
         <CardContent>
           <div style={{ width: '100%', height: 300 }}>
