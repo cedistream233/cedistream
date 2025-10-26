@@ -73,8 +73,9 @@ export default function AdminEarnings() {
       cur.creator_amount = +(cur.creator_amount + creator_amount).toFixed(2);
       map.set(key, cur);
     }
-    const arr = Array.from(map.entries()).map(([k,v]) => ({ key:k, ...v }));
-    arr.sort((a,b) => a.key.localeCompare(b.key));
+  const arr = Array.from(map.entries()).map(([k,v]) => ({ key:k, ...v }));
+  // Sort descending so the latest periods/dates appear first in the admin UI
+  arr.sort((a,b) => b.key.localeCompare(a.key));
     return arr;
   }, [filtered, mode]);
 
