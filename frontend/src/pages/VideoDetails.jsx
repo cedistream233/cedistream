@@ -24,6 +24,10 @@ export default function VideoDetails() {
   const [mediaUrl, setMediaUrl] = useState(null);
   const [hqUrl, setHqUrl] = useState(null);
   const [mediaFetching, setMediaFetching] = useState(false);
+  // Prevent a very short "skeleton flash" by delaying the skeleton show
+  // for fast responses. This avoids the initial placeholder appearing for
+  // a split second before the real page renders.
+  const [showSkeleton, setShowSkeleton] = useState(false);
   const [amountModal, setAmountModal] = useState({ visible: false, min: 0 });
   const [priceEditModal, setPriceEditModal] = useState(false);
   const [optimisticPrice, setOptimisticPrice] = useState(null);
@@ -34,7 +38,8 @@ export default function VideoDetails() {
   }, []);
 
   // Derived flags for rendering
-  const noPreviewAvailable = !canAccess && mediaUrl === null;
+  // Don't show the "no preview" state while we're still fetching the media URL.
+  const noPreviewAvailable = !canAccess && mediaUrl === null && !mediaFetching;
   const getIdFromToken = (tok) => {
     try {
       const parts = String(tok || '').split('.');
@@ -84,9 +89,11 @@ export default function VideoDetails() {
       }
 
       setVideo(foundVideo);
-  // indicate we're about to fetch the media URL / preview so the UI
-  // can show a loading overlay immediately and prevent premature clicks
-  if (foundVideo) setMediaFetching(true);
+      // indicate we're about to fetch the media URL / preview so the UI
+      // can show a loading overlay immediately and prevent premature clicks
+      if (foundVideo) {
+        setMediaFetching(true);
+      }
 
       // Parallelize sales fetch for owners (non-blocking)
       if (foundVideo) {
@@ -105,76 +112,103 @@ export default function VideoDetails() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         if (!video) return;
-        // we are starting the media URL fetch flow; ensure UI shows a loader
-        setMediaFetching(true);
 
-      // First, check if a preview was pre-fetched and stored
-      try {
-        const stored = sessionStorage.getItem(`preview:video:${video.id}`);
-        if (stored) { setMediaUrl(stored); setCanAccess(false); sessionStorage.removeItem(`preview:video:${video.id}`); }
-      } catch {}
+    // indicate we're starting the media lookup immediately and clear any
+    // previously cached media URL so an old preview doesn't linger.
+    setMediaFetching(true);
+        setMediaUrl(null);
 
-      const token = localStorage.getItem('token');
-      // If authorized, attempt to get full signed URL(s)
-      if (token) {
+        // First, check if a preview was pre-fetched and stored
         try {
-          const res = await fetch(`/api/media/video/${video.id}`, { headers: { Authorization: `Bearer ${token}` } });
-          if (res.ok) {
-            const d = await res.json();
-            setCanAccess(true);
-            // backend returns { hq, sd, hq_signed, sd_signed }
-            // Prefer direct signed URLs only when they don't point at Backblaze's download host
-            // because some Backblaze download hosts don't return CORS headers for signed URLs.
-            const isBackblazeHost = (u) => typeof u === 'string' && u.includes('backblazeb2.com');
-            let chosen = null;
-            if (d) {
-              // prefer sd signed if it's safe
-              if (d.sd_signed && !isBackblazeHost(d.sd_signed)) chosen = d.sd_signed;
-              else if (d.sd) chosen = d.sd; // proxy
-              else if (d.hq_signed && !isBackblazeHost(d.hq_signed)) chosen = d.hq_signed;
-              else if (d.hq) chosen = d.hq;
-              else chosen = d.url || null;
+          const stored = sessionStorage.getItem(`preview:video:${video.id}`);
+          if (stored) {
+            if (!cancelled) {
+              setMediaUrl(stored);
+              setCanAccess(false);
+              sessionStorage.removeItem(`preview:video:${video.id}`);
             }
-            setHqUrl(d?.hq || d?.hq_signed || null);
-            setMediaUrl(chosen);
+            return;
+          }
+        } catch {}
+
+        const token = localStorage.getItem('token');
+        // If authorized, attempt to get full signed URL(s)
+        if (token) {
+          try {
+            const res = await fetch(`/api/media/video/${video.id}`, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.ok) {
+              const d = await res.json();
+              if (cancelled) return;
+              if (d) {
+                // mark that the viewer can access the full media
+                setCanAccess(true);
+                // backend returns { hq, sd, hq_signed, sd_signed }
+                const isBackblazeHost = (u) => typeof u === 'string' && u.includes('backblazeb2.com');
+                let chosen = null;
+                if (d.sd_signed && !isBackblazeHost(d.sd_signed)) chosen = d.sd_signed;
+                else if (d.sd) chosen = d.sd; // proxy
+                else if (d.hq_signed && !isBackblazeHost(d.hq_signed)) chosen = d.hq_signed;
+                else if (d.hq) chosen = d.hq;
+                else chosen = d.url || null;
+                if (!cancelled) {
+                  setHqUrl(d?.hq || d?.hq_signed || null);
+                  setMediaUrl(chosen);
+                }
+              }
+              return;
+            }
+          } catch (e) {
+            // ignore and fall back to preview
+          }
+        }
+
+        // fallback to preview: prefer backend preview endpoint (which may return
+        // a proxied URL with correct CORS headers) over the raw metadata
+        // preview_url which can be a direct Backblaze URL lacking CORS.
+        try {
+          const { Video: VideoEntity } = await import('@/entities/Video');
+          const prevUrl = await VideoEntity.getPreviewUrl(video.id);
+          if (prevUrl) {
+            if (!cancelled) { setMediaUrl(prevUrl); setCanAccess(false); }
             return;
           }
         } catch (e) {
-          // ignore and fall back to preview
+          // ignore and fallback to metadata below
         }
-      }
 
-      // fallback to preview: prefer backend preview endpoint (which may return
-      // a proxied URL with correct CORS headers) over the raw metadata
-      // preview_url which can be a direct Backblaze URL lacking CORS.
-      try {
-        const { Video: VideoEntity } = await import('@/entities/Video');
-        const prevUrl = await VideoEntity.getPreviewUrl(video.id);
-        if (prevUrl) {
-          setMediaUrl(prevUrl); setCanAccess(false); return;
+        // If backend preview lookup failed, fall back to raw metadata if it exists
+        if (Object.prototype.hasOwnProperty.call(video, 'preview_url')) {
+          if (!cancelled) { setMediaUrl(video.preview_url || null); setCanAccess(false); }
+          return;
         }
+
+        if (!cancelled) { setMediaUrl(null); setCanAccess(false); }
       } catch (e) {
-        // ignore and fallback to metadata below
-      }
-
-      // If backend preview lookup failed, fall back to raw metadata if it exists
-      if (Object.prototype.hasOwnProperty.call(video, 'preview_url')) {
-        setMediaUrl(video.preview_url || null); setCanAccess(false); return;
-      }
-      setMediaUrl(null); setCanAccess(false);
-      } catch (e) { /* swallow errors to avoid breaking render */ }
-      finally {
-        // If mediaUrl hasn't been set by the fetch flow above, keep mediaFetching
-        // false only if mediaUrl was resolved; otherwise leave it (the inner
-        // branches set mediaUrl and will implicitly clear). To be safe, clear
-        // mediaFetching here if a mediaUrl was set synchronously in the flow.
-        if (mediaUrl) setMediaFetching(false);
+        // swallow errors to avoid breaking render
+      } finally {
+        if (!cancelled) setMediaFetching(false);
       }
     })();
+
+    return () => { cancelled = true; };
   }, [video?.id]);
+
+  // Delay showing the skeleton briefly so we don't flash it on fast loads.
+  useEffect(() => {
+    let id = null;
+    if (isLoading) {
+      // show skeleton only after a short delay
+      id = setTimeout(() => setShowSkeleton(true), 160);
+    } else {
+      setShowSkeleton(false);
+    }
+    return () => { if (id) clearTimeout(id); };
+  }, [isLoading]);
 
   
 
@@ -271,7 +305,15 @@ export default function VideoDetails() {
     }
   };
 
-  if (isLoading) {
+  // Only show the skeleton when metadata is loading and we haven't started
+  // the media lookup. If the media lookup is in progress we render the
+  // normal page (thumbnail + spinner overlay) so users see context while
+  // the preview resolves.
+    // Only show the skeleton when we're still loading metadata and we don't
+    // yet have video metadata. If `video` is already present, render the
+    // page so the thumbnail + spinner overlay can be shown while media
+    // resolution continues.
+    if (isLoading && !video) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="animate-pulse">
@@ -285,7 +327,7 @@ export default function VideoDetails() {
             </div>
           </div>
         </div>
-        {(!canAccess && mediaUrl === null) && (
+  {noPreviewAvailable && (
           <div className="mt-4">
             <div className="rounded-lg border border-purple-900/20 bg-slate-900/40 p-3 text-center">
               <div className="text-sm text-gray-300">No preview available</div>
