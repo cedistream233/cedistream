@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
 
 export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false, onReady, suppressLoadingUI=false }) {
@@ -6,7 +6,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const containerRef = useRef(null);
   // callback ref + state so effects can re-run when the video element mounts
   const [videoEl, setVideoEl] = useState(null);
-  const setRef = (el) => { ref.current = el; setVideoEl(el); };
+  const setRef = useCallback((el) => { ref.current = el; setVideoEl(el); }, []);
+  const debug = typeof window !== 'undefined' && window.location.search.includes('debugVideo=1');
   // show an immediate loading overlay when the source changes so users know
   // the video is loading and they shouldn't click expecting instant playback
   // Initialize from `src` so the overlay renders on the very first paint when
@@ -30,6 +31,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const hideTimer = useRef(null);
   const bufferingMonitor = useRef(null);
   const lastPlayProgress = useRef({ time: 0, timestamp: 0 });
+  const recentPlayTimer = useRef(null);
+  const recentUserPlayRef = useRef(false);
+  const recentTouchHandledRef = useRef(false);
   // track when controls were last shown so a rapid click after reveal doesn't
   // immediately toggle playback – the first click should reveal controls only
   const lastControlsShownAt = useRef(0);
@@ -54,6 +58,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setReadyState(v.readyState || 0);
       setNetworkState(v.networkState || 0);
       setIsReady((v.readyState || 0) >= 3);
+      // show center controls briefly when the element reports loaded metadata
+      try { showControlsTemporarily(); } catch (e) {}
       // loaded metadata -> we have enough info to hide the source loading UI
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
@@ -120,7 +126,16 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // noisy (short-lived and expected), so we delay/soften the UI.
       try {
         if (!isIOS) {
-          setBuffering(true);
+          // If the user just initiated play, delay showing buffering for a
+          // short moment to avoid a flash — the browser may still be fetching
+          // the next segment and will update shortly.
+          if (recentUserPlayRef.current) {
+            try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
+            const waitId = setTimeout(() => { try { if (v && (v.readyState || 0) < 3) setBuffering(true); } catch (e) {} }, 450);
+            try { if (v) v._waitingDebounce = waitId; } catch (e) {}
+          } else {
+            setBuffering(true);
+          }
         } else {
           // clear existing debounce timer
           try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
@@ -143,6 +158,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     const onCanPlay = () => {
       setBuffering(false);
       setIsReady(true);
+      try { showControlsTemporarily(); } catch (e) {}
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
       // clear any waiting debounce timers
@@ -152,6 +168,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     const onCanPlayThrough = () => {
       setBuffering(false);
       setIsReady(true);
+      try { showControlsTemporarily(); } catch (e) {}
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
       try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
@@ -317,7 +334,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     // removed PiP handlers
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     
-    v.addEventListener('loadedmetadata', onLoaded);
+  if (debug) console.log('[VideoPlayer] attaching listeners');
+  v.addEventListener('loadedmetadata', onLoaded);
   const onSeeking = () => { try { setBuffering(true); } catch (e) {} };
   const onSuspend = () => { try { setBuffering(true); } catch (e) {} };
   v.addEventListener('timeupdate', onTime);
@@ -345,6 +363,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     } catch (e) {}
     
     return () => {
+      if (debug) console.log('[VideoPlayer] detaching listeners');
       v.removeEventListener('loadedmetadata', onLoaded);
       v.removeEventListener('timeupdate', onTime);
       v.removeEventListener('ended', onEnd);
@@ -364,6 +383,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         v.removeEventListener && v.removeEventListener('webkitendfullscreen', onWebkitEnd);
       } catch (e) {}
       if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
+      try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
     };
   }, [videoEl, onReady]);
 
@@ -450,8 +470,11 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     setSourceLoading(true);
     const v = videoEl;
     if (v && (v.readyState >= 3 || v.readyState > 0)) {
-      // already have metadata/ready data, hide overlay
+      // already have metadata/ready data, hide overlay and show center controls
       setSourceLoading(false);
+      try { setIsReady(true); } catch (e) {}
+      try { showControlsTemporarily(); } catch (e) {}
+      try { onReady && onReady(); } catch (e) {}
     }
     // no cleanup
   }, [videoEl]);
@@ -460,11 +483,19 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, []);
 
+  // ensure recentPlayTimer cleared on unmount
+  useEffect(() => {
+    return () => {
+      try { if (recentPlayTimer.current) { clearTimeout(recentPlayTimer.current); recentPlayTimer.current = null; } } catch (e) {}
+    };
+  }, []);
+
   function showControlsTemporarily() {
+    if (debug) console.log('[VideoPlayer] showControlsTemporarily');
     setControlsVisible(true);
     try { lastControlsShownAt.current = Date.now(); } catch (e) {}
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
+    hideTimer.current = setTimeout(() => { if (debug) console.log('[VideoPlayer] hiding controls'); setControlsVisible(false); }, 3000);
   }
 
   const togglePlay = async () => {
@@ -489,7 +520,20 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   pauseRequestedRef.current = false;
   // a fresh play request resets the user-paused flag
   userPausedRef.current = false;
+  // mark a short window after user-initiated play where we suppress
+  // transient buffering UI so the center play doesn't immediately vanish
+  try {
+    recentUserPlayRef.current = true;
+    if (recentPlayTimer.current) { clearTimeout(recentPlayTimer.current); recentPlayTimer.current = null; }
+    recentPlayTimer.current = setTimeout(() => { recentUserPlayRef.current = false; recentPlayTimer.current = null; }, 800);
+  } catch (e) {}
     try {
+        // initialize a baseline progress so the monitor doesn't immediately
+        // consider the playback stalled. Also clear sourceLoading to avoid
+        // overlay flicker.
+        try { lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() }; } catch (e) {}
+        try { setSourceLoading(false); } catch (e) {}
+        try { setBuffering(false); } catch (e) {}
       // If the element is in ended state, seek to 0 so replay reuses buffered data
       try {
         if (v.ended && typeof v.currentTime !== 'undefined') {
@@ -578,8 +622,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
   const onContainerTap = (ev) => {
     // Ignore synthetic click that often follows a touch on mobile
-    try { if (ev.type === 'click' && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 700) return; } catch (e) {}
+    try { if (ev.type === 'click' && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 700) { if (debug) console.log('[VideoPlayer] ignoring synthetic click'); return; } } catch (e) {}
     const target = ev.target;
+    if (debug) console.log('[VideoPlayer] onContainerTap', { type: ev.type, controlsVisible });
     // guard: some events may come from non-Element targets (e.g., window)
     if (!target || !(target instanceof Element)) return;
     // Don't toggle if clicking on controls
@@ -626,7 +671,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         src={src || undefined}
         poster={poster}
         className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-full object-cover cedi-video"}
-        preload="metadata"
+  preload="auto"
         playsInline
         // vendor attributes must be strings in JSX; use spread to add them as DOM attributes
         {...{ 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }}
@@ -658,12 +703,15 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         .is-fullscreen .cedi-video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
       `}</style>
 
-      {/* custom center play/pause overlay: show immediately when controls visible (unless buffering) */}
-      {controlsVisible && !buffering && (
+    {/* custom center play/pause overlay: show immediately when controls visible.
+      Keep it visible for a short user-play window even if buffering state
+      briefly toggles to avoid a flash effect after a refresh. */}
+    {controlsVisible && (!buffering || recentUserPlayRef.current) && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-auto px-4">
           <button
             aria-label={playing ? 'Pause' : 'Play'}
-            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+            onClick={(e) => { e.stopPropagation(); if (recentTouchHandledRef.current) { recentTouchHandledRef.current = false; return; } togglePlay(); }}
+            onTouchEnd={(e) => { try { e.stopPropagation(); e.preventDefault(); recentTouchHandledRef.current = true; setTimeout(()=>{ recentTouchHandledRef.current = false; }, 700); } catch (err) {} togglePlay(); }}
             className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-black/60 flex items-center justify-center shadow-lg"
           >
             {playing ? (
@@ -678,7 +726,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       {/* Buffering spinner: show a clear loading circle whenever the player
           is in a buffering state so users see explicit feedback. Honor the
           suppressLoadingUI prop to allow parent to hide overlays when needed. */}
-      {buffering && !suppressLoadingUI && (
+      {buffering && !suppressLoadingUI && !recentUserPlayRef.current && (
         <div className="absolute inset-0 z-[9999] flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 border-4 border-t-transparent border-white/80 rounded-full animate-spin" />
         </div>
