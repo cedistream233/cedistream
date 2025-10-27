@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Video } from "@/entities/Video";
 import { User } from "@/entities/User";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export default function VideoDetails() {
   const [mediaUrl, setMediaUrl] = useState(null);
   const [hqUrl, setHqUrl] = useState(null);
   const [mediaFetching, setMediaFetching] = useState(false);
+  const handlePlayerReady = useCallback(() => setMediaFetching(false), []);
   // Prevent a very short "skeleton flash" by delaying the skeleton show
   // for fast responses. This avoids the initial placeholder appearing for
   // a split second before the real page renders.
@@ -375,7 +376,7 @@ export default function VideoDetails() {
           ) : (
             <div className="w-full rounded-lg overflow-hidden bg-black/60">
               {mediaUrl ? (
-                <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} onReady={() => setMediaFetching(false)} suppressLoadingUI={true} />
+                <VideoPlayer src={mediaUrl} poster={video.thumbnail} showPreviewBadge={!canAccess} onReady={handlePlayerReady} suppressLoadingUI={true} />
               ) : (
                 video.thumbnail ? (
                   <div className="relative group">

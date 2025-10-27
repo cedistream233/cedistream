@@ -4,6 +4,9 @@ import { Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-reac
 export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false, onReady, suppressLoadingUI=false }) {
   const ref = useRef(null);
   const containerRef = useRef(null);
+  // callback ref + state so effects can re-run when the video element mounts
+  const [videoEl, setVideoEl] = useState(null);
+  const setRef = (el) => { ref.current = el; setVideoEl(el); };
   // show an immediate loading overlay when the source changes so users know
   // the video is loading and they shouldn't click expecting instant playback
   // Initialize from `src` so the overlay renders on the very first paint when
@@ -40,7 +43,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const userPausedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
-    const v = ref.current; if (!v) return;
+    const v = videoEl; if (!v) { setIsFullscreen(!!document.fullscreenElement); return; }
     const onLoaded = () => {
       setDuration(v.duration || 0);
       setReadyState(v.readyState || 0);
@@ -98,8 +101,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // Seek to 0 so that repeating the same video reuses buffered data instead
       // of causing a full reload in some browsers.
       try {
-        if (ref.current && typeof ref.current.currentTime !== 'undefined') {
-          ref.current.currentTime = 0;
+        if (v && typeof v.currentTime !== 'undefined') {
+          v.currentTime = 0;
           setCurrent(0);
           lastPlayProgress.current = { time: 0, timestamp: Date.now() };
         }
@@ -113,12 +116,12 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // avoid false positives in some edge cases.
       try { setBuffering(true); } catch (e) {}
       if (bufferingMonitor.current) { /* reuse */ }
-      // clear any existing debounce timer
-      try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
+  // clear any existing debounce timer
+  try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
       // schedule a gentle check after a short delay to re-evaluate longer stalls
       const waitId = setTimeout(() => {
         try {
-          if (ref.current && (ref.current.readyState || 0) < 3) {
+          if (v && (v.readyState || 0) < 3) {
             const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
             if (Date.now() - (last.timestamp || 0) > 700) {
               setBuffering(true);
@@ -126,7 +129,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
           }
         } catch (e) {}
       }, 350);
-      try { ref.current._waitingDebounce = waitId; } catch (e) {}
+      try { if (v) v._waitingDebounce = waitId; } catch (e) {}
     };
 
     const onCanPlay = () => {
@@ -135,7 +138,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
       // clear any waiting debounce timers
-      try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
+      try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
     };
 
     const onCanPlayThrough = () => {
@@ -143,7 +146,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       setIsReady(true);
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
-      try { if (ref.current && ref.current._waitingDebounce) { clearTimeout(ref.current._waitingDebounce); ref.current._waitingDebounce = null; } } catch (e) {}
+      try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
     };
 
     const onStalled = () => {
@@ -151,7 +154,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // debounced to avoid false positives for short stalls.
       setTimeout(() => {
         try {
-          if (ref.current && (ref.current.readyState || 0) < 3) {
+          if (v && (v.readyState || 0) < 3) {
             setBuffering(true);
           }
         } catch (e) {}
@@ -202,7 +205,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         // update buffered percent (existing behavior)
         try {
           const d = v.duration || 0;
-          if (d > 0) {
+          if (d > 0 && buffered && buffered.length > 0) {
             const bufferedEnd = buffered.end(buffered.length - 1);
             setBufferedPercent(Math.min(100, (bufferedEnd / d) * 100));
           }
@@ -334,7 +337,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
     };
-  }, []);
+  }, [videoEl, onReady]);
 
   // toggle a class on container when entering/exiting fullscreen to help with layout
   useEffect(() => {
@@ -346,10 +349,17 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     }
   }, [isFullscreen]);
 
+  // Keep muted state in sync with the element when it mounts
+  useEffect(() => {
+    if (videoEl) {
+      try { setMuted(videoEl.muted ?? false); } catch (e) {}
+    }
+  }, [videoEl]);
+
   // PiP/speed menu removed
 
   useEffect(() => {
-    const v = ref.current; if (!v) return;
+    const v = videoEl; if (!v) { setIsFullscreen(!!document.fullscreenElement); return; }
     // When source changes, prefer seeking to 0 if the browser already has
     // the same resolved source to avoid forcing a full reload which causes
     // re-buffering. Only call load() when the effective source actually
@@ -389,7 +399,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     try { v.load && v.load(); } catch (e) {}
     if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
     setIsFullscreen(!!document.fullscreenElement);
-  }, [src]);
+  }, [src, videoEl]);
 
   // Ensure the loading overlay is shown as soon as `src` changes even if the
   // video element ref isn't mounted yet. The other effect that calls
@@ -410,13 +420,13 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // flicker.
   useEffect(() => {
     setSourceLoading(true);
-    const v = ref.current;
+    const v = videoEl;
     if (v && (v.readyState >= 3 || v.readyState > 0)) {
       // already have metadata/ready data, hide overlay
       setSourceLoading(false);
     }
     // no cleanup
-  }, []);
+  }, [videoEl]);
 
   useEffect(() => {
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
@@ -430,7 +440,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   }
 
   const togglePlay = async () => {
-    const v = ref.current; if (!v) { console.debug('[VideoPlayer] no video element'); return; }
+    const v = videoEl; if (!v) { console.debug('[VideoPlayer] no video element'); return; }
   // debug logs removed to reduce console noise in production
 
     // If currently playing, request a pause. If a play is in progress, mark pauseRequested and return —
@@ -496,9 +506,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     }
   };
   const format = (t) => { if (!isFinite(t)) return '0:00'; const m = Math.floor(t/60); const s = Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`; };
-  const onSeek = (e) => { const v = ref.current; if (!v) return; v.currentTime = Number(e.target.value); setCurrent(Number(e.target.value)); };
+  const onSeek = (e) => { const v = videoEl; if (!v) return; v.currentTime = Number(e.target.value); setCurrent(Number(e.target.value)); };
   const toggleMute = () => {
-    const v = ref.current; if (!v) return;
+    const v = videoEl; if (!v) return;
     // toggling mute shouldn't interrupt playback attempts. Just update muted state.
     const newMuted = !v.muted;
     try { v.muted = newMuted; } catch (e) { console.warn('[VideoPlayer] toggleMute failed', e); }
@@ -519,6 +529,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
   const onContainerTap = (ev) => {
     const target = ev.target;
+    // guard: some events may come from non-Element targets (e.g., window)
+    if (!target || !(target instanceof Element)) return;
     // Don't toggle if clicking on controls
     if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button') || target.closest('input')) {
       showControlsTemporarily();
@@ -558,7 +570,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
     >
       <video
-        ref={ref}
+        ref={setRef}
         src={src || undefined}
         poster={poster}
         className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-full object-cover cedi-video"}
