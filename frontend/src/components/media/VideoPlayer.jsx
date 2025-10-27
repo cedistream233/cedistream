@@ -42,6 +42,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // we should leave buffering state alone so the spinner stays visible.
   const userPausedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // track the last touch timestamp so we can ignore the synthetic click that follows on mobile
+  const lastTouchAt = useRef(0);
   // Detect iOS devices (iPhone/iPad) to apply milder buffering heuristics
   // and prefer inline/native behaviors that avoid excessive buffering UI.
   const isIOS = typeof navigator !== 'undefined' && (/iP(ad|hone|od)/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
@@ -76,10 +78,11 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
         const now = Date.now();
         const timeAdvanced = (v.currentTime || 0) - (last.time || 0);
-        // For very short clips, be aggressive: if playback made almost no progress
-        // for > 350ms while not paused, consider this buffering. Use a small
-        // progress tolerance to avoid marking normal playback as buffering.
-        if (v && !v.paused && (now - (last.timestamp || 0) > 350) && timeAdvanced < 0.06) {
+        // For very short clips, be aggressive on desktop but more tolerant on iOS.
+        // iOS can emit noisy timestamps; use a longer window and higher tolerance there.
+        const quickWindow = isIOS ? 700 : 350;
+        const quickProgressTolerance = isIOS ? 0.12 : 0.06;
+        if (v && !v.paused && (now - (last.timestamp || 0) > quickWindow) && timeAdvanced < quickProgressTolerance) {
           setBuffering(true);
         }
         // record progress after evaluation
@@ -574,6 +577,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // PiP and speed controls removed
 
   const onContainerTap = (ev) => {
+    // Ignore synthetic click that often follows a touch on mobile
+    try { if (ev.type === 'click' && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 700) return; } catch (e) {}
     const target = ev.target;
     // guard: some events may come from non-Element targets (e.g., window)
     if (!target || !(target instanceof Element)) return;
@@ -612,7 +617,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       className="relative bg-black rounded-xl overflow-hidden select-none group"
       onMouseMove={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}
-      onTouchEnd={onContainerTap}
+  onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
       onClick={onContainerTap}
       style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
     >
