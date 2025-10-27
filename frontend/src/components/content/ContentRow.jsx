@@ -3,7 +3,7 @@ import { setPostAuthIntent } from '@/utils';
 
 // Generic row-style renderer that matches the Library's Purchased*Row components:
 // small 56x56-ish thumbnail on the left, compact text, and a right-side action button.
-export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails, showPwyw = true, noCard = false }) {
+export default function ContentRow({ item, type = 'song', onAddToCart, onViewDetails, showPwyw = true, noCard = false, showLocked = false }) {
   const image = item?.cover_image || item?.thumbnail || null;
   const title = item?.title || item?.name || 'Untitled';
   // Don't show a fallback dash when artist/creator is missing — keep it empty
@@ -70,6 +70,9 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900" />
               )}
+              {(!owned && showLocked) ? (
+                <div className="absolute left-2 top-2 bg-black/60 text-white text-[11px] px-2 py-0.5 rounded pointer-events-none">🔒 Locked</div>
+              ) : null}
             </div>
 
             <div className="min-w-0">
@@ -112,6 +115,9 @@ export default function ContentRow({ item, type = 'song', onAddToCart, onViewDet
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900" />
                 )}
+                {(!owned && showLocked) ? (
+                  <div className="absolute left-2 top-2 bg-black/60 text-white text-[11px] px-2 py-0.5 rounded pointer-events-none">🔒 Locked</div>
+                ) : null}
               </div>
 
               <div className="min-w-0">

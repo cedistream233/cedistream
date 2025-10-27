@@ -143,6 +143,7 @@ export default function Creator() {
                     }}
                     onViewDetails={() => window.location.href = `/songs/${encodeURIComponent(song.id)}`}
                     showPwyw={false}
+                    showLocked={true}
                   />
                 ))}
               </div>
@@ -158,7 +159,7 @@ export default function Creator() {
             <div className="text-center py-8"><p className="text-gray-400">No results</p></div>
           ) : (
             <div className="rounded-lg bg-slate-900/50 border border-purple-900/20 overflow-hidden divide-y divide-slate-800">
-              {filteredAlbums.map((album) => (
+                {filteredAlbums.map((album) => (
                 <ContentRow
                   key={album.id}
                   noCard={true}
@@ -175,6 +176,7 @@ export default function Creator() {
                   type="album"
                   onViewDetails={() => window.location.href = `/albums/${encodeURIComponent(album.id)}`}
                   showPwyw={false}
+                  showLocked={true}
                 />
               ))}
             </div>
@@ -205,6 +207,7 @@ export default function Creator() {
                   type="video"
                   onViewDetails={() => { window.location.href = `/videos/${encodeURIComponent(video.id)}`; }}
                   showPwyw={false}
+                  showLocked={true}
                 />
               ))}
             </div>
