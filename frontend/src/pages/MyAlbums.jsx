@@ -145,7 +145,7 @@ export default function MyAlbums() {
         />
       </div>
 
-      <div className="space-y-2">
+  <div className="flex flex-col divide-y divide-slate-800">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-16 bg-slate-800/40 rounded animate-pulse" />

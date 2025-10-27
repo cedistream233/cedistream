@@ -147,7 +147,7 @@ export default function MyVideos() {
       </div>
 
       {/* Mobile list */}
-      <div className="sm:hidden flex flex-col gap-3">
+  <div className="sm:hidden flex flex-col divide-y divide-slate-800">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-40 bg-slate-800/40 rounded animate-pulse" />
@@ -212,7 +212,7 @@ export default function MyVideos() {
                 </div>
               </div>
               <div className="pl-3 flex items-center gap-2">
-                <button onClick={(e) => { e.stopPropagation(); navigate(`/my/videos/${encodeURIComponent(v.id)}`); }} className="px-3 py-1.5 rounded-md bg-slate-800 text-white text-sm hover:bg-slate-700">Manage</button>
+                <button onClick={(e) => { e.stopPropagation(); navigate(`/videos/${encodeURIComponent(v.id)}?autoplay=1`); }} className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700">Play</button>
               </div>
             </div>
           ))

@@ -138,7 +138,7 @@ export default function MySongs() {
 
       <div>
         {/* Mobile: compact rows */}
-        <div className="block sm:hidden flex flex-col gap-3">
+  <div className="block sm:hidden flex flex-col divide-y divide-slate-800">
           {loading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-20 bg-slate-800/40 rounded animate-pulse" />
@@ -158,7 +158,7 @@ export default function MySongs() {
         </div>
 
         {/* Desktop/Tablet: row-style list (matches supporters' layout) */}
-        <div className="hidden sm:flex flex-col gap-3">
+  <div className="hidden sm:flex flex-col divide-y divide-slate-800">
           {loading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-20 bg-slate-800/40 rounded animate-pulse" />
