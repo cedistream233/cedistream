@@ -28,6 +28,7 @@ export default function AudioPlayer({
   const capRef = useRef(null);
   const loopRef = useRef(loopMode);
   const onNextRef = useRef(onNext);
+  const endedTriggeredRef = useRef(false);
 
   // keep a live ref of the effective preview cap
   useEffect(() => {
@@ -75,6 +76,11 @@ export default function AudioPlayer({
         return;
       }
       if (loopRef.current === 'all' && typeof onNextRef.current === 'function') {
+        // mark that the next track change was triggered by an ended event so
+        // the src change effect can attempt to autoplay on platforms (like
+        // iOS) that require a user gesture — this improves seamless playback
+        // when 'loop all' is enabled.
+        try { endedTriggeredRef.current = true; } catch (e) {}
         try { onNextRef.current(); } catch {}
         return;
       }
