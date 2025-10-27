@@ -137,7 +137,7 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
         coverUrl = variants.medium || variants.small || variants.original || null;
       } catch (e) {
         // fallback to uploading the raw cover if variants failed
-        coverUrl = await uploadToStorage('albums', path, byField.cover.buffer, byField.cover.mimetype || 'image/jpeg');
+  coverUrl = await uploadToStorage('albums', path, byField.cover.buffer, byField.cover.mimetype || 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
       }
     }
 
@@ -165,13 +165,13 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
         const f = byField[s.audio];
         const ext = (f.originalname.split('.').pop() || 'mp3').toLowerCase();
         const path = `albums/${userId}/${album.id}/songs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        audioUrl = await uploadToStorage('media', path, f.buffer, f.mimetype || 'audio/mpeg');
+  audioUrl = await uploadToStorage('media', path, f.buffer, f.mimetype || 'audio/mpeg', { cacheControl: 'public, max-age=604800, immutable' });
       }
       if (s.preview && byField[s.preview]) {
         const f = byField[s.preview];
         const ext = (f.originalname.split('.').pop() || 'mp3').toLowerCase();
         const pathPrev = `albums/${userId}/${album.id}/previews/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        previewUrl = await uploadToStorage('previews', pathPrev, f.buffer, f.mimetype || 'audio/mpeg');
+  previewUrl = await uploadToStorage('previews', pathPrev, f.buffer, f.mimetype || 'audio/mpeg', { cacheControl: 'public, max-age=604800, immutable' });
       }
       const ins = await query(
         `INSERT INTO songs (user_id, album_id, title, price, duration, cover_image, audio_url, preview_url, track_number, status, published_at)
@@ -217,7 +217,7 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
 
     const vext = (videoFile.originalname.split('.').pop() || 'mp4').toLowerCase();
     const vpath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${vext}`;
-    const videoUrl = await uploadToStorage('videos', vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4');
+  const videoUrl = await uploadToStorage('videos', vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4', { cacheControl: 'public, max-age=604800, immutable' });
 
     let thumbUrl = null;
     if (thumbFile) {
@@ -227,7 +227,7 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
         const variants = await uploadImageVariants('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
         thumbUrl = variants.medium || variants.small || variants.original || null;
       } catch (e) {
-        thumbUrl = await uploadToStorage('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+  thumbUrl = await uploadToStorage('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
       }
     }
 
@@ -237,7 +237,7 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
     if (previewField) {
       const pext = (previewField.originalname.split('.').pop() || 'mp4').toLowerCase();
       const ppath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}-preview.${pext}`;
-      previewUrl = await uploadToStorage('previews', ppath, previewField.buffer, previewField.mimetype || 'video/mp4');
+  previewUrl = await uploadToStorage('previews', ppath, previewField.buffer, previewField.mimetype || 'video/mp4', { cacheControl: 'public, max-age=604800, immutable' });
     }
 
     // Insert video row with status 'processing' while we create optimized files in background
@@ -294,7 +294,7 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     // upload audio to media bucket (cedistream-audio-files)
     const aext = (audioFile.originalname.split('.').pop() || 'mp3').toLowerCase();
     const apath = `songs/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${aext}`;
-    const audioUrl = await uploadToStorage('media', apath, audioFile.buffer, audioFile.mimetype || 'audio/mpeg');
+  const audioUrl = await uploadToStorage('media', apath, audioFile.buffer, audioFile.mimetype || 'audio/mpeg', { cacheControl: 'public, max-age=604800, immutable' });
 
     // optional cover (store in albums bucket = cedistream-album-covers)
     let coverUrl = null;
@@ -305,7 +305,7 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
         const variants = await uploadImageVariants('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
         coverUrl = variants.medium || variants.small || variants.original || null;
       } catch (e) {
-        coverUrl = await uploadToStorage('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
+  coverUrl = await uploadToStorage('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
       }
     }
 
@@ -314,7 +314,7 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     if (previewFile) {
       const pext = (previewFile.originalname.split('.').pop() || 'mp3').toLowerCase();
       const ppath = `previews/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${pext}`;
-      previewUrl = await uploadToStorage('previews', ppath, previewFile.buffer, previewFile.mimetype || 'audio/mpeg');
+  previewUrl = await uploadToStorage('previews', ppath, previewFile.buffer, previewFile.mimetype || 'audio/mpeg', { cacheControl: 'public, max-age=604800, immutable' });
     }
 
     const ins = await query(
@@ -438,7 +438,7 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
     const displayUrl = variants.medium || variants.small || variants.original || null;
     return res.json({ url: displayUrl, storagePath, variants });
   } catch (e) {
-    const publicUrl = await uploadToStorage('promotions', storagePath, buffer, 'image/jpeg');
+  const publicUrl = await uploadToStorage('promotions', storagePath, buffer, 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
     return res.json({ url: publicUrl, storagePath });
   }
   } catch (err) {
