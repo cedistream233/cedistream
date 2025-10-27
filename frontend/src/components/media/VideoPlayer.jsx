@@ -319,6 +319,15 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     v.addEventListener('playing', onPlaying);
     // (PiP removed)
     document.addEventListener('fullscreenchange', onFullscreenChange);
+    // iOS Safari emits webkitbeginfullscreen / webkitendfullscreen on the <video>
+    // element when entering native fullscreen. Listen and update state so our
+    // UI (icons / container class) stays in sync on phones.
+    const onWebkitBegin = () => setIsFullscreen(true);
+    const onWebkitEnd = () => setIsFullscreen(false);
+    try {
+      v.addEventListener && v.addEventListener('webkitbeginfullscreen', onWebkitBegin);
+      v.addEventListener && v.addEventListener('webkitendfullscreen', onWebkitEnd);
+    } catch (e) {}
     
     return () => {
       v.removeEventListener('loadedmetadata', onLoaded);
@@ -335,6 +344,10 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       v.removeEventListener('pause', onPause);
       v.removeEventListener('playing', onPlaying);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
+      try {
+        v.removeEventListener && v.removeEventListener('webkitbeginfullscreen', onWebkitBegin);
+        v.removeEventListener && v.removeEventListener('webkitendfullscreen', onWebkitEnd);
+      } catch (e) {}
       if (bufferingMonitor.current) { clearInterval(bufferingMonitor.current); bufferingMonitor.current = null; }
     };
   }, [videoEl, onReady]);
@@ -514,15 +527,36 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     try { v.muted = newMuted; } catch (e) { console.warn('[VideoPlayer] toggleMute failed', e); }
     setMuted(newMuted);
   };
-  const enterFullscreen = () => { const el = containerRef.current; if (!el) return; if (el.requestFullscreen) el.requestFullscreen(); };
+  const enterFullscreen = async () => {
+    try {
+      const el = containerRef.current; if (!el) return;
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+    } catch (e) { console.warn('enterFullscreen failed', e); }
+  };
   // skip buttons removed to increase seek bar space on mobile
   const toggleFullscreen = async () => {
     try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        const el = containerRef.current; if (!el) return; await el.requestFullscreen();
+      // If the document is already in a Fullscreen API session, exit it.
+      const docFs = document.fullscreenElement || document.webkitFullscreenElement || null;
+      if (docFs) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        return;
       }
+
+      // Prefer the video element's native iOS fullscreen method when available
+      // because some iOS versions don't honor requestFullscreen on arbitrary
+      // elements. webkitEnterFullscreen triggers native fullscreen player on iOS.
+      const v = videoEl;
+      if (v && v.webkitEnterFullscreen) {
+        try { v.webkitEnterFullscreen(); return; } catch (e) { /* fallthrough */ }
+      }
+
+      // Fallback: request fullscreen on the container element (Android / desktop)
+      const el = containerRef.current; if (!el) return;
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
     } catch (e) { console.warn('fullscreen toggle failed', e); }
   };
   // PiP and speed controls removed
@@ -576,6 +610,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-full object-cover cedi-video"}
         preload="auto"
         playsInline
+        webkit-playsinline
+        x5-playsinline
         // removed native controls to avoid browser center-play overlay
         crossOrigin="anonymous"
         controlsList="nodownload"
