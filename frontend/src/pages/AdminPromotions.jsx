@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import ImagePreviewModal from '@/components/ui/ImagePreviewModal';
+import { buildSrcSet } from '@/utils';
 import UploadProgressModal from '@/components/ui/UploadProgressModal';
 import {
   Dialog,
@@ -152,6 +153,7 @@ export default function AdminPromotions() {
               className="h-20 rounded object-cover border border-slate-700"
               loading="lazy"
               decoding="async"
+              srcSet={buildSrcSet(form.image) || undefined}
             />
           </div>
         )}

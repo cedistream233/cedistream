@@ -56,6 +56,43 @@ async function uploadToStorage(bucket, path, buffer, contentType) {
   throw lastErr || new Error('uploadToStorage failed');
 }
 
+// Upload image and generate resized variants (small/medium/large + optimized original)
+async function uploadImageVariants(bucket, path, buffer, contentType) {
+  // dynamic import sharp to avoid startup penalty when not needed
+  const sharp = (await import('sharp')).default;
+  const sizes = { small: 64, medium: 320, large: 800 };
+  const baseNoExt = String(path).replace(/\.[^.]+$/, '');
+  const out = {};
+  try {
+    // Upload resized variants
+    for (const [name, w] of Object.entries(sizes)) {
+      try {
+        const buf = await sharp(buffer).resize({ width: Number(w), height: Number(w), fit: 'cover' }).jpeg({ quality: 80 }).toBuffer();
+        const p = `${baseNoExt}-${w}w.jpg`;
+        out[name] = await uploadToStorage(bucket, p, buf, 'image/jpeg');
+      } catch (e) {
+        // warn but continue
+        console.warn('Failed to create/upload variant', name, e?.message || e);
+      }
+    }
+
+    // Upload an optimized original (max dimension limit)
+    try {
+      const maxOrig = Number(process.env.IMAGE_MAX_DIM || 2000);
+      const origBuf = await sharp(buffer).resize({ width: maxOrig, height: maxOrig, fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+      out.original = await uploadToStorage(bucket, path, origBuf, 'image/jpeg');
+    } catch (e) {
+      console.warn('Failed to upload optimized original image', e?.message || e);
+      // fallback: attempt to upload the raw buffer using the original path
+      out.original = await uploadToStorage(bucket, path, buffer, contentType || 'application/octet-stream');
+    }
+  } catch (err) {
+    console.error('uploadImageVariants error', err);
+    throw err;
+  }
+  return out;
+}
+
 // Create or draft an album with cover and songs; publish optional
 // multipart/form-data with fields:
 //  title, description, price, genre, release_date, publish ("true"/"false")
@@ -86,7 +123,14 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
       const ext = (byField.cover.originalname.split('.').pop() || 'jpg').toLowerCase();
       // Store album covers in albums bucket (cedistream-album-covers)
       const path = `album-covers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      coverUrl = await uploadToStorage('albums', path, byField.cover.buffer, byField.cover.mimetype || 'image/jpeg');
+      try {
+        const variants = await uploadImageVariants('albums', path, byField.cover.buffer, byField.cover.mimetype || 'image/jpeg');
+        // Prefer medium variant for listing thumbnails, fall back to small/original
+        coverUrl = variants.medium || variants.small || variants.original || null;
+      } catch (e) {
+        // fallback to uploading the raw cover if variants failed
+        coverUrl = await uploadToStorage('albums', path, byField.cover.buffer, byField.cover.mimetype || 'image/jpeg');
+      }
     }
 
     // create album row
@@ -171,7 +215,12 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
     if (thumbFile) {
       const text = (thumbFile.originalname.split('.').pop() || 'jpg').toLowerCase();
       const tpath = `thumbnails/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${text}`;
-      thumbUrl = await uploadToStorage('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+      try {
+        const variants = await uploadImageVariants('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+        thumbUrl = variants.medium || variants.small || variants.original || null;
+      } catch (e) {
+        thumbUrl = await uploadToStorage('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+      }
     }
 
     // optional preview file for video
@@ -244,7 +293,12 @@ router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields
     if (coverFile) {
       const cext = (coverFile.originalname.split('.').pop() || 'jpg').toLowerCase();
       const cpath = `covers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${cext}`;
-      coverUrl = await uploadToStorage('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
+      try {
+        const variants = await uploadImageVariants('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
+        coverUrl = variants.medium || variants.small || variants.original || null;
+      } catch (e) {
+        coverUrl = await uploadToStorage('albums', cpath, coverFile.buffer, coverFile.mimetype || 'image/jpeg');
+      }
     }
 
     // optional preview (to previews bucket = cedistream-previews)
@@ -371,8 +425,14 @@ router.post('/promotions-image', authenticateToken, requireRole(['admin']), uplo
     }
   const ext = 'jpg';
   const storagePath = `promotions/${req.user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const publicUrl = await uploadToStorage('promotions', storagePath, buffer, 'image/jpeg');
-  return res.json({ url: publicUrl, storagePath });
+  try {
+    const variants = await uploadImageVariants('promotions', storagePath, buffer, 'image/jpeg');
+    const displayUrl = variants.medium || variants.small || variants.original || null;
+    return res.json({ url: displayUrl, storagePath, variants });
+  } catch (e) {
+    const publicUrl = await uploadToStorage('promotions', storagePath, buffer, 'image/jpeg');
+    return res.json({ url: publicUrl, storagePath });
+  }
   } catch (err) {
     console.error('Promotions image upload error:', err);
     return res.status(500).json({ error: 'Failed to upload image' });

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { buildSrcSet } from '@/utils';
 
 export default function PromotionsBanner() {
   const [items, setItems] = useState([]);
@@ -67,6 +68,7 @@ export default function PromotionsBanner() {
                       className="w-full h-full object-contain"
                       loading="lazy"
                       decoding="async"
+                      srcSet={buildSrcSet(it.image) || undefined}
                     />
                   ) : (
                     <div className="w-full h-full bg-slate-800" />

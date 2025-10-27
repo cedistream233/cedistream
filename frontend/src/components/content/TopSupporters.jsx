@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
+import { buildSrcSet } from '@/utils';
 import { Trophy, Medal, Award } from 'lucide-react';
 
 export default function TopSupporters({ itemType, itemId, className = '' }) {
@@ -151,6 +152,7 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
                       decoding="async"
                       width="40"
                       height="40"
+                      srcSet={buildSrcSet(supporter.profile_image) || undefined}
                     />
                   ) : (
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-2 border-white/10">

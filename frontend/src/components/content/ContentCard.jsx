@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { buildSrcSet } from '@/utils';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Music2, Lock } from "lucide-react";
@@ -165,6 +166,8 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   loading="lazy"
                   decoding="async"
+                  srcSet={buildSrcSet(image) || undefined}
+                  sizes="(max-width: 640px) 100vw, 320px"
                 />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">

@@ -78,3 +78,22 @@ export const Leaderboard = {
     }
   }
 };
+
+// Build a srcset string for image variants using the naming convention
+// where variants are stored with suffixes like "-64w.jpg", "-320w.jpg".
+export function buildSrcSet(url) {
+  try {
+    if (!url || typeof url !== 'string') return null;
+    // Match pattern: <base>-<width>w.<ext>[?query]
+    const m = url.match(/(.+)-(\d+)w(\.[^?]+)(\?.*)?$/);
+    if (!m) return null;
+    const base = m[1];
+    const ext = m[3] || '';
+    const qs = m[4] || '';
+    const sizes = [64, 320, 800];
+    const parts = sizes.map(s => `${base}-${s}w${ext}${qs} ${s}w`);
+    return parts.join(', ');
+  } catch (e) {
+    return null;
+  }
+}

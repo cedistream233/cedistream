@@ -24,6 +24,7 @@ import Insights from '@/components/insights/Insights';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useImageViewer } from '@/contexts/ImageViewerContext';
+import { buildSrcSet } from '@/utils';
 import { useNavigate } from 'react-router-dom';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import Pagination from '@/components/ui/Pagination';
@@ -564,6 +565,7 @@ export default function CreatorDashboard() {
                       decoding="async"
                       width="112"
                       height="112"
+                      srcSet={buildSrcSet(user.profile_image) || undefined}
                     />
                   ) : (
                     (() => {

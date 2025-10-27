@@ -5,6 +5,7 @@ import { createPageUrl } from "@/utils";
 import { Sparkles, Search, BarChart3, X, Clock } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useImageViewer } from "@/contexts/ImageViewerContext.jsx";
+import { buildSrcSet } from '@/utils';
 
 const RECENT_SEARCHES_KEY = 'cedistream_recent_searches';
 const MAX_RECENT_SEARCHES = 5;
@@ -168,6 +169,7 @@ export default function Home() {
                         decoding="async"
                         width="64"
                         height="64"
+                        srcSet={buildSrcSet(c.profile_image) || undefined}
                       />
                       <div className="min-w-0">
                         <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>
