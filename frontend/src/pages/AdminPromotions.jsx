@@ -146,7 +146,13 @@ export default function AdminPromotions() {
         </div>
         {form.image && (
           <div className="mt-2">
-            <img src={form.image} alt="preview" className="h-20 rounded object-cover border border-slate-700" />
+            <img
+              src={form.image}
+              alt="preview"
+              className="h-20 rounded object-cover border border-slate-700"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
         )}
           <ImagePreviewModal

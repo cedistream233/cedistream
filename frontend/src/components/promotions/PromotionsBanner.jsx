@@ -61,7 +61,13 @@ export default function PromotionsBanner() {
               <a href={it.url} target="_blank" rel="noopener noreferrer" className="flex gap-4 items-center w-full">
                 <div className="w-28 h-20 sm:w-36 sm:h-28 bg-slate-900 rounded overflow-hidden flex items-center justify-center flex-none">
                   {it.image ? (
-                    <img src={it.image} alt="" className="w-full h-full object-contain" />
+                    <img
+                      src={it.image}
+                      alt=""
+                      className="w-full h-full object-contain"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <div className="w-full h-full bg-slate-800" />
                   )}

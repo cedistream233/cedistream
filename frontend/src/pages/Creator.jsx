@@ -53,7 +53,15 @@ export default function Creator() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center gap-4 mb-6">
-        <img src={creator.profile_image || 'https://via.placeholder.com/96?text=%F0%9F%8E%B5'} alt={creator.display_name} className="w-20 h-20 rounded-full object-cover" />
+        <img
+          src={creator.profile_image || 'https://via.placeholder.com/96?text=%F0%9F%8E%B5'}
+          alt={creator.display_name}
+          className="w-20 h-20 rounded-full object-cover"
+          loading="lazy"
+          decoding="async"
+          width="80"
+          height="80"
+        />
         <div>
           <h1 className="text-3xl font-bold text-white">{creator.display_name}</h1>
           {creator.bio && <p className="text-gray-400">{creator.bio}</p>}

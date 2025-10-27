@@ -160,10 +160,12 @@ export default function ContentCard({ item, type, onAddToCart, onViewDetails, sh
           <div className={`relative overflow-hidden ${mobileRow ? 'w-28 h-20 flex-shrink-0 sm:w-full sm:h-auto sm:aspect-square' : (desktopRow ? 'w-56 h-32 flex-shrink-0 md:w-64 md:h-36 lg:w-72 lg:h-40' : (compact ? 'w-full h-20 sm:h-20 md:h-24 lg:h-24' : 'w-full h-36 sm:h-32 md:h-28 lg:h-32'))}`}>
             {image ? (
               <img
-                src={image}
-                alt={title}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
+                  src={image}
+                  alt={title}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  loading="lazy"
+                  decoding="async"
+                />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
                 {type === "album" ? (

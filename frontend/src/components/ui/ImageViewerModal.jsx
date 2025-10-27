@@ -24,6 +24,7 @@ export default function ImageViewerModal({ isOpen, onClose, imageUrl }) {
               src={imageUrl}
               alt="Preview"
               className="max-h-[70vh] w-full h-auto object-contain rounded-lg"
+              decoding="async"
             />
           ) : (
             <div className="h-64 w-full flex items-center justify-center text-gray-400">No image</div>

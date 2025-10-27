@@ -147,6 +147,10 @@ export default function TopSupporters({ itemType, itemId, className = '' }) {
                       alt={supporter.name}
                       className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white/10 cursor-zoom-in"
                       onClick={(e) => { e.stopPropagation(); if (supporter.profile_image) openViewer(supporter.profile_image); }}
+                      loading="lazy"
+                      decoding="async"
+                      width="40"
+                      height="40"
                     />
                   ) : (
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-2 border-white/10">

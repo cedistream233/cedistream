@@ -164,6 +164,10 @@ export default function Home() {
                         alt={c.display_name}
                         className="w-16 h-16 rounded-full object-cover cursor-zoom-in"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (c.profile_image) openViewer(c.profile_image); }}
+                        loading="lazy"
+                        decoding="async"
+                        width="64"
+                        height="64"
                       />
                       <div className="min-w-0">
                         <div className="text-white font-semibold group-hover:text-purple-300 truncate">{c.display_name}</div>

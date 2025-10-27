@@ -555,8 +555,16 @@ export default function CreatorDashboard() {
               <div className="relative">
        <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border-4 border-white/5 flex items-center justify-center text-2xl font-bold text-white cursor-pointer"
          onClick={() => { if (user?.profile_image) openViewer(user.profile_image); }}>
-                  {user?.profile_image ? (
-                    <img src={user.profile_image} alt="Avatar" className="w-full h-full object-cover" />
+                    {user?.profile_image ? (
+                    <img
+                      src={user.profile_image}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      width="112"
+                      height="112"
+                    />
                   ) : (
                     (() => {
                       const first = user?.first_name || user?.firstName || '';
