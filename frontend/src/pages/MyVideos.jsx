@@ -172,32 +172,49 @@ export default function MyVideos() {
         )}
       </div>
 
-      {/* Desktop grid: thumbnails. If no thumbnail, show a simple gradient placeholder (no play button). */}
-      <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+  {/* Desktop/Tablet: row-style list (matches supporters' layout) */}
+  <div className="hidden sm:flex flex-col divide-y divide-slate-800">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="w-full bg-slate-800/40 rounded animate-pulse" style={{ paddingTop: '56.25%' }} />
+            <div key={i} className="h-28 bg-slate-800/40 rounded animate-pulse" />
           ))
         ) : (
           items.map((v) => (
-            <Card key={`grid-${v.id}`} className="bg-slate-900/50 border-purple-900/20 cursor-pointer" onClick={() => navigate(`/videos/${v.id}`)}>
-              <CardContent className="p-0">
-                <div className="w-full relative rounded overflow-hidden" style={{ paddingTop: '56.25%' }}>
+            <div
+              key={v.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/videos/${v.id}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/videos/${v.id}`); } }}
+              className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative w-14 h-14 rounded-md overflow-hidden shrink-0">
                   {v.thumbnail ? (
-                    <img src={v.thumbnail} alt={v.title} className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900 to-pink-900 flex items-center justify-center">
-                      {/* intentionally left blank: removed Play button per request */}
-                    </div>
+                    <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900" />
                   )}
                 </div>
-                <div className="p-3">
-                  <h3 className="text-white font-semibold text-sm line-clamp-2 mb-1">{v.title}</h3>
-                  <div className="text-xs text-gray-400">{v.creator || v.uploader}</div>
-                  {v.published_at && <div className="text-xs text-gray-500 mt-1">{new Date(v.published_at).toLocaleDateString()}</div>}
+                <div className="min-w-0">
+                  <div className="text-white font-medium truncate">{v.title}</div>
+                  {/* show published date like mobile; don't render fallback dash */}
+                  {(() => {
+                    const d = v.published_at || v.created_at || v.created_date || null;
+                    if (!d) return null;
+                    try {
+                      const formatted = new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                      return <div className="text-xs text-gray-400">Published {formatted}</div>;
+                    } catch (e) {
+                      return null;
+                    }
+                  })()}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="pl-3 flex items-center gap-2">
+                <button onClick={(e) => { e.stopPropagation(); navigate(`/my/videos/${encodeURIComponent(v.id)}`); }} className="px-3 py-1.5 rounded-md bg-slate-800 text-white text-sm hover:bg-slate-700">Manage</button>
+              </div>
+            </div>
           ))
         )}
       </div>

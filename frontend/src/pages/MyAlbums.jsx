@@ -145,34 +145,48 @@ export default function MyAlbums() {
         />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="space-y-2">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-40 bg-slate-800/40 rounded animate-pulse" />
+            <div key={i} className="h-16 bg-slate-800/40 rounded animate-pulse" />
           ))
         ) : (
           items.map(a => (
-            <Card
+            <div
               key={a.id}
               role="button"
               tabIndex={0}
               onClick={() => navigate(`/albums/${a.id}`)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/albums/${a.id}`); } }}
-              className="bg-slate-900/50 border-purple-900/20 cursor-pointer"
+              className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition cursor-pointer"
             >
-              <CardContent className="p-3">
-                <div className="w-full h-28 rounded bg-slate-800 overflow-hidden mb-2">
-                  {a.cover_image ? <img className="w-full h-full object-cover" src={a.cover_image} alt={a.title} /> : (
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative w-14 h-14 rounded-md overflow-hidden shrink-0">
+                  {a.cover_image ? (
+                    <img src={a.cover_image} alt={a.title} className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
                     <div className="w-full h-full bg-gradient-to-br from-purple-900 to-pink-900" />
                   )}
                 </div>
-                <div className="text-white font-medium truncate">{a.title}</div>
-                <div className="text-xs text-gray-400">Min GHS {parseFloat(a.price || 0).toFixed(2)}</div>
-                <div className="flex gap-2 mt-2">
-                  <Button size="sm" variant="outline" className="border-slate-700 text-white hover:bg-slate-800" onClick={(e) => { e.stopPropagation(); navigate(`/albums/${a.id}`); }}>Open</Button>
+                <div className="min-w-0">
+                  <div className="text-white font-medium truncate">{a.title}</div>
+                  {a.artist || a.creator ? <div className="text-xs text-gray-400 truncate">{a.artist || a.creator}</div> : null}
+                  {(() => {
+                    const d = a.published_at || a.release_date || a.created_at || a.created_date || null;
+                    if (!d) return null;
+                    try {
+                      const formatted = new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                      return <div className="text-xs text-gray-400 mt-0.5">Published {formatted}</div>;
+                    } catch (e) {
+                      return null;
+                    }
+                  })()}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="pl-3 flex items-center gap-2">
+                <button onClick={(e) => { e.stopPropagation(); navigate(`/albums/${a.id}`); }} className="px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm hover:from-purple-700 hover:to-pink-700">Open</button>
+              </div>
+            </div>
           ))
         )}
       </div>

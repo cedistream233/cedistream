@@ -441,7 +441,7 @@ export default function CreatorDashboard() {
   const AlbumRow = ({ album }) => {
     const image = album?.cover_image || null;
     const title = album?.title || 'Untitled';
-    const artist = album?.artist || '—';
+    const artist = album?.artist || null;
     return (
       <div className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition">
         <div className="flex items-center gap-3 min-w-0">
@@ -454,8 +454,15 @@ export default function CreatorDashboard() {
           </div>
           <div className="min-w-0">
             <div className="text-white font-medium truncate">{title}</div>
-            <div className="text-xs text-gray-400 truncate">{artist}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Album</div>
+            {artist ? <div className="text-xs text-gray-400 truncate">{artist}</div> : null}
+            {(() => {
+              const d = album?.published_at || album?.release_date || album?.created_at || album?.created_date || null;
+              if (!d) return null;
+              try {
+                const formatted = new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                return <div className="text-xs text-gray-400 mt-0.5">Published {formatted}</div>;
+              } catch (e) { return null; }
+            })()}
           </div>
         </div>
         <div className="pl-3 flex items-center gap-2">
@@ -468,7 +475,7 @@ export default function CreatorDashboard() {
   const SongRow = ({ song }) => {
     const image = song?.cover_image || null;
     const title = song?.title || 'Untitled';
-    const artist = song?.artist || '—';
+    const artist = song?.artist || song?.creator || null;
     return (
       <div className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition">
         <div className="flex items-center gap-3 min-w-0">
@@ -481,8 +488,15 @@ export default function CreatorDashboard() {
           </div>
           <div className="min-w-0">
             <div className="text-white font-medium truncate">{title}</div>
-            <div className="text-xs text-gray-400 truncate">{artist}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Song</div>
+            {artist ? <div className="text-xs text-gray-400 truncate">{artist}</div> : null}
+            {(() => {
+              const d = song?.published_at || song?.release_date || song?.created_at || song?.created_date || null;
+              if (!d) return null;
+              try {
+                const formatted = new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                return <div className="text-xs text-gray-400 mt-0.5">Published {formatted}</div>;
+              } catch (e) { return null; }
+            })()}
           </div>
         </div>
         <div className="pl-3 flex items-center gap-2">
@@ -495,7 +509,7 @@ export default function CreatorDashboard() {
   const VideoRow = ({ video }) => {
     const image = video?.thumbnail || null;
     const title = video?.title || 'Untitled';
-    const creatorName = video?.creator || '—';
+    const creatorName = video?.creator || video?.uploader || null;
     return (
       <div className="group flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-purple-900/20 hover:bg-slate-900/70 transition">
         <div className="flex items-center gap-3 min-w-0">
@@ -508,8 +522,15 @@ export default function CreatorDashboard() {
           </div>
           <div className="min-w-0">
             <div className="text-white font-medium truncate">{title}</div>
-            <div className="text-xs text-gray-400 truncate">{creatorName}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Video</div>
+            {creatorName ? <div className="text-xs text-gray-400 truncate">{creatorName}</div> : null}
+            {(() => {
+              const d = video?.published_at || video?.created_at || video?.created_date || null;
+              if (!d) return null;
+              try {
+                const formatted = new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                return <div className="text-xs text-gray-400 mt-0.5">Published {formatted}</div>;
+              } catch (e) { return null; }
+            })()}
           </div>
         </div>
         <div className="pl-3 flex items-center gap-2">
@@ -728,51 +749,36 @@ export default function CreatorDashboard() {
                 <CardContent className="p-6 text-gray-400">Loading your content…</CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Albums ({stats.albumCount})</h3>
-                  {Array.isArray(myContent.albums) && myContent.albums.length > 0 ? (
-                    <div className="space-y-2">
-                      {myContent.albums.map((a) => <AlbumRow key={a.id || a._id || a.title} album={a} />)}
-                    </div>
-                  ) : (
-                    <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                      <CardContent className="p-4 text-gray-400">
-                        You have no albums yet. <button onClick={() => navigate('/upload-album')} className="ml-2 text-purple-400">Upload an album</button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Songs ({stats.songsCount})</h3>
-                  {Array.isArray(myContent.songs) && myContent.songs.length > 0 ? (
-                    <div className="space-y-2">
-                      {myContent.songs.map((s) => <SongRow key={s.id || s._id || s.title} song={s} />)}
-                    </div>
-                  ) : (
-                    <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                      <CardContent className="p-4 text-gray-400">
-                        You have no songs yet. <button onClick={() => navigate('/upload-song')} className="ml-2 text-purple-400">Upload a song</button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Videos ({stats.videoCount})</h3>
-                  {Array.isArray(myContent.videos) && myContent.videos.length > 0 ? (
-                    <div className="space-y-2">
-                      {myContent.videos.map((v) => <VideoRow key={v.id || v._id || v.title} video={v} />)}
-                    </div>
-                  ) : (
-                    <Card className="bg-slate-900/50 border-purple-900/20 backdrop-blur-sm">
-                      <CardContent className="p-4 text-gray-400">
-                        You have no videos yet. <button onClick={() => navigate('/upload-video')} className="ml-2 text-purple-400">Upload a video</button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+                {[{
+                  label: `Albums (${stats.albumCount})`,
+                  icon: Music2,
+                  desc: 'View and manage all your albums',
+                  href: '/my/albums'
+                },{
+                  label: `Songs (${stats.songsCount})`,
+                  icon: Music,
+                  desc: 'View and manage all your songs',
+                  href: '/my/songs'
+                },{
+                  label: `Videos (${stats.videoCount})`,
+                  icon: Video,
+                  desc: 'View and manage all your videos',
+                  href: '/my/videos'
+                }].map((t, i) => (
+                  <Card key={i} onClick={()=>navigate(t.href)} className="group bg-slate-900/50 border-purple-900/20 backdrop-blur-sm cursor-pointer hover:bg-slate-900/70 transition">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <t.icon className="w-5 h-5 text-purple-400" /> {t.label}
+                        <ChevronRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition ml-auto" />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-400 text-sm">{t.desc}</p>
+                      <p className="text-xs text-slate-500 mt-2">Tap to view all</p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </TabsContent>
