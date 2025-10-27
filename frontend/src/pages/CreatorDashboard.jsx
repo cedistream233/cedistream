@@ -579,12 +579,12 @@ export default function CreatorDashboard() {
             if (v === 'content') { /* ensure content lists are ready */ setContentLoading(true); setTimeout(()=>setContentLoading(false), 0); }
             if (v === 'earnings') { fetchRecentSales().catch(()=>{}); loadWithdrawSummary(); }
           }} defaultValue="overview" className="space-y-6">
-          <TabsList className="bg-slate-900/50 border-purple-900/20">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600">Overview</TabsTrigger>
-            <TabsTrigger value="content" className="data-[state=active]:bg-purple-600">My Content</TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-purple-600">Analytics</TabsTrigger>
-            <TabsTrigger value="earnings" className="data-[state=active]:bg-purple-600">Earnings</TabsTrigger>
-          </TabsList>
+          <TabsList className="bg-slate-900/50 border-purple-900/20 overflow-x-auto no-scrollbar">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
+              <TabsTrigger value="content" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">My Content</TabsTrigger>
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
+              <TabsTrigger value="earnings" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Earnings</TabsTrigger>
+            </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
