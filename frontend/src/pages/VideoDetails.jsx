@@ -10,6 +10,7 @@ import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
 import VideoPlayer from '@/components/media/VideoPlayer';
 import TopSupporters from '@/components/content/TopSupporters';
+import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function VideoDetails() {
@@ -315,42 +316,9 @@ export default function VideoDetails() {
     // page so the thumbnail + spinner overlay can be shown while media
     // resolution continues.
     if (isLoading && !video) {
-      // Show a focused "loading video" overlay while metadata is loading so
-      // users see a clear action-state instead of a skeletal placeholder.
-      return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-6">
-            <div className="h-8 bg-slate-800/40 rounded w-32 mb-8" />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="w-full rounded-lg overflow-hidden bg-black/60 flex items-center justify-center relative" style={{minHeight: 320}}>
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-14 h-14 border-4 border-t-transparent border-white/90 rounded-full animate-spin" />
-                <div className="text-sm text-white/90">Loading video…</div>
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-center">
-              <div className="mb-6">
-                <div className="h-6 bg-slate-800/40 rounded w-3/4 mb-4" />
-                <div className="h-4 bg-slate-800/30 rounded w-1/2 mb-6" />
-                <div className="h-28 bg-slate-800/30 rounded" />
-              </div>
-            </div>
-          </div>
-
-          { /* If a preview truly isn't available, show the friendly note below the placeholders. */ }
-          {noPreviewAvailable && (
-            <div className="mt-8">
-              <div className="rounded-lg border border-purple-900/20 bg-slate-900/40 p-3 text-center">
-                <div className="text-sm text-gray-300">No preview available</div>
-                <div className="text-xs text-gray-500 mt-1">This creator hasn't uploaded a preview for this video.</div>
-              </div>
-            </div>
-          )}
-        </div>
-      );
+      // Use the shared full-screen loading overlay used across the app so
+      // this page matches the library / other pages.
+      return <LoadingOverlay text="Loading video" />;
     }
 
   if (!video) {
