@@ -42,6 +42,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // we should leave buffering state alone so the spinner stays visible.
   const userPausedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Detect iOS devices (iPhone/iPad) to apply milder buffering heuristics
+  // and prefer inline/native behaviors that avoid excessive buffering UI.
+  const isIOS = typeof navigator !== 'undefined' && (/iP(ad|hone|od)/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
   useEffect(() => {
     const v = videoEl; if (!v) { setIsFullscreen(!!document.fullscreenElement); return; }
     const onLoaded = () => {
@@ -110,26 +113,28 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     };
 
     const onWaiting = () => {
-      // native waiting usually indicates buffering
-      // Show buffering immediately so short stalls are visible to users.
-      // Keep the existing debounce check for a secondary verification to
-      // avoid false positives in some edge cases.
-      try { setBuffering(true); } catch (e) {}
-      if (bufferingMonitor.current) { /* reuse */ }
-  // clear any existing debounce timer
-  try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
-      // schedule a gentle check after a short delay to re-evaluate longer stalls
-      const waitId = setTimeout(() => {
-        try {
-          if (v && (v.readyState || 0) < 3) {
-            const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
-            if (Date.now() - (last.timestamp || 0) > 700) {
-              setBuffering(true);
-            }
-          }
-        } catch (e) {}
-      }, 350);
-      try { if (v) v._waitingDebounce = waitId; } catch (e) {}
+      // native waiting usually indicates buffering. On iOS this can be
+      // noisy (short-lived and expected), so we delay/soften the UI.
+      try {
+        if (!isIOS) {
+          setBuffering(true);
+        } else {
+          // clear existing debounce timer
+          try { if (v && v._waitingDebounce) { clearTimeout(v._waitingDebounce); v._waitingDebounce = null; } } catch (e) {}
+          // schedule a delayed check to confirm the stall persists
+          const waitId = setTimeout(() => {
+            try {
+              if (v && (v.readyState || 0) < 3) {
+                const last = lastPlayProgress.current || { time: 0, timestamp: 0 };
+                if (Date.now() - (last.timestamp || 0) > 700) {
+                  setBuffering(true);
+                }
+              }
+            } catch (e) {}
+          }, 700);
+          try { if (v) v._waitingDebounce = waitId; } catch (e) {}
+        }
+      } catch (e) {}
     };
 
     const onCanPlay = () => {
@@ -151,11 +156,17 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
     const onStalled = () => {
       // browser couldn't fetch data — treat similarly to waiting but keep it
-      // debounced to avoid false positives for short stalls.
+      // debounced to avoid false positives for short stalls. On iOS be more
+      // conservative to avoid unnecessary buffering overlays.
       setTimeout(() => {
         try {
           if (v && (v.readyState || 0) < 3) {
-            setBuffering(true);
+            if (!isIOS) setBuffering(true);
+            else {
+              setTimeout(() => {
+                try { if (v && (v.readyState || 0) < 3) setBuffering(true); } catch (e) {}
+              }, 600);
+            }
           }
         } catch (e) {}
       }, 500);
@@ -238,8 +249,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() };
       // start a short monitor loop that checks real progress and buffered headroom.
       // This is intentionally frequent (250ms) so we detect short stalls on tiny clips.
-      if (bufferingMonitor.current) clearInterval(bufferingMonitor.current);
-      bufferingMonitor.current = setInterval(() => {
+  if (bufferingMonitor.current) clearInterval(bufferingMonitor.current);
+  const monitorInterval = isIOS ? 400 : 250;
+  bufferingMonitor.current = setInterval(() => {
         try {
           // If the element is gone or ended, clear buffering and stop
           if (!v || v.ended) { setBuffering(false); return; }
@@ -280,7 +292,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             setBuffering(true);
           }
         } catch (e) {}
-      }, 250);
+  }, monitorInterval);
     };
     const onPause = () => {
       setPlaying(false);
@@ -600,6 +612,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       className="relative bg-black rounded-xl overflow-hidden select-none group"
       onMouseMove={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}
+      onTouchEnd={onContainerTap}
       onClick={onContainerTap}
       style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
     >
@@ -608,7 +621,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         src={src || undefined}
         poster={poster}
         className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-full object-cover cedi-video"}
-        preload="auto"
+        preload="metadata"
         playsInline
         // vendor attributes must be strings in JSX; use spread to add them as DOM attributes
         {...{ 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }}
