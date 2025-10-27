@@ -15,7 +15,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [bufferedPercent, setBufferedPercent] = useState(0);
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
   // buffering: true when playback is actually stalled (not just UI progress)
   const [buffering, setBuffering] = useState(false);
   // readyState & networkState exposed for debug
@@ -27,6 +27,9 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const hideTimer = useRef(null);
   const bufferingMonitor = useRef(null);
   const lastPlayProgress = useRef({ time: 0, timestamp: 0 });
+  // track when controls were last shown so a rapid click after reveal doesn't
+  // immediately toggle playback – the first click should reveal controls only
+  const lastControlsShownAt = useRef(0);
   // tracking in-flight play/pause operations to avoid races
   const playInProgressRef = useRef(false);
   const pauseRequestedRef = useRef(false);
@@ -421,6 +424,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
   function showControlsTemporarily() {
     setControlsVisible(true);
+    try { lastControlsShownAt.current = Date.now(); } catch (e) {}
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => setControlsVisible(false), 3000);
   }
@@ -525,7 +529,20 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       showControlsTemporarily();
       return;
     }
-    // controls visible -> toggle playback
+
+    // If controls were just shown (by touchstart/mousemove immediately
+    // before the click), treat this click as a reveal-only interaction so
+    // the user can take actions (play/pause/mute) on a subsequent click.
+    try {
+      const now = Date.now();
+      if (lastControlsShownAt.current && (now - lastControlsShownAt.current) < 700) {
+        // refresh the controls visible timer and do not toggle playback
+        showControlsTemporarily();
+        return;
+      }
+    } catch (e) {}
+
+    // controls visible and not just-revealed -> toggle playback
     togglePlay();
   };
 
@@ -575,15 +592,19 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         .is-fullscreen .cedi-video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
       `}</style>
 
-      {/* custom center play overlay: only show when video is ready and not buffering */}
-      {controlsVisible && (!playing) && isReady && !buffering && (
+      {/* custom center play/pause overlay: show play when paused, pause when playing */}
+      {controlsVisible && isReady && !buffering && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-auto px-4">
           <button
-            aria-label="Play"
+            aria-label={playing ? 'Pause' : 'Play'}
             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
             className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-black/60 flex items-center justify-center shadow-lg"
           >
-            <Play className="w-6 h-6 md:w-8 md:h-8 text-white" />
+            {playing ? (
+              <Pause className="w-6 h-6 md:w-8 md:h-8 text-white" />
+            ) : (
+              <Play className="w-6 h-6 md:w-8 md:h-8 text-white" />
+            )}
           </button>
         </div>
       )}
