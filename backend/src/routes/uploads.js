@@ -17,7 +17,7 @@ const upload = multer({
 
 // Helper to upload a file buffer to supabase and return public URL.
 // Implements simple retry/backoff for transient network/gateway errors (502, network connection lost).
-async function uploadToStorage(bucket, path, buffer, contentType) {
+async function uploadToStorage(bucket, path, buffer, contentType, options = {}) {
   // Use Backblaze client (required)
   const backblaze = createBackblazeClient();
 
@@ -32,7 +32,9 @@ async function uploadToStorage(bucket, path, buffer, contentType) {
       let uploadResult;
       if (backblaze) {
         const b = backblaze.from(bucket);
-        uploadResult = await b.upload(path, buffer, { contentType });
+        const uploadOpts = { contentType };
+        if (options && options.cacheControl) uploadOpts.cacheControl = options.cacheControl;
+        uploadResult = await b.upload(path, buffer, uploadOpts);
         if (uploadResult.error) throw uploadResult.error;
   // attempt to build public url (Backblaze Friendly URL)
   const { data } = await b.getPublicUrl(path);
@@ -64,27 +66,33 @@ async function uploadImageVariants(bucket, path, buffer, contentType) {
   const baseNoExt = String(path).replace(/\.[^.]+$/, '');
   const out = {};
   try {
-    // Upload resized variants
+    // Upload resized variants (JPEG and WebP)
     for (const [name, w] of Object.entries(sizes)) {
       try {
-        const buf = await sharp(buffer).resize({ width: Number(w), height: Number(w), fit: 'cover' }).jpeg({ quality: 80 }).toBuffer();
-        const p = `${baseNoExt}-${w}w.jpg`;
-        out[name] = await uploadToStorage(bucket, p, buf, 'image/jpeg');
+        const jpegBuf = await sharp(buffer).resize({ width: Number(w), height: Number(w), fit: 'cover' }).jpeg({ quality: 80 }).toBuffer();
+        const webpBuf = await sharp(buffer).resize({ width: Number(w), height: Number(w), fit: 'cover' }).webp({ quality: 75 }).toBuffer();
+        const pJpg = `${baseNoExt}-${w}w.jpg`;
+        const pWebp = `${baseNoExt}-${w}w.webp`;
+        // Set long-lived immutable caching for generated variants
+        out[name] = await uploadToStorage(bucket, pJpg, jpegBuf, 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
+        out[`${name}_webp`] = await uploadToStorage(bucket, pWebp, webpBuf, 'image/webp', { cacheControl: 'public, max-age=31536000, immutable' });
       } catch (e) {
         // warn but continue
         console.warn('Failed to create/upload variant', name, e?.message || e);
       }
     }
 
-    // Upload an optimized original (max dimension limit)
+    // Upload an optimized original (max dimension limit) in both JPEG and WebP
     try {
       const maxOrig = Number(process.env.IMAGE_MAX_DIM || 2000);
-      const origBuf = await sharp(buffer).resize({ width: maxOrig, height: maxOrig, fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
-      out.original = await uploadToStorage(bucket, path, origBuf, 'image/jpeg');
+  const origJpeg = await sharp(buffer).resize({ width: maxOrig, height: maxOrig, fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+  const origWebp = await sharp(buffer).resize({ width: maxOrig, height: maxOrig, fit: 'inside' }).webp({ quality: 85 }).toBuffer();
+  out.original = await uploadToStorage(bucket, path, origJpeg, 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
+  out.original_webp = await uploadToStorage(bucket, path.replace(/\.[^.]+$/, '.webp'), origWebp, 'image/webp', { cacheControl: 'public, max-age=31536000, immutable' });
     } catch (e) {
       console.warn('Failed to upload optimized original image', e?.message || e);
       // fallback: attempt to upload the raw buffer using the original path
-      out.original = await uploadToStorage(bucket, path, buffer, contentType || 'application/octet-stream');
+  out.original = await uploadToStorage(bucket, path, buffer, contentType || 'application/octet-stream', { cacheControl: 'public, max-age=31536000, immutable' });
     }
   } catch (err) {
     console.error('uploadImageVariants error', err);

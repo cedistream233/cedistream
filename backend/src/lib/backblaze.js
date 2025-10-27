@@ -1,4 +1,5 @@
 import B2 from 'backblaze-b2';
+import axios from 'axios';
 import { Readable } from 'stream';
 import http from 'http';
 import https from 'https';
@@ -148,6 +149,31 @@ export function createBackblazeClient() {
 
           if (data.length <= LARGE_UPLOAD_THRESHOLD) {
             const { data: uploadUrlData } = await b2.getUploadUrl({ bucketId: await getBucketId(physicalBucket) });
+
+            // If the caller passed a cacheControl option, use a direct HTTP upload
+            // so we can include the Cache-Control header on the uploaded object.
+            if (opts && opts.cacheControl) {
+              const headers = {
+                Authorization: uploadUrlData.authorizationToken,
+                'Content-Type': contentType,
+                'Cache-Control': opts.cacheControl,
+                // B2 expects X-Bz-File-Name to be URL-encoded
+                'X-Bz-File-Name': encodeURIComponent(objectPath)
+              };
+
+              // Use axios to POST the raw bytes to the provided upload URL.
+              const resp = await axios.post(uploadUrlData.uploadUrl, data, {
+                headers,
+                maxBodyLength: Infinity,
+                httpAgent,
+                httpsAgent,
+                // backblaze expects the raw bytes in the body; don't transform them
+                transitional: { forcedJSONParsing: false }
+              });
+
+              return { error: null, data: resp.data };
+            }
+
             const resp = await b2.uploadFile({
               uploadUrl: uploadUrlData.uploadUrl,
               uploadAuthToken: uploadUrlData.authorizationToken,
