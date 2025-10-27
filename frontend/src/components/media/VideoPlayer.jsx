@@ -610,8 +610,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         className={isFullscreen ? "w-full h-full object-contain cedi-video" : "w-full h-full object-cover cedi-video"}
         preload="auto"
         playsInline
-        webkit-playsinline
-        x5-playsinline
+        // vendor attributes must be strings in JSX; use spread to add them as DOM attributes
+        {...{ 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }}
         // removed native controls to avoid browser center-play overlay
         crossOrigin="anonymous"
         controlsList="nodownload"
@@ -640,8 +640,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         .is-fullscreen .cedi-video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
       `}</style>
 
-      {/* custom center play/pause overlay: show play when paused, pause when playing */}
-      {controlsVisible && isReady && !buffering && (
+      {/* custom center play/pause overlay: show immediately when controls visible (unless buffering) */}
+      {controlsVisible && !buffering && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-auto px-4">
           <button
             aria-label={playing ? 'Pause' : 'Play'}
