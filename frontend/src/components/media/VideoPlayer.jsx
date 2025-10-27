@@ -660,8 +660,10 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     <div
       ref={containerRef}
       className="relative bg-black rounded-xl overflow-hidden select-none group"
-      onMouseMove={showControlsTemporarily}
-      onTouchStart={showControlsTemporarily}
+  onMouseMove={showControlsTemporarily}
+  onPointerDown={showControlsTemporarily}
+  onPointerMove={showControlsTemporarily}
+  onTouchStart={showControlsTemporarily}
   onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
       onClick={onContainerTap}
       style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
@@ -675,10 +677,26 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         playsInline
         // vendor attributes must be strings in JSX; use spread to add them as DOM attributes
         {...{ 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }}
+          // keep muted attribute in sync with React state so muted retries work reliably
+          muted={muted}
         // removed native controls to avoid browser center-play overlay
         crossOrigin="anonymous"
         controlsList="nodownload"
       />
+
+        {/* Fallback poster image: some iOS browsers don't reliably render the <video> poster
+            in all states (especially after programmatic src changes). Render a lightweight
+            <img> on top of the video when not playing so users always see a thumbnail.
+            pointer-events:none keeps the image from interfering with taps. Spinner overlays
+            use higher z-index so they still appear above this image. */}
+        {poster && !playing && (
+          <img
+            src={poster}
+            alt={title || 'Video thumbnail'}
+            className="absolute inset-0 w-full h-full object-cover rounded-xl z-20 pointer-events-none"
+            loading="lazy"
+          />
+        )}
 
       {/* Immediate blocking loading overlay shown when sourceLoading is true.
           It's modern (semi-transparent backdrop + spinner + subtle text) and
@@ -726,7 +744,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       {/* Buffering spinner: show a clear loading circle whenever the player
           is in a buffering state so users see explicit feedback. Honor the
           suppressLoadingUI prop to allow parent to hide overlays when needed. */}
-      {buffering && !suppressLoadingUI && !recentUserPlayRef.current && (
+      {buffering && !suppressLoadingUI && (
         <div className="absolute inset-0 z-[9999] flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 border-4 border-t-transparent border-white/80 rounded-full animate-spin" />
         </div>

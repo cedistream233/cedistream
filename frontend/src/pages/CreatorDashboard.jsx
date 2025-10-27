@@ -541,7 +541,7 @@ export default function CreatorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black">
+  <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black overflow-x-hidden">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -665,12 +665,35 @@ export default function CreatorDashboard() {
             if (v === 'content') { /* ensure content lists are ready */ setContentLoading(true); setTimeout(()=>setContentLoading(false), 0); }
             if (v === 'earnings') { fetchRecentSales().catch(()=>{}); loadWithdrawSummary(); }
           }} defaultValue="overview" className="space-y-6">
-          <TabsList className="bg-slate-900/50 border-purple-900/20 overflow-x-auto no-scrollbar">
-              <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
-              <TabsTrigger value="content" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">My Content</TabsTrigger>
-              <TabsTrigger value="analytics" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
-              <TabsTrigger value="earnings" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Earnings</TabsTrigger>
-            </TabsList>
+        <div className="relative">
+          {/* Scrollable tabs container: keep internal scroll, prevent page-level overflow */}
+          <div className="bg-slate-900/50 border-purple-900/20 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="overflow-x-auto no-scrollbar">
+              <TabsList className="inline-flex gap-2">
+                <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
+                <TabsTrigger value="content" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">My Content</TabsTrigger>
+                <TabsTrigger value="analytics" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
+                <TabsTrigger value="earnings" className="data-[state=active]:bg-purple-600 min-w-[110px] whitespace-nowrap flex-shrink-0">Earnings</TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
+
+          {/* Left/right gradient masks to visually indicate there's more to scroll */}
+          <div className="pointer-events-none hidden sm:block absolute left-0 top-0 bottom-0 w-6" style={{background: 'linear-gradient(to right, rgba(0,0,0,0.5), transparent)'}} />
+          <div className="pointer-events-none hidden sm:block absolute right-0 top-0 bottom-0 w-6" style={{background: 'linear-gradient(to left, rgba(0,0,0,0.5), transparent)'}} />
+
+          {/* Mobile affordance removed from overlay position; rendered below tabs for discoverability */}
+        </div>
+
+        {/* Mobile swipe affordance: shown below the tabs on small screens */}
+        <div className="sm:hidden -mx-4 px-4 sm:mx-0 sm:px-0 mt-2 flex justify-end">
+          <div className="bg-black/40 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 shadow">
+            <span>Swipe</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 4L17 12L7 20V4Z" fill="white" />
+            </svg>
+          </div>
+        </div>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
