@@ -193,6 +193,54 @@ export default function AlbumDetails() {
     })();
   }, [album?.songs, token]);
 
+  // Play a track: ensure the correct URL (full or preview) is available before setting current index
+  const handlePlay = async (index) => {
+    if (!album?.songs?.length) return;
+    const song = album.songs[index];
+    if (!song) return;
+    const sid = song.id;
+    // determine desired mode
+    let desired = 'preview';
+    if (isOwner) desired = ownerPlayMode || 'full';
+    else if (purchased) desired = 'full';
+    else desired = albumHasAnyPreview ? 'preview' : null;
+    if (!desired) return; // nothing to play
+
+    setAudioFetching(true);
+    try {
+      // ensure urls exist in maps
+      if (desired === 'full') {
+        if (!trackFullUrls[sid]) {
+          try {
+            const tok = localStorage.getItem('token');
+            const full = tok ? await Song.getSignedUrl(sid, tok) : null;
+            if (full) setTrackFullUrls(prev => ({ ...prev, [sid]: full }));
+          } catch (e) { /* ignore */ }
+        }
+        // fallback to preview if full not available
+        if (!trackFullUrls[sid] && !trackPreviewUrls[sid]) {
+          try {
+            const prev = await Song.getPreviewUrl(sid);
+            if (prev) setTrackPreviewUrls(prevMap => ({ ...prevMap, [sid]: prev }));
+          } catch (e) { }
+        }
+      } else if (desired === 'preview') {
+        if (!trackPreviewUrls[sid]) {
+          try {
+            const prev = await Song.getPreviewUrl(sid);
+            if (prev) setTrackPreviewUrls(prevMap => ({ ...prevMap, [sid]: prev }));
+          } catch (e) { }
+        }
+      }
+    } finally {
+      setAudioFetching(false);
+    }
+
+    // After ensuring the appropriate url map entries exist (if possible), set the index and trigger autoplay
+    setCurrentIndex(index);
+    setAutoPlayTrigger(true);
+  };
+
   // Owners should always be able to access full audio. If an owner switches to Full mode
   // and the signed full URL for the current track isn't present yet, fetch it on demand.
   useEffect(() => {
@@ -498,7 +546,7 @@ export default function AlbumDetails() {
               {album.songs.map((song, index) => (
                 <button
                   key={song.id || index}
-                  onClick={() => { setCurrentIndex(index); setAutoPlayTrigger(true); }}
+                  onClick={() => { handlePlay(index); }}
                   className={`w-full text-left p-4 hover:bg-purple-900/10 transition-colors ${index===currentIndex?'bg-purple-900/10':''}`}
                 >
                   <div className="flex items-center justify-between">
