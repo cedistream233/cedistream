@@ -4,8 +4,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createBackblazeClient } from '../src/lib/backblaze.js';
 import { query } from '../src/lib/database.js';
+import { createBackblazeClient } from '../src/lib/backblaze.js';
+import axios from 'axios';
 
 // CLI options: --batch N, --dry-run, --checkpoint <path>, --resume, --tables csv
 const rawArgs = process.argv.slice(2);
@@ -20,7 +21,8 @@ const args = rawArgs.reduce((acc, cur, idx, arr) => {
 
 const BATCH_SIZE = Number(args.batch || process.env.MIGRATION_BATCH_SIZE || 100);
 const DRY_RUN = Boolean(args.dryRun);
-const CHECKPOINT_PATH = args.checkpoint || path.join(process.cwd(), 'backend', 'migration-thumbnails-checkpoint.json');
+// Default checkpoint file placed in current working directory to avoid nested paths
+const CHECKPOINT_PATH = args.checkpoint || path.join(process.cwd(), 'migration-thumbnails-checkpoint.json');
 const TABLES_FILTER = Array.isArray(args.tables) && args.tables.length > 0 ? args.tables : null;
 
 // dynamic import sharp
@@ -74,6 +76,28 @@ async function downloadFromB2(bucket, objectPath) {
   if (res.error) throw new Error('download failed');
   const buf = await toBuffer(res.data);
   return buf;
+}
+
+// Download a public URL. If it's a Backblaze-style URL we try to stream via the B2 client
+// otherwise fall back to a plain HTTP GET.
+async function downloadPublicUrl(publicUrl) {
+  try {
+    const u = new URL(publicUrl);
+    const host = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim();
+    if ((u.hostname && u.hostname.includes('backblazeb2.com')) || (host && u.href.startsWith(host))) {
+      // Try to parse as backblaze path
+      const parsed = parseStorageUrl(publicUrl);
+      if (parsed.bucket && parsed.objectPath) {
+        return await downloadFromB2(parsed.bucket, parsed.objectPath);
+      }
+    }
+  } catch (e) {
+    // ignore and try HTTP
+  }
+
+  // Fallback: fetch via HTTP GET
+  const resp = await axios.get(publicUrl, { responseType: 'arraybuffer' });
+  return Buffer.from(resp.data);
 }
 
 async function uploadToB2(bucket, pathName, buffer, contentType, options = {}) {
@@ -134,11 +158,39 @@ async function processRow(table, idCol, id, urlCol, url, checkpoint) {
       saveCheckpoint(checkpoint);
       return;
     }
-    const { bucket, objectPath } = parseStorageUrl(url);
-    if (!bucket || !objectPath) { console.log(`[skip] ${table} ${id} - cannot parse url ${url}`); checkpoint[table] = id; saveCheckpoint(checkpoint); return; }
-    console.log(`Processing ${table} ${id} -> ${bucket}/${objectPath}`);
-    const buf = await downloadFromB2(bucket, objectPath);
-    const variants = await generateAndUploadVariants(bucket, objectPath, buf);
+    // Determine source and attempt to download the original image buffer.
+    const parsed = parseStorageUrl(url);
+    let buf;
+    try {
+      buf = await downloadPublicUrl(url);
+    } catch (e) {
+      console.log(`[error] ${table} ${id} download failed`, e?.message || e);
+      checkpoint[table] = id;
+      saveCheckpoint(checkpoint);
+      return;
+    }
+
+  // Decide destination bucket/objectPath for generated variants.
+  // If source is a Backblaze-hosted URL and parsed to a Backblaze bucket, reuse it;
+  // otherwise map by table to the logical Backblaze bucket names.
+  const tableBucketMap = { albums: 'albums', songs: 'albums', videos: 'thumbnails', users: 'profiles' };
+  let isBackblazeHost = false;
+  try { const uu = new URL(url); const envBase = (process.env.BACKBLAZE_PUBLIC_BASE || '').trim(); isBackblazeHost = uu.hostname.includes('backblazeb2.com') || (envBase && uu.href.startsWith(envBase)); } catch(e){}
+  let targetBucket = (isBackblazeHost && parsed.bucket) ? parsed.bucket : (tableBucketMap[table] || 'previews');
+    // Derive a destination objectPath: reuse original objectPath if available, else synthesize
+    let targetObjectPath = parsed.objectPath;
+    if (!targetObjectPath) {
+      // extract filename from URL
+      try {
+        const u = new URL(url);
+        const base = path.basename(u.pathname) || `${id}.jpg`;
+        targetObjectPath = `${table}/${id}/${Date.now()}-${base}`;
+      } catch (e) {
+        targetObjectPath = `${table}/${id}/${Date.now()}.jpg`;
+      }
+    }
+    console.log(`Processing ${table} ${id} -> ${targetBucket}/${targetObjectPath}`);
+    const variants = await generateAndUploadVariants(targetBucket, targetObjectPath, buf);
     const medium = variants['320w'] || variants['64w'] || variants.original || null;
     if (medium) {
       if (DRY_RUN) {
@@ -179,10 +231,19 @@ async function run() {
       continue;
     }
     console.log(`Processing table ${t.name} in batches (batch=${BATCH_SIZE})`);
-    let lastId = checkpoint[t.name] || 0;
+    let lastId = checkpoint[t.name] ?? null;
     while (true) {
-      const sql = `SELECT ${t.idCol} as id, ${t.urlCol} as url FROM ${t.name} WHERE ${t.urlCol} IS NOT NULL AND ${t.idCol} > $1 ORDER BY ${t.idCol} ASC LIMIT $2`;
-      const res = await query(sql, [lastId, BATCH_SIZE]);
+      let sql, params;
+      if (lastId !== null && lastId !== undefined) {
+        // If we have a lastId, use a cursor-style query (works for numeric or string ids)
+        sql = `SELECT ${t.idCol} as id, ${t.urlCol} as url FROM ${t.name} WHERE ${t.urlCol} IS NOT NULL AND ${t.idCol} > $1 ORDER BY ${t.idCol} ASC LIMIT $2`;
+        params = [lastId, BATCH_SIZE];
+      } else {
+        // No lastId: select the first batch without an id predicate.
+        sql = `SELECT ${t.idCol} as id, ${t.urlCol} as url FROM ${t.name} WHERE ${t.urlCol} IS NOT NULL ORDER BY ${t.idCol} ASC LIMIT $1`;
+        params = [BATCH_SIZE];
+      }
+      const res = await query(sql, params);
       if (!res.rows || res.rows.length === 0) break;
       for (const r of res.rows) {
         await processRow(t.name, t.idCol, r.id, t.urlCol, r.url, checkpoint);
