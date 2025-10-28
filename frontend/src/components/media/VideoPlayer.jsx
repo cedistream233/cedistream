@@ -29,6 +29,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   const [isReady, setIsReady] = useState(false);
   const [playError, setPlayError] = useState(null);
   const hideTimer = useRef(null);
+  // suppress re-showing controls for a short window after an explicit hide
+  const suppressShowUntil = useRef(0);
   const bufferingMonitor = useRef(null);
   const lastPlayProgress = useRef({ time: 0, timestamp: 0 });
   const recentPlayTimer = useRef(null);
@@ -491,6 +493,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   }, []);
 
   function showControlsTemporarily() {
+    // honor short suppression window set when controls were explicitly hidden
+    try { if (Date.now() < (suppressShowUntil.current || 0)) return; } catch (e) {}
     if (debug) console.log('[VideoPlayer] showControlsTemporarily');
     setControlsVisible(true);
     try { lastControlsShownAt.current = Date.now(); } catch (e) {}
@@ -627,31 +631,23 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     if (debug) console.log('[VideoPlayer] onContainerTap', { type: ev.type, controlsVisible });
     // guard: some events may come from non-Element targets (e.g., window)
     if (!target || !(target instanceof Element)) return;
-    // Don't toggle if clicking on controls
+    // Don't toggle if clicking on controls (buttons/inputs). Treat as control interaction.
     if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button') || target.closest('input')) {
       showControlsTemporarily();
       return;
     }
-    // single tap: if controls hidden -> show them, otherwise toggle play
+
+    // single tap: if controls hidden -> show them
     if (!controlsVisible) {
       showControlsTemporarily();
       return;
     }
 
-    // If controls were just shown (by touchstart/mousemove immediately
-    // before the click), treat this click as a reveal-only interaction so
-    // the user can take actions (play/pause/mute) on a subsequent click.
-    try {
-      const now = Date.now();
-      if (lastControlsShownAt.current && (now - lastControlsShownAt.current) < 700) {
-        // refresh the controls visible timer and do not toggle playback
-        showControlsTemporarily();
-        return;
-      }
-    } catch (e) {}
-
-    // controls visible and not just-revealed -> toggle playback
-    togglePlay();
+    // Controls are visible and the click was outside the control area -> hide
+    // immediately (match mobile and desktop behavior similar to YouTube).
+    try { if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null; } } catch (e) {}
+    try { suppressShowUntil.current = Date.now() + 350; } catch (e) {}
+    setControlsVisible(false);
   };
 
   const progressPercent = duration > 0 ? (current / duration) * 100 : 0;
@@ -661,9 +657,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       ref={containerRef}
       className="relative bg-black rounded-xl overflow-hidden select-none group"
   onMouseMove={showControlsTemporarily}
-  onPointerDown={showControlsTemporarily}
+  onPointerDown={(e) => { try { if (!e || e.pointerType === 'touch') return; } catch (err) {} showControlsTemporarily(); }}
   onPointerMove={showControlsTemporarily}
-  onTouchStart={showControlsTemporarily}
   onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
       onClick={onContainerTap}
       style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
@@ -689,7 +684,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             <img> on top of the video when not playing so users always see a thumbnail.
             pointer-events:none keeps the image from interfering with taps. Spinner overlays
             use higher z-index so they still appear above this image. */}
-        {poster && !playing && (
+        {poster && !playing && current === 0 && (
           <img
             src={poster}
             alt={title || 'Video thumbnail'}
