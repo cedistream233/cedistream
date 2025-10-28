@@ -193,6 +193,25 @@ export default function AlbumDetails() {
     })();
   }, [album?.songs, token]);
 
+  // Owners should always be able to access full audio. If an owner switches to Full mode
+  // and the signed full URL for the current track isn't present yet, fetch it on demand.
+  useEffect(() => {
+    if (!isOwner || ownerPlayMode !== 'full' || !album?.songs?.length) return;
+    const sid = album.songs[currentIndex]?.id;
+    if (!sid) return;
+    if (trackFullUrls[sid]) return; // already have it
+    (async () => {
+      try {
+        const t = localStorage.getItem('token');
+        if (!t) return;
+        const full = await Song.getSignedUrl(sid, t);
+        if (full) setTrackFullUrls(prev => ({ ...prev, [sid]: full }));
+      } catch (e) {
+        // ignore — owner will still be able to play preview if present
+      }
+    })();
+  }, [isOwner, ownerPlayMode, currentIndex, album?.songs, trackFullUrls]);
+
   const onPrev = () => {
     if (!album?.songs?.length) return;
     if (currentIndex > 0) {
@@ -409,14 +428,17 @@ export default function AlbumDetails() {
                 <button
                   className={`px-3 py-1 ${ownerPlayMode === 'preview' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-gray-300'} disabled:opacity-50`}
                   onClick={() => setOwnerPlayMode('preview')}
-                  disabled={!trackPreviewUrls[album.songs[currentIndex]?.id]}
+                  // Owners should be able to toggle preview mode even if a preview URL hasn't been seeded yet
+                  disabled={!trackPreviewUrls[album.songs[currentIndex]?.id] && !isOwner}
                 >
                   Preview
                 </button>
                 <button
                   className={`px-3 py-1 ${ownerPlayMode === 'full' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-gray-300'} disabled:opacity-50`}
                   onClick={() => setOwnerPlayMode('full')}
-                  disabled={!trackFullUrls[album.songs[currentIndex]?.id]}
+                  // Owners get full access to their own uploads; allow switching to Full even if a signed URL
+                  // hasn't been seeded into state yet (player will fall back to preview if needed).
+                  disabled={!trackFullUrls[album.songs[currentIndex]?.id] && !isOwner}
                 >
                   Full
                 </button>
@@ -499,7 +521,7 @@ export default function AlbumDetails() {
                         // has no previews at all, show 'Locked' instead (no preview uploaded).
                         if (audioFetching && albumHasAnyPreview && !hasFull && !hasPreview) return 'Loading...';
                         if (isOwner) {
-                          return (hasFull || hasPreview) ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No audio';
+                          return (hasFull || hasPreview) ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'No preview';
                         }
                         if (purchased) {
                           return hasFull ? (index===currentIndex ? 'Playing' : 'Tap to play') : 'Loading...';

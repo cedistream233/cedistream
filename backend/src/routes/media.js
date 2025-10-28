@@ -194,7 +194,14 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
     if (!canAccess) return res.status(403).json({ error: 'Not purchased' });
 
   const { bucket, objectPath } = parseStorageUrl(song.audio_url || '');
-  if (!bucket || !objectPath) return res.status(500).json({ error: 'Invalid storage path' });
+  if (!bucket || !objectPath) {
+    // Don't fail hard if parsing doesn't recognize the storage URL format.
+    // Log for debugging and fall back to returning the original URL so playback
+    // can proceed when the audio_url is already a public URL or handled elsewhere.
+    console.warn('[media] parseStorageUrl failed for song.audio_url, falling back to raw URL', { id: song.id, audio_url: song.audio_url });
+    if (song.audio_url) return res.json({ url: song.audio_url });
+    return res.status(500).json({ error: 'Invalid storage path' });
+  }
 
   // For private Backblaze buckets, return a streaming proxy URL handled by our server.
   // For public files, return the public B2 URL.
@@ -206,8 +213,8 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
         const signed = await b2.from(bucket).createSignedUrl(objectPath, 60 * 60);
         const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
         if (signedUrl) {
-          if (shouldProxySignedUrl(signedUrl)) {
-            const base = getServerBaseUrl(req);
+            if (shouldProxySignedUrl(signedUrl)) {
+            const base = getAppBaseUrl(req);
             const encodedPath = encodeURIComponent(objectPath);
             const { st, sig } = signStreamToken(req.user.id, objectPath, 60 * 60);
             const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
@@ -221,9 +228,9 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
         // If signed URL generation fails, fall back to stream proxy
         console.warn('Failed to create signed URL, falling back to stream proxy', err?.message || err);
       }
-  const base = getServerBaseUrl(req);
+  const base = getAppBaseUrl(req);
       const encodedPath = encodeURIComponent(objectPath);
-      const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
+  const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
       
       return res.json({ url: streamUrl });
     }
@@ -271,7 +278,7 @@ router.get('/song/:id/preview', async (req, res) => {
                     const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
                     if (signedUrl) {
                       if (shouldProxySignedUrl(signedUrl)) {
-                        const base = getServerBaseUrl(req);
+                        const base = getAppBaseUrl(req);
                         const encodedPath = encodeURIComponent(objectPath);
                         const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
                         const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
@@ -284,7 +291,7 @@ router.get('/song/:id/preview', async (req, res) => {
                   } catch (err) {
                     console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
                   }
-                  const base = getServerBaseUrl(req);
+                  const base = getAppBaseUrl(req);
                   const encodedPath = encodeURIComponent(objectPath);
                   const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
                   return res.json({ url: streamUrl });

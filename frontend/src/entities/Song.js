@@ -35,6 +35,24 @@ async function getSignedUrl(id, token) {
     return null;
   }
 }
+
+// Defensive fallback: try the preview endpoint with auth if the primary signed URL route fails.
+// The preview route will return the full signed URL for owners when an Authorization header is provided.
+async function getSignedUrlWithFallback(id, token) {
+  const primary = await getSignedUrl(id, token);
+  if (primary) return primary;
+  try {
+    const previewPath = `/api/media/song/${id}/preview`;
+    const previewUrl = `${config.backendUrl}${previewPath}`;
+    const res = await fetch(previewUrl, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.url || null;
+  } catch (err) {
+    console.warn('getSignedUrl fallback failed:', err?.message || err);
+    return null;
+  }
+}
 export const SongSchema = {
   name: "Song",
   type: "object",
@@ -88,7 +106,7 @@ export const Song = {
     return res.json();
   },
   getPreviewUrl,
-  getSignedUrl
+  getSignedUrl: getSignedUrlWithFallback
 };
 
 export default SongSchema;
