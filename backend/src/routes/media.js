@@ -207,7 +207,7 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
         const signedUrl = (signed?.data?.signedUrl) || (signed?.data?.publicUrl) || signed?.signedUrl || signed?.publicUrl || null;
         if (signedUrl) {
           if (shouldProxySignedUrl(signedUrl)) {
-            const base = getAppBaseUrl(req);
+            const base = getServerBaseUrl(req);
             const encodedPath = encodeURIComponent(objectPath);
             const { st, sig } = signStreamToken(req.user.id, objectPath, 60 * 60);
             const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
@@ -221,7 +221,7 @@ router.get('/song/:id', authenticateToken, async (req, res) => {
         // If signed URL generation fails, fall back to stream proxy
         console.warn('Failed to create signed URL, falling back to stream proxy', err?.message || err);
       }
-      const base = getAppBaseUrl(req);
+  const base = getServerBaseUrl(req);
       const encodedPath = encodeURIComponent(objectPath);
       const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
       
@@ -271,7 +271,7 @@ router.get('/song/:id/preview', async (req, res) => {
                     const signedUrl = signed?.data?.signedUrl || signed?.data?.publicUrl || null;
                     if (signedUrl) {
                       if (shouldProxySignedUrl(signedUrl)) {
-                        const base = getAppBaseUrl(req);
+                        const base = getServerBaseUrl(req);
                         const encodedPath = encodeURIComponent(objectPath);
                         const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
                         const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}`;
@@ -284,7 +284,7 @@ router.get('/song/:id/preview', async (req, res) => {
                   } catch (err) {
                     console.warn('Signed URL generation failed, using stream proxy', err?.message || err);
                   }
-                  const base = getAppBaseUrl(req);
+                  const base = getServerBaseUrl(req);
                   const encodedPath = encodeURIComponent(objectPath);
                   const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
                   return res.json({ url: streamUrl });
@@ -306,7 +306,7 @@ router.get('/song/:id/preview', async (req, res) => {
       try {
         const b2 = createBackblazeClient();
         if (isPrivateBucket(bucket)) {
-          const base = getAppBaseUrl(req);
+          const base = getServerBaseUrl(req);
           const encodedPath = encodeURIComponent(objectPath);
           const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
           return res.json({ url: streamUrl });
@@ -347,7 +347,7 @@ router.get('/video/:id/preview', async (req, res) => {
             if (bucket && objectPath) {
                 const useBackblaze = process.env.BACKBLAZE_ACCOUNT_ID && process.env.BACKBLAZE_APPLICATION_KEY && (process.env.BACKBLAZE_BUCKET_NAME || process.env.B2_BUCKET_NAME);
                 // With Backblaze, we use the stream proxy for private buckets
-                const base = getAppBaseUrl(req);
+                const base = getServerBaseUrl(req);
                 const encodedPath = encodeURIComponent(objectPath);
                 const streamUrl = `${base}/api/media/stream/${bucket}/${encodedPath}`;
                 return res.json({ url: streamUrl });
@@ -368,7 +368,7 @@ router.get('/video/:id/preview', async (req, res) => {
         // always receive permissive CORS headers. Direct public Backblaze URLs
         // sometimes lack Access-Control-Allow-Origin which causes playback to fail
         // in cross-origin contexts. Proxying ensures consistent headers for previews.
-        const base = getAppBaseUrl(req);
+  const base = getServerBaseUrl(req);
         const encodedPath = encodeURIComponent(objectPath);
         // Include a short-lived signed stream token when possible so the stream
         // endpoint can verify intent even if the request lacks an Authorization header.
@@ -453,7 +453,7 @@ router.get('/video/:id', authenticateToken, async (req, res) => {
             console.warn('Failed to create signed URL, will fall back to proxy', err?.message || err);
             signedUrl = null;
           }
-          const base = getAppBaseUrl(req);
+          const base = getServerBaseUrl(req);
           const encodedPath = encodeURIComponent(objectPath);
           const { st, sig } = signStreamToken(userId, objectPath, 60 * 60);
           const proxyUrl = `${base}/api/media/stream/${bucket}/${encodedPath}${signedUrl ? `?st=${encodeURIComponent(st)}&sig=${encodeURIComponent(sig)}` : ''}`;
