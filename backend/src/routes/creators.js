@@ -230,61 +230,134 @@ router.get('/:id/content', optionalAuth, async (req, res, next) => {
 });
 
 // GET /api/creators/:id/analytics
+// Supports either: ?range=7|14 (legacy) OR ?start=ISO&end=ISO (preferred)
+// When start/end span more than ~62 days we return monthly buckets (YYYY-MM), otherwise daily (YYYY-MM-DD)
 router.get('/:id/analytics', async (req, res, next) => {
   try {
     const { id: rawId } = req.params;
     const id = await resolveUserIdentifier(rawId);
     if (!id) return res.status(404).json({ error: 'Creator not found' });
-    // support only ?range=7|14 days per product requirement
-    let days = parseInt(req.query.range || '14', 10);
-    if (![7, 14].includes(days)) days = 14;
-    // Build last 30 days dates
-    const dates = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0,10);
-      dates.push(iso);
+
+    // Parse start/end from query if provided
+    let start = null;
+    let end = null;
+    if (req.query.start && req.query.end) {
+      // Accept ISO dates (YYYY-MM-DD or full ISO)
+      start = new Date(String(req.query.start));
+      end = new Date(String(req.query.end));
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: 'Invalid start or end date' });
+      }
+      // normalize to date boundaries
+      start.setHours(0,0,0,0);
+      end.setHours(23,59,59,999);
+    } else {
+      // fallback to legacy range param (days)
+      let days = parseInt(req.query.range || '14', 10);
+      if (![7, 14].includes(days)) days = 14;
+      end = new Date();
+      end.setHours(23,59,59,999);
+      start = new Date();
+      start.setDate(start.getDate() - (days - 1));
+      start.setHours(0,0,0,0);
     }
 
-    // Revenue per day from purchases where item belongs to this creator
-    const revenueRes = await query(
-      `SELECT to_char(p.created_at::date, 'YYYY-MM-DD') as day, COALESCE(SUM(p.amount),0) as total
+    // compute span in days
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const spanDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / msPerDay) + 1);
+
+    // Decide aggregation granularity
+    const useMonthly = spanDays > 62; // longer than ~2 months -> monthly buckets
+
+    if (!useMonthly) {
+      // Daily aggregation: return one row per day between start..end (inclusive)
+      const dates = [];
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(new Date(d));
+      }
+
+      const revenueRes = await query(
+        `SELECT to_char(p.created_at::date, 'YYYY-MM-DD') as day, COALESCE(SUM(p.amount),0) as total
+         FROM purchases p
+         WHERE p.payment_status = 'completed' AND (
+           (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+           (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+           (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+         ) AND p.created_at >= $2 AND p.created_at <= $3
+         GROUP BY day`,
+        [id, start.toISOString(), end.toISOString()]
+      );
+      const revMap = new Map((revenueRes.rows || []).map(r => [r.day, parseFloat(r.total)]));
+
+      const salesRes = await query(
+        `SELECT to_char(p.created_at::date, 'YYYY-MM-DD') as day, COUNT(1)::int as count
+         FROM purchases p
+         WHERE p.payment_status = 'completed' AND (
+           (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
+           (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
+           (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
+         ) AND p.created_at >= $2 AND p.created_at <= $3
+         GROUP BY day`,
+        [id, start.toISOString(), end.toISOString()]
+      );
+      const salesMap = new Map((salesRes.rows || []).map(r => [r.day, parseInt(r.count, 10) || 0]));
+
+      const series = dates.map(d => {
+        const iso = d.toISOString().slice(0,10);
+        return { date: iso, revenue: revMap.get(iso) || 0, sales: salesMap.get(iso) || 0 };
+      });
+
+      const totalRevenue = series.reduce((s, v) => s + (v.revenue || 0), 0);
+      const totalSales = series.reduce((s, v) => s + (v.sales || 0), 0);
+      const viewsThisMonth = 0; // placeholder
+
+      return res.json({ series, totalRevenue, totalSales, monthlyRevenue: totalRevenue, viewsThisMonth });
+    }
+
+    // Monthly aggregation: group by year-month
+    const revenueMonthRes = await query(
+      `SELECT to_char(date_trunc('month', p.created_at), 'YYYY-MM') as mon, COALESCE(SUM(p.amount),0) as total
        FROM purchases p
        WHERE p.payment_status = 'completed' AND (
          (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
          (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
          (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
-       ) AND p.created_at >= (NOW() - ($2 || ' days')::interval)
-       GROUP BY day`,
-      [id, String(days)]
+       ) AND p.created_at >= $2 AND p.created_at <= $3
+       GROUP BY mon
+       ORDER BY mon`,
+      [id, start.toISOString(), end.toISOString()]
     );
+    const revMonthMap = new Map((revenueMonthRes.rows || []).map(r => [r.mon, parseFloat(r.total)]));
 
-    const revMap = new Map((revenueRes.rows || []).map(r => [r.day, parseFloat(r.total)]));
-
-    // Sales count per day
-    const salesRes = await query(
-      `SELECT to_char(p.created_at::date, 'YYYY-MM-DD') as day, COUNT(1)::int as count
+    const salesMonthRes = await query(
+      `SELECT to_char(date_trunc('month', p.created_at), 'YYYY-MM') as mon, COUNT(1)::int as count
        FROM purchases p
        WHERE p.payment_status = 'completed' AND (
          (p.item_type = 'album' AND p.item_id IN (SELECT id FROM albums WHERE user_id = $1)) OR
          (p.item_type = 'video' AND p.item_id IN (SELECT id FROM videos WHERE user_id = $1)) OR
          (p.item_type = 'song'  AND p.item_id IN (SELECT id FROM songs WHERE user_id = $1))
-       ) AND p.created_at >= (NOW() - ($2 || ' days')::interval)
-       GROUP BY day`,
-      [id, String(days)]
+       ) AND p.created_at >= $2 AND p.created_at <= $3
+       GROUP BY mon
+       ORDER BY mon`,
+      [id, start.toISOString(), end.toISOString()]
     );
-    const salesMap = new Map((salesRes.rows || []).map(r => [r.day, parseInt(r.count, 10) || 0]));
+    const salesMonthMap = new Map((salesMonthRes.rows || []).map(r => [r.mon, parseInt(r.count, 10) || 0]));
 
-    // Create series combining revenue and placeholder views (0)
-  const series = dates.map(d => ({ date: d, revenue: revMap.get(d) || 0, sales: salesMap.get(d) || 0 }));
+    // build month list from start..end (YYYY-MM)
+    const months = [];
+    const s = new Date(start.getFullYear(), start.getMonth(), 1);
+    const e = new Date(end.getFullYear(), end.getMonth(), 1);
+    for (let d = new Date(s); d <= e; d.setMonth(d.getMonth() + 1)) {
+      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      months.push(label);
+    }
 
-    // totals
+    const series = months.map(m => ({ date: m, revenue: revMonthMap.get(m) || 0, sales: salesMonthMap.get(m) || 0 }));
     const totalRevenue = series.reduce((s, v) => s + (v.revenue || 0), 0);
     const totalSales = series.reduce((s, v) => s + (v.sales || 0), 0);
-    const viewsThisMonth = 0; // placeholder - not tracked currently
+    const viewsThisMonth = 0;
 
-    res.json({ series, totalRevenue, totalSales, monthlyRevenue: totalRevenue, viewsThisMonth });
+    return res.json({ series, totalRevenue, totalSales, monthlyRevenue: totalRevenue, viewsThisMonth });
   } catch (err) { next(err); }
 });
 
