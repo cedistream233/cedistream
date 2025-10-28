@@ -44,7 +44,7 @@ export default function Insights({ creatorId, token }) {
   const [overview, setOverview] = useState({ viewsThisMonth: 0, monthlyRevenue: 0 });
   const [revenueSeries, setRevenueSeries] = useState([]);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
-  const [range, setRange] = useState('7'); // '7' | '14' | 'all'
+  const [range, setRange] = useState('7'); // '7' | '30' | 'all'
   const [total, setTotal] = useState(0);
   const [totalSales, setTotalSales] = useState(0);
   const [metric, setMetric] = useState('revenue'); // 'revenue' | 'sales' - show only one at a time
@@ -109,6 +109,13 @@ export default function Insights({ creatorId, token }) {
     return (revenueSeries || []).map(r => ({ date: r.date, revenue: r.revenue || 0, sales: r.sales || 0 }));
   }, [revenueSeries]);
 
+  // Sum totals for the currently selected range (combined is already range-filtered)
+  const rangeTotals = useMemo(() => {
+    const rev = (combined || []).reduce((s, p) => s + (Number(p.revenue || 0)), 0);
+    const sales = (combined || []).reduce((s, p) => s + (Number(p.sales || 0)), 0);
+    return { revenue: rev, sales };
+  }, [combined]);
+
   // compute axis maxima with padding so lines don't hit top edge (like screenshot)
   const { maxSales, maxRevenue } = useMemo(() => {
     const maxS = combined.reduce((m, p) => Math.max(m, p.sales || 0), 0);
@@ -154,14 +161,14 @@ export default function Insights({ creatorId, token }) {
           {isMobile ? (
             <div className="flex flex-col gap-3 w-full">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-white">{range === '7' ? 'Last 7 days' : range === '14' ? 'Last 14 days' : 'All time'}</CardTitle>
+                <CardTitle className="text-white">{range === '7' ? 'Last 7 days' : range === '30' ? 'Last 1 month' : 'All time'}</CardTitle>
               </div>
               <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
                 <div className="shrink-0">
                   <Tabs value={range} onValueChange={setRange} className="w-auto">
                     <TabsList className="bg-slate-800/70 rounded-md p-1">
                       <TabsTrigger value="7" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">7d</TabsTrigger>
-                      <TabsTrigger value="14" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">14d</TabsTrigger>
+                      <TabsTrigger value="30" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">1m</TabsTrigger>
                       <TabsTrigger value="all" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">All</TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -177,13 +184,13 @@ export default function Insights({ creatorId, token }) {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3 w-full">
-              <CardTitle className="text-white">{range === '7' ? 'Last 7 days' : range === '14' ? 'Last 14 days' : 'All time'}</CardTitle>
+              <div className="flex items-center justify-between gap-3 w-full">
+              <CardTitle className="text-white">{range === '7' ? 'Last 7 days' : range === '30' ? 'Last 1 month' : 'All time'}</CardTitle>
               <div className="flex items-center gap-3">
                 <Tabs value={range} onValueChange={setRange} className="w-auto">
-                  <TabsList className="bg-slate-800/70 rounded-md p-1">
+                    <TabsList className="bg-slate-800/70 rounded-md p-1">
                     <TabsTrigger value="7" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">7d</TabsTrigger>
-                    <TabsTrigger value="14" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">14d</TabsTrigger>
+                    <TabsTrigger value="30" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">1m</TabsTrigger>
                     <TabsTrigger value="all" className="data-[state=active]:bg-purple-600 rounded-md px-3 py-1">All</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -201,16 +208,19 @@ export default function Insights({ creatorId, token }) {
         </CardHeader>
 
         <CardContent className={isMobile ? 'p-3 space-y-3' : 'p-6 space-y-4'}>
-          {/* KPI center */}
+          {/* KPI center - show only the active metric's total for the selected range */}
           <div className="flex items-end justify-center gap-6 flex-wrap">
-            <div className="text-center">
-              <div className="text-slate-300 text-sm">Revenue GHS</div>
-              <div className="text-3xl md:text-4xl font-semibold text-white">{Number(total).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            </div>
-            <div className="text-center md:text-left">
-              <div className="text-slate-300 text-sm">Total Sales</div>
-              <div className="text-xl md:text-2xl font-medium text-blue-300">{Number(totalSales).toLocaleString()}</div>
-            </div>
+            {metric === 'revenue' ? (
+              <div className="text-center">
+                <div className="text-slate-300 text-sm">Revenue GHS</div>
+                <div className="text-3xl md:text-4xl font-semibold text-white">{Number(rangeTotals.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="text-slate-300 text-sm">Total Sales</div>
+                <div className="text-3xl md:text-4xl font-semibold text-blue-300">{Number(rangeTotals.sales || 0).toLocaleString()}</div>
+              </div>
+            )}
           </div>
 
           {/* Chart area */}
@@ -221,15 +231,17 @@ export default function Insights({ creatorId, token }) {
                   <LineChart data={combined} margin={{ top: 20, right: 48, left: 12, bottom: 40 }}>
                     <CartesianGrid stroke="#1f2937" strokeDasharray="3 8" vertical={false} />
                     <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={xAxisTickFormatter} interval={0} height={36} />
-                    {metric === 'sales' ? (
-                      <YAxis yAxisId="left" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, Math.max(4, fixedSalesMax)]} width={48} />
-                    ) : (
-                      <YAxis yAxisId="right" orientation="right" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, fixedRevenueMax]} width={64} />
-                    )}
+                    {/* Single Y axis on the left for both metrics; domain depends on selected metric */}
+                    <YAxis
+                      yAxisId="left"
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={[0, Math.max(4, metric === 'sales' ? fixedSalesMax : fixedRevenueMax)]}
+                      width={64}
+                    />
                     <Tooltip content={<CustomTooltip metric={metric} />} wrapperStyle={{ outline: 'none' }} />
-                        {!isMobile && (
-                          <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />
-                        )}
+                    {!isMobile && <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />}
                     {metric === 'sales' ? (
                       <Line
                         yAxisId="left"
@@ -246,7 +258,7 @@ export default function Insights({ creatorId, token }) {
                       />
                     ) : (
                       <Line
-                        yAxisId="right"
+                        yAxisId="left"
                         type="linear"
                         dataKey="revenue"
                         name="revenue"
@@ -267,40 +279,44 @@ export default function Insights({ creatorId, token }) {
                 <LineChart data={combined} margin={{ top: 20, right: 48, left: 12, bottom: 20 }}>
                   <CartesianGrid stroke="#1f2937" strokeDasharray="3 8" vertical={false} />
                   <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 12 }} interval={Math.max(0, Math.floor((combined?.length || 1) / 7))} tickFormatter={xAxisTickFormatter} axisLine={false} tickLine={false} height={20} />
-                  {metric === 'sales' ? (
-                    <YAxis yAxisId="left" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, Math.max(4, fixedSalesMax)]} width={48} />
-                  ) : (
-                    <YAxis yAxisId="right" orientation="right" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, fixedRevenueMax]} width={64} />
-                  )}
-                  <Tooltip content={<CustomTooltip metric={metric} />} wrapperStyle={{ outline: 'none' }} />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />
-                  {metric === 'sales' ? (
-                    <Line
+                    {/* Single Y axis on the left for both metrics; domain depends on selected metric */}
+                    <YAxis
                       yAxisId="left"
-                      type="linear"
-                      dataKey="sales"
-                      name="sales"
-                      stroke="#60a5fa"
-                      strokeWidth={2.2}
-                      strokeDasharray="6 4"
-                      dot={{ r: 5, stroke: '#60a5fa', strokeWidth: 1.6, fill: '#ffffff' }}
-                      activeDot={{ r: 6, stroke: '#e0f2ff', strokeWidth: 2, fill: '#60a5fa' }}
-                      strokeLinecap="round"
-                      connectNulls
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={[0, Math.max(4, metric === 'sales' ? fixedSalesMax : fixedRevenueMax)]}
+                      width={64}
                     />
-                  ) : (
-                    <Line
-                      yAxisId="right"
-                      type="linear"
-                      dataKey="revenue"
-                      name="revenue"
-                      stroke="#34d399"
-                      strokeWidth={2.4}
-                      dot={{ r: 4, stroke: '#34d399', strokeWidth: 1.2, fill: '#ffffff' }}
-                      activeDot={{ r: 6, stroke: '#dfffee', strokeWidth: 2, fill: '#34d399' }}
-                      connectNulls
-                    />
-                  )}
+                    <Tooltip content={<CustomTooltip metric={metric} />} wrapperStyle={{ outline: 'none' }} />
+                    {!isMobile && <Legend verticalAlign="bottom" height={36} wrapperStyle={{ color: '#cbd5e1' }} />}
+                    {metric === 'sales' ? (
+                      <Line
+                        yAxisId="left"
+                        type="linear"
+                        dataKey="sales"
+                        name="sales"
+                        stroke="#60a5fa"
+                        strokeWidth={2.2}
+                        strokeDasharray="6 4"
+                        dot={{ r: 5, stroke: '#60a5fa', strokeWidth: 1.6, fill: '#ffffff' }}
+                        activeDot={{ r: 6, stroke: '#e0f2ff', strokeWidth: 2, fill: '#60a5fa' }}
+                        strokeLinecap="round"
+                        connectNulls
+                      />
+                    ) : (
+                      <Line
+                        yAxisId="left"
+                        type="linear"
+                        dataKey="revenue"
+                        name="revenue"
+                        stroke="#34d399"
+                        strokeWidth={2.4}
+                        dot={{ r: 4, stroke: '#34d399', strokeWidth: 1.2, fill: '#ffffff' }}
+                        activeDot={{ r: 6, stroke: '#dfffee', strokeWidth: 2, fill: '#34d399' }}
+                        connectNulls
+                      />
+                    )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
