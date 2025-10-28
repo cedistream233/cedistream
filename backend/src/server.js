@@ -96,6 +96,36 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false
 }));
+// Allow frontend origin(s) for CORS
+const primaryFrontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+const allowedOrigins = new Set([
+  primaryFrontend,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  // Primary Render frontend host
+  'https://cedistream.onrender.com',
+]);
+
+// Register CORS BEFORE rate limiting and other early-exit middleware so
+// preflight, rate-limited (429) and error responses include CORS headers.
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // allow tools/curl
+    if (allowedOrigins.has(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+}));
+
+// Ensure OPTIONS preflight responses always return CORS headers
+app.options('*', cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.has(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+}));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -105,7 +135,18 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Skip rate limiting for upload endpoints to allow large file uploads
-  skip: (req) => req.path.startsWith('/api/uploads/')
+  skip: (req) => req.path.startsWith('/api/uploads/'),
+  // Ensure 429 responses include CORS headers so browsers don't block them
+  handler: (req, res /*, next */) => {
+    // prefer request origin when present, otherwise fall back to allowed primaryFrontend or wildcard
+    const origin = req.headers.origin || primaryFrontend || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // Also mirror standard CORS preflight headers that clients may expect
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return res.status(429).json({ error: 'Too many requests, please try again later' });
+  }
 });
 
 const authLimiter = rateLimit({
@@ -116,24 +157,6 @@ const authLimiter = rateLimit({
 });
 
 app.use(limiter);
-
-// Allow frontend origin(s) for CORS
-const primaryFrontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
-const allowedOrigins = new Set([
-  primaryFrontend,
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  // Primary Render frontend host
-  'https://cedistream.onrender.com',
-]);
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // allow tools/curl
-    if (allowedOrigins.has(origin)) return cb(null, true);
-    return cb(null, false);
-  },
-  credentials: true,
-}));
 // Use JSON by default; Paystack webhook uses raw body at the route level
 // Raw body required for Paystack signature verification on webhook
 app.post('/api/paystack/webhook', express.raw({ type: '*/*' }), paystackWebhookHandler);
@@ -212,7 +235,16 @@ app.get('*', (req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err);
-  
+
+  // Ensure CORS headers are present on error responses so browsers can read them
+  try {
+    const origin = req && req.headers && req.headers.origin ? req.headers.origin : primaryFrontend || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } catch (e) {
+    // ignore header set errors
+  }
+
   // Don't leak error details in production
   if (process.env.NODE_ENV === 'production') {
     res.status(500).json({ error: 'Internal Server Error' });
@@ -232,11 +264,22 @@ app.use((err, req, res, next) => {
 app.use((req, res, next) => {
   // If it's an API route, always return JSON 404
   if (req.originalUrl && req.originalUrl.startsWith('/api')) {
+    // Ensure CORS headers on API 404s too
+    try {
+      const origin = req && req.headers && req.headers.origin ? req.headers.origin : primaryFrontend || '*';
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } catch (e) {}
     return res.status(404).json({ error: 'API route not found' });
   }
 
   // Non-GET requests to non-API routes should get a JSON 404 as well
   if (req.method !== 'GET') {
+    try {
+      const origin = req && req.headers && req.headers.origin ? req.headers.origin : primaryFrontend || '*';
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } catch (e) {}
     return res.status(404).json({ error: 'Route not found' });
   }
 
