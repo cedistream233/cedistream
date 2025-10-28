@@ -724,7 +724,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     {/* custom center play/pause overlay: show immediately when controls visible.
       Keep it visible for a short user-play window even if buffering state
       briefly toggles to avoid a flash effect after a refresh. */}
-    {controlsVisible && (!buffering || recentUserPlayRef.current) && (
+  {controlsVisible && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-auto px-4">
           <button
             aria-label={playing ? 'Pause' : 'Play'}
