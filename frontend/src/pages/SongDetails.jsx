@@ -112,11 +112,38 @@ export default function SongDetails() {
         setPreviewUrl(prev || null);
   setFullUrl(full || null);
 
-        if (full) {
-          setPurchased(true);
+        // Determine ownership robustly. Prefer a purchases API confirmation
+        // rather than trusting a returned signed URL alone (which can be
+        // mistaken or delayed). Consider both direct song purchases and
+        // album purchases that include this song.
+        let isPurchased = false;
+        try {
+          const token = localStorage.getItem('token');
+          if (token) {
+            const pRes = await fetch(`/api/purchases?item_type=song&me=true`, { headers: { Authorization: `Bearer ${token}` } });
+            if (pRes.ok) {
+              const rows = await pRes.json();
+              const albumId = song?.album_id || (song?.album && song.album.id) || null;
+              if (Array.isArray(rows) && rows.length) {
+                isPurchased = rows.some(r => {
+                  const ok = (r.payment_status === 'completed' || r.payment_status === 'success');
+                  if (!ok) return false;
+                  if (String(r.item_type) === 'song' && String(r.item_id) === String(song.id)) return true;
+                  if (albumId && String(r.item_type) === 'album' && String(r.item_id) === String(albumId)) return true;
+                  return false;
+                });
+              }
+            }
+          }
+        } catch (e) {
+          // ignore errors; default to not purchased to avoid false positives
+          isPurchased = false;
+        }
+
+        setPurchased(isPurchased);
+        if (isPurchased && full) {
           setAudioUrl(full);
         } else if (prev) {
-          setPurchased(false);
           setAudioUrl(prev);
         } else {
           setAudioUrl(null);

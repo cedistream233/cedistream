@@ -147,8 +147,6 @@ export default function VideoDetails() {
               const d = await res.json();
               if (cancelled) return;
               if (d) {
-                // mark that the viewer can access the full media
-                setCanAccess(true);
                 // backend returns { hq, sd, hq_signed, sd_signed }
                 const isBackblazeHost = (u) => typeof u === 'string' && u.includes('backblazeb2.com');
                 let chosen = null;
@@ -157,9 +155,34 @@ export default function VideoDetails() {
                 else if (d.hq_signed && !isBackblazeHost(d.hq_signed)) chosen = d.hq_signed;
                 else if (d.hq) chosen = d.hq;
                 else chosen = d.url || null;
-                if (!cancelled) {
-                  setHqUrl(d?.hq || d?.hq_signed || null);
-                  setMediaUrl(chosen);
+
+                // Only treat this as full-access if the viewer is the owner OR
+                // the purchases API confirms a completed purchase for this video.
+                let allow = false;
+                if (isOwner) {
+                  allow = true;
+                } else {
+                  try {
+                    const pRes = await fetch(`/api/purchases?item_type=video&me=true`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (pRes.ok) {
+                      const rows = await pRes.json();
+                      if (Array.isArray(rows) && rows.some(r => (r.payment_status === 'completed' || r.payment_status === 'success') && String(r.item_type) === 'video' && String(r.item_id) === String(video.id))) {
+                        allow = true;
+                      }
+                    }
+                  } catch (e) {
+                    // ignore purchase check errors — default to deny to avoid false positives
+                    allow = false;
+                  }
+                }
+
+                if (allow) {
+                  if (!cancelled) {
+                    setCanAccess(true);
+                    setHqUrl(d?.hq || d?.hq_signed || null);
+                    setMediaUrl(chosen);
+                  }
+                  return;
                 }
               }
               return;

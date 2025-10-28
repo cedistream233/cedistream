@@ -187,8 +187,35 @@ export default function AlbumDetails() {
       previewResults.forEach(r => { if (r.preview) previews[r.id] = r.preview; });
       fullResults.forEach(r => { if (r.full) fulls[r.id] = r.full; });
 
+      // If we have a token and the viewer is not the owner, consult purchases
+      // so we only accept full signed URLs when a purchase for the song or
+      // the whole album exists. This avoids showing 'Support again' when a
+      // signed URL was returned incorrectly.
+      let allowedFulls = {};
+      if (!token || isOwner) {
+        allowedFulls = fulls;
+      } else {
+        try {
+          const pRes = await fetch(`/api/purchases?me=true`, { headers: { Authorization: `Bearer ${token}` } });
+          const rows = pRes.ok ? await pRes.json() : [];
+          for (const id of Object.keys(fulls)) {
+            const has = Array.isArray(rows) && rows.some(r => {
+              const ok = (r.payment_status === 'completed' || r.payment_status === 'success');
+              if (!ok) return false;
+              if (String(r.item_type) === 'song' && String(r.item_id) === String(id)) return true;
+              if (String(r.item_type) === 'album' && String(r.item_id) === String(album.id)) return true;
+              return false;
+            });
+            if (has) allowedFulls[id] = fulls[id];
+          }
+        } catch (e) {
+          // On error, be conservative and don't expose fulls to avoid false positives
+          allowedFulls = {};
+        }
+      }
+
       setTrackPreviewUrls(previews);
-      setTrackFullUrls(fulls);
+      setTrackFullUrls(allowedFulls);
       setAudioFetching(false);
     })();
   }, [album?.songs, token]);
@@ -214,7 +241,27 @@ export default function AlbumDetails() {
           try {
             const tok = localStorage.getItem('token');
             const full = tok ? await Song.getSignedUrl(sid, tok) : null;
-            if (full) setTrackFullUrls(prev => ({ ...prev, [sid]: full }));
+            if (full) {
+              // Only accept on-demand full URL if owner or purchases confirm access
+              let allow = false;
+              if (isOwner) allow = true;
+              else if (tok) {
+                try {
+                  const pRes = await fetch(`/api/purchases?me=true`, { headers: { Authorization: `Bearer ${tok}` } });
+                  if (pRes.ok) {
+                    const rows = await pRes.json();
+                    allow = Array.isArray(rows) && rows.some(r => {
+                      const ok = (r.payment_status === 'completed' || r.payment_status === 'success');
+                      if (!ok) return false;
+                      if (String(r.item_type) === 'song' && String(r.item_id) === String(sid)) return true;
+                      if (String(r.item_type) === 'album' && String(r.item_id) === String(album.id)) return true;
+                      return false;
+                    });
+                  }
+                } catch (e) { allow = false; }
+              }
+              if (allow) setTrackFullUrls(prev => ({ ...prev, [sid]: full }));
+            }
           } catch (e) { /* ignore */ }
         }
         // fallback to preview if full not available
