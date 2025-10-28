@@ -651,6 +651,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   };
 
   const progressPercent = duration > 0 ? (current / duration) * 100 : 0;
+  // Show spinner when buffering or when playback is paused for non-user reasons
+  const shouldShowSpinner = (!suppressLoadingUI) && (buffering || (videoEl && videoEl.paused && !userPausedRef.current && !sourceLoading));
 
   return (
     <div
@@ -739,7 +741,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       {/* Buffering spinner: show a clear loading circle whenever the player
           is in a buffering state so users see explicit feedback. Honor the
           suppressLoadingUI prop to allow parent to hide overlays when needed. */}
-      {buffering && !suppressLoadingUI && (
+      {shouldShowSpinner && (
         <div className="absolute inset-0 z-[9999] flex items-center justify-center pointer-events-none">
           <div className="w-12 h-12 border-4 border-t-transparent border-white/80 rounded-full animate-spin" />
         </div>
