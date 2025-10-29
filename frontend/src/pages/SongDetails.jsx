@@ -232,8 +232,9 @@ export default function SongDetails() {
             loading={audioFetching}
             title={song.title}
             autoPlay={!!(autoplayRequested && purchased)}
-            showPreviewBadge={!purchased}
-            previewCapSeconds={!purchased ? 30 : undefined}
+            // Only show the preview badge / cap for non-owners who haven't purchased
+            showPreviewBadge={!purchased && !isOwner}
+            previewCapSeconds={(!purchased && !isOwner) ? 30 : undefined}
             hasPrev={false}
             hasNext={false}
             loopMode={loopMode}
