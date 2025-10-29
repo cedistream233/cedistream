@@ -264,6 +264,16 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
     const onPlay = () => {
       setPlaying(true);
+      // On iOS the sequence of events after a user-initiated play can
+      // trigger synthetic taps or browser UI that immediately hide our
+      // custom controls. Show controls and temporarily suppress hiding
+      // to ensure the user sees them after tapping Play.
+      try {
+        if (isIOS) {
+          showControlsTemporarily();
+          suppressShowUntil.current = Date.now() + 1100;
+        }
+      } catch (e) {}
       // playback started -> hide source-loading overlay if still visible
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
@@ -625,10 +635,21 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // PiP and speed controls removed
 
   const onContainerTap = (ev) => {
+    // If a control just handled the touch (e.g. center play button), ignore
+    // container taps that follow. recentTouchHandledRef is set by control
+    // handlers to avoid double-toggles on mobile.
+    try {
+      if (recentTouchHandledRef.current) {
+        if (debug) console.log('[VideoPlayer] recent touch already handled; ignoring container tap');
+        // reset the flag so subsequent taps work normally
+        recentTouchHandledRef.current = false;
+        return;
+      }
+    } catch (e) {}
     // Ignore synthetic click/pointerup that often follows a touch on mobile
     try {
       const isClickLike = ev.type === 'click' || ev.type === 'pointerup' || ev.type === 'mouseup';
-      if (isClickLike && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 500) {
+      if (isClickLike && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 700) {
         if (debug) console.log('[VideoPlayer] ignoring synthetic click/pointerup');
         return;
       }
@@ -682,6 +703,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     <div
       ref={containerRef}
       className="relative bg-black rounded-xl overflow-hidden select-none group"
+      onTouchStart={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} }}
       onMouseMove={showControlsTemporarily}
       // Use pointer events to unify mouse/touch/stylus handling across browsers
       onPointerDown={(e) => {
