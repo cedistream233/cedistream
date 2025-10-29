@@ -841,7 +841,10 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
       {/* Responsive modern control bar (mobile-friendly) */}
       {controlsVisible && (
-        <div className="absolute left-0 right-0 bottom-0 z-40 bg-gradient-to-t from-black/80 to-transparent p-1 md:p-3 flex items-center md:gap-3 gap-1">
+        <div
+          className="absolute left-0 right-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1 md:p-3 flex items-center md:gap-3 gap-1"
+          style={{ zIndex: 100000, WebkitTransform: 'translateZ(0)', pointerEvents: 'auto' }}
+        >
           <div className="flex items-center gap-1 md:gap-3 flex-none">
             <button onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} className="p-1 md:p-2 touch-manipulation">
               {playing ? <Pause className="w-5 h-5 text-white" /> : <Play className="w-5 h-5 text-white" />}
@@ -878,6 +881,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
                 value={current}
                 onChange={onSeek}
                 className="absolute left-0 top-0 w-full h-6 md:h-8 opacity-0 cursor-pointer"
+                style={{ pointerEvents: 'auto' }}
                 aria-label="Seek"
               />
             </div>
