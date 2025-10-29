@@ -186,6 +186,16 @@ export default function CreatorDashboard() {
 
   };
 
+  // Refetch recent sales whenever the page or page size changes (or token updates)
+  // so the pagination controls actually load the requested page.
+  useEffect(() => {
+    // Only fetch when on the overview/earnings tab to avoid unnecessary calls
+    if (tab === 'overview' || tab === 'earnings') {
+      fetchRecentSales().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesPage, salesPageSize, token, tab]);
+
   const fetchDashboardData = async () => {
     // Deduplicate: skip if already fetching or if fetched within last 2 seconds
     const now = Date.now();
