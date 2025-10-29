@@ -271,17 +271,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       // so the user sees them after tapping Play.
       try {
         if (isIOS) {
-          showControlsTemporarily();
-          // refresh hide timer so controls don't vanish immediately
-          if (hideTimer.current) {
-            clearTimeout(hideTimer.current);
-            hideTimer.current = null;
-          }
-          hideTimer.current = setTimeout(() => {
-            if (debug) console.log('[VideoPlayer] hiding controls (post-play refresh)');
-            setControlsVisible(false);
-            hideTimer.current = null;
-          }, 3000);
+          // force show on play (user gesture) so iOS timing won't block the controls
+          showControlsTemporarily(true);
         }
       } catch (e) {}
 
@@ -514,10 +505,10 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     };
   }, []);
 
-  function showControlsTemporarily() {
+  function showControlsTemporarily(force = false) {
     // honor short suppression window set when controls were explicitly hidden
-    try { if (Date.now() < (suppressShowUntil.current || 0)) return; } catch (e) {}
-    if (debug) console.log('[VideoPlayer] showControlsTemporarily');
+    try { if (!force && Date.now() < (suppressShowUntil.current || 0)) return; } catch (e) {}
+    if (debug) console.log('[VideoPlayer] showControlsTemporarily', { force });
     setControlsVisible(true);
     try { lastControlsShownAt.current = Date.now(); } catch (e) {}
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -760,10 +751,14 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         // container handlers on iOS where the element can sometimes intercept
         // touch events. These call the same handler used by the container so
         // behavior is consistent across platforms.
-        onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
-        onPointerUp={(e) => { try { if (e && e.pointerType === 'touch') lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
-        onClick={(e) => { onContainerTap(e); }}
+        onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} onContainerTap(e); }}
+        onPointerUp={(e) => { try { if (e && e.pointerType === 'touch') lastTouchAt.current = Date.now(); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} onContainerTap(e); }}
+        onClick={(e) => { try { showControlsTemporarily(true); } catch (err) {} onContainerTap(e); }}
       />
+      {/* Ensure gestures on the video element explicitly refresh controls visibility
+          on iOS: some event sequences can prevent our container handler from
+          showing controls due to timing. Call showControlsTemporarily() first
+          (it is idempotent and safe) so the controls become visible immediately. */}
 
         {/* Fallback poster image: some iOS browsers don't reliably render the <video> poster
             in all states (especially after programmatic src changes). Render a lightweight
