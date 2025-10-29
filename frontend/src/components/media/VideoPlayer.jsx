@@ -625,12 +625,36 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
   // PiP and speed controls removed
 
   const onContainerTap = (ev) => {
-    // Ignore synthetic click that often follows a touch on mobile
-    try { if (ev.type === 'click' && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 700) { if (debug) console.log('[VideoPlayer] ignoring synthetic click'); return; } } catch (e) {}
+    // Ignore synthetic click/pointerup that often follows a touch on mobile
+    try {
+      const isClickLike = ev.type === 'click' || ev.type === 'pointerup' || ev.type === 'mouseup';
+      if (isClickLike && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 500) {
+        if (debug) console.log('[VideoPlayer] ignoring synthetic click/pointerup');
+        return;
+      }
+    } catch (e) {}
     const target = ev.target;
     if (debug) console.log('[VideoPlayer] onContainerTap', { type: ev.type, controlsVisible });
     // guard: some events may come from non-Element targets (e.g., window)
     if (!target || !(target instanceof Element)) return;
+    // If this was a touch/pointer event, prefer to show or extend controls rather than
+    // toggle/hide them on finger lift. On Android Chrome, the video element can
+    // receive touchend/pointerup and browsers may expose transient native UI while the
+    // finger is down — hiding controls on touchend causes the controls to only
+    // appear while the finger is pressing. Treat touch/pointer events as show/extend.
+    try {
+      const evType = ev.type || '';
+      const isTouchLike = (evType.startsWith && evType.startsWith('touch')) || (ev.pointerType === 'touch');
+      if (isTouchLike) {
+        if (!controlsVisible) {
+          showControlsTemporarily();
+          return;
+        }
+        // controls already visible: extend their visibility
+        showControlsTemporarily();
+        return;
+      }
+    } catch (e) {}
     // Don't toggle if clicking on controls (buttons/inputs). Treat as control interaction.
     if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button') || target.closest('input')) {
       showControlsTemporarily();
@@ -658,12 +682,31 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     <div
       ref={containerRef}
       className="relative bg-black rounded-xl overflow-hidden select-none group"
-  onMouseMove={showControlsTemporarily}
-  onPointerDown={(e) => { try { if (!e || e.pointerType === 'touch') return; } catch (err) {} showControlsTemporarily(); }}
-  onPointerMove={showControlsTemporarily}
-  onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
+      onMouseMove={showControlsTemporarily}
+      // Use pointer events to unify mouse/touch/stylus handling across browsers
+      onPointerDown={(e) => {
+        try {
+          if (e && e.pointerType === 'touch') {
+            // record touch timestamp for synthetic-click suppression
+            lastTouchAt.current = Date.now();
+          } else {
+            // non-touch pointer: show controls immediately (mouse/pen)
+            showControlsTemporarily();
+          }
+        } catch (err) {}
+      }}
+      onPointerMove={showControlsTemporarily}
+      onPointerUp={(e) => {
+        try {
+          if (e && e.pointerType === 'touch') {
+            // treat pointerUp like touchend
+            lastTouchAt.current = Date.now();
+            onContainerTap(e);
+          }
+        } catch (err) {}
+      }}
       onClick={onContainerTap}
-      style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%' } : undefined}
+      style={!isFullscreen ? { aspectRatio: '16/9', maxWidth: '100%', touchAction: 'manipulation' } : { touchAction: 'manipulation' }}
     >
       <video
         ref={setRef}
@@ -679,6 +722,13 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         // removed native controls to avoid browser center-play overlay
         crossOrigin="anonymous"
         controlsList="nodownload"
+        // Ensure taps/clicks on the <video> element itself bubble into our
+        // container handlers on iOS where the element can sometimes intercept
+        // touch events. These call the same handler used by the container so
+        // behavior is consistent across platforms.
+        onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
+        onPointerUp={(e) => { try { if (e && e.pointerType === 'touch') lastTouchAt.current = Date.now(); } catch (err) {} onContainerTap(e); }}
+        onClick={(e) => { onContainerTap(e); }}
       />
 
         {/* Fallback poster image: some iOS browsers don't reliably render the <video> poster
