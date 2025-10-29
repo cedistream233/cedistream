@@ -652,7 +652,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     // Ignore synthetic click/pointerup that often follows a touch on mobile
     try {
       const isClickLike = ev.type === 'click' || ev.type === 'pointerup' || ev.type === 'mouseup';
-      if (isClickLike && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 700) {
+      if (isClickLike && lastTouchAt.current && (Date.now() - lastTouchAt.current) < 400) {
         if (debug) console.log('[VideoPlayer] ignoring synthetic click/pointerup');
         return;
       }
@@ -751,9 +751,22 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
         // container handlers on iOS where the element can sometimes intercept
         // touch events. These call the same handler used by the container so
         // behavior is consistent across platforms.
-        onTouchEnd={(e) => { try { lastTouchAt.current = Date.now(); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} onContainerTap(e); }}
-        onPointerUp={(e) => { try { if (e && e.pointerType === 'touch') lastTouchAt.current = Date.now(); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} onContainerTap(e); }}
-        onClick={(e) => { try { showControlsTemporarily(true); } catch (err) {} onContainerTap(e); }}
+        onTouchEnd={(e) => { try { e.stopPropagation(); e.preventDefault(); } catch (err) {} try { lastTouchAt.current = Date.now(); } catch (err) {} try { recentTouchHandledRef.current = true; setTimeout(()=>{ recentTouchHandledRef.current = false; }, 400); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} }}
+        onPointerUp={(e) => { try { if (e && e.pointerType === 'touch') lastTouchAt.current = Date.now(); } catch (err) {} try { e.stopPropagation(); } catch (err) {} try { recentTouchHandledRef.current = true; setTimeout(()=>{ recentTouchHandledRef.current = false; }, 400); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} }}
+        onClick={(e) => { try { e.stopPropagation(); } catch (err) {} try { showControlsTemporarily(true); } catch (err) {} }}
+        style={{ position: 'relative', zIndex: 0, WebkitTransform: 'translateZ(0)' }}
+      />
+      {/* Invisible tap-catcher overlay: when controls are hidden this sits above the <video>
+          and catches taps to reliably show controls on iOS where the video element
+          can sometimes swallow touch events. When controls are visible it becomes
+          pointer-events:none so controls receive input normally. */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{ zIndex: 50, pointerEvents: controlsVisible ? 'none' : 'auto' }}
+        onClick={(e) => { try { e.stopPropagation(); showControlsTemporarily(true); } catch (err) {} }}
+        onTouchEnd={(e) => { try { e.stopPropagation(); showControlsTemporarily(true); } catch (err) {} }}
+        onPointerUp={(e) => { try { e.stopPropagation(); showControlsTemporarily(true); } catch (err) {} }}
       />
       {/* Ensure gestures on the video element explicitly refresh controls visibility
           on iOS: some event sequences can prevent our container handler from
@@ -800,8 +813,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
     {/* custom center play/pause overlay: show immediately when controls visible.
       Keep it visible for a short user-play window even if buffering state
       briefly toggles to avoid a flash effect after a refresh. */}
-  {controlsVisible && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-auto px-4">
+      {controlsVisible && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto px-4" style={{ zIndex: 99999, WebkitTransform: 'translateZ(0)' }}>
           <button
             aria-label={playing ? 'Pause' : 'Play'}
             onClick={(e) => { e.stopPropagation(); if (recentTouchHandledRef.current) { recentTouchHandledRef.current = false; return; } togglePlay(); }}
