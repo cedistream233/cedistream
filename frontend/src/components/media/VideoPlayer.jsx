@@ -264,26 +264,38 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
 
     const onPlay = () => {
       setPlaying(true);
+
       // On iOS the sequence of events after a user-initiated play can
       // trigger synthetic taps or browser UI that immediately hide our
-      // custom controls. Show controls and temporarily suppress hiding
-      // to ensure the user sees them after tapping Play.
+      // custom controls. Show controls and ensure the hide timer is refreshed
+      // so the user sees them after tapping Play.
       try {
         if (isIOS) {
           showControlsTemporarily();
-          suppressShowUntil.current = Date.now() + 1100;
+          // refresh hide timer so controls don't vanish immediately
+          if (hideTimer.current) {
+            clearTimeout(hideTimer.current);
+            hideTimer.current = null;
+          }
+          hideTimer.current = setTimeout(() => {
+            if (debug) console.log('[VideoPlayer] hiding controls (post-play refresh)');
+            setControlsVisible(false);
+            hideTimer.current = null;
+          }, 3000);
         }
       } catch (e) {}
+
       // playback started -> hide source-loading overlay if still visible
       setSourceLoading(false);
       try { onReady && onReady(); } catch (e) {}
       // initialize lastPlayProgress so the monitor has a baseline immediately
       lastPlayProgress.current = { time: v.currentTime || 0, timestamp: Date.now() };
+
       // start a short monitor loop that checks real progress and buffered headroom.
       // This is intentionally frequent (250ms) so we detect short stalls on tiny clips.
-  if (bufferingMonitor.current) clearInterval(bufferingMonitor.current);
-  const monitorInterval = isIOS ? 400 : 250;
-  bufferingMonitor.current = setInterval(() => {
+      if (bufferingMonitor.current) clearInterval(bufferingMonitor.current);
+      const monitorInterval = isIOS ? 400 : 250;
+      bufferingMonitor.current = setInterval(() => {
         try {
           // If the element is gone or ended, clear buffering and stop
           if (!v || v.ended) { setBuffering(false); return; }
@@ -324,7 +336,7 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
             setBuffering(true);
           }
         } catch (e) {}
-  }, monitorInterval);
+      }, monitorInterval);
     };
     const onPause = () => {
       setPlaying(false);
