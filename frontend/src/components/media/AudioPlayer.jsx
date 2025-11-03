@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import formatDuration from '@/lib/formatDuration';
 import { Play, Pause, SkipBack, SkipForward, Repeat } from 'lucide-react';
 
 // loopMode: 'off' | 'one' | 'all'
@@ -171,11 +172,7 @@ export default function AudioPlayer({
       } catch {}
     }
   };
-  const format = (t) => {
-    if (!isFinite(t)) return '0:00';
-    const m = Math.floor(t/60); const s = Math.floor(t%60).toString().padStart(2,'0');
-    return `${m}:${s}`;
-  };
+  const format = (t) => formatDuration(t);
   const onSeek = (e) => {
     const v = Number(e.target.value);
     // When in preview mode, prevent seeking beyond the cap

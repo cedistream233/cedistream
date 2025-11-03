@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
+import formatDuration from '@/lib/formatDuration';
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import AudioPlayer from '@/components/media/AudioPlayer';
 import { PriceEditModal, PriceDisplay } from '@/components/ui/PriceEditModal';
@@ -600,10 +601,10 @@ export default function AlbumDetails() {
                     <div className="flex items-center gap-4">
                       <span className="text-gray-500 font-medium w-8">{index + 1}</span>
                       <div>
-                        <p className="text-white font-medium">{song.title}</p>
-                        {song.duration && (
-                          <p className="text-sm text-gray-400">{song.duration}</p>
-                        )}
+                                <p className="text-white font-medium">{song.title}</p>
+                                {song.duration && (
+                                  <p className="text-sm text-gray-400">{formatDuration(song.duration)}</p>
+                                )}
                       </div>
                     </div>
                     <div className="text-xs text-gray-400">

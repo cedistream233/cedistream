@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import formatDuration from '@/lib/formatDuration';
 import { Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
 
 export default function VideoPlayer({ src, poster, title='Video', showPreviewBadge=false, onReady, suppressLoadingUI=false }) {
@@ -594,7 +595,8 @@ export default function VideoPlayer({ src, poster, title='Video', showPreviewBad
       pauseRequestedRef.current = false;
     }
   };
-  const format = (t) => { if (!isFinite(t)) return '0:00'; const m = Math.floor(t/60); const s = Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`; };
+  // Use shared formatter so durations consistently show H:MM:SS for long clips
+  const format = (t) => formatDuration(t);
   const onSeek = (e) => { const v = videoEl; if (!v) return; v.currentTime = Number(e.target.value); setCurrent(Number(e.target.value)); };
   const toggleMute = () => {
     const v = videoEl; if (!v) return;

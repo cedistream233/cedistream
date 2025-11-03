@@ -6,6 +6,7 @@ import { ShoppingCart, Play, Clock, Calendar } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createPageUrl, setPostAuthIntent } from "@/utils";
 import { format } from "date-fns";
+import formatDuration from '@/lib/formatDuration';
 import ChooseAmountModal from '@/components/ui/ChooseAmountModal';
 import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
 import VideoPlayer from '@/components/media/VideoPlayer';
@@ -425,7 +426,7 @@ export default function VideoDetails() {
             {video.duration && (
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                <span>{video.duration}</span>
+                <span>{formatDuration(video.duration)}</span>
               </div>
             )}
             {video.release_date && (
