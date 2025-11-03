@@ -153,12 +153,16 @@ export function createBackblazeClient() {
             // If the caller passed a cacheControl option, use a direct HTTP upload
             // so we can include the Cache-Control header on the uploaded object.
             if (opts && opts.cacheControl) {
+              // Backblaze requires X-Bz-Content-Sha1 for single-part uploads.
+              // Compute SHA1 of the payload to satisfy the API.
+              const sha1 = crypto.createHash('sha1').update(data).digest('hex');
               const headers = {
                 Authorization: uploadUrlData.authorizationToken,
                 'Content-Type': contentType,
                 'Cache-Control': opts.cacheControl,
                 // B2 expects X-Bz-File-Name to be URL-encoded
-                'X-Bz-File-Name': encodeURIComponent(objectPath)
+                'X-Bz-File-Name': encodeURIComponent(objectPath),
+                'X-Bz-Content-Sha1': sha1,
               };
 
               // Use axios to POST the raw bytes to the provided upload URL.

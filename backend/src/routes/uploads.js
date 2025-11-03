@@ -3,6 +3,8 @@ import multer from 'multer';
 import { authenticateToken, requireRole } from '../lib/auth.js';
 import { createBackblazeClient } from '../lib/backblaze.js';
 import { query } from '../lib/database.js';
+import fs from 'fs';
+import path from 'path';
 
 import QueryStream from 'pg-query-stream';
 import { getPool } from '../lib/database.js';
