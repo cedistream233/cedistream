@@ -8,12 +8,41 @@ import path from 'path';
 
 import QueryStream from 'pg-query-stream';
 import { getPool } from '../lib/database.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const router = express.Router();
-// Unlimited file size to support large video uploads (YouTube-length videos ~1 hour+)
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { 
+
+// Use disk storage for videos to avoid memory issues on platforms with limited RAM (e.g. Render free tier: 512MB)
+// Small uploads (images/thumbnails) can still use memory storage, but videos should stream to disk
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(__dirname, '../../tmp/uploads');
+      // Ensure directory exists
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      // Use timestamp + random string to avoid collisions
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: {
     fileSize: Infinity // No file size limit
+  }
+});
+
+// For smaller uploads (images, thumbnails) memory storage is fine
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit for images
   }
 });
 
@@ -199,7 +228,7 @@ router.post('/albums', authenticateToken, requireRole(['creator']), upload.any()
 // Upload a single video with thumbnail
 // fields: title, description, price, category, release_date, publish (true/false)
 // files: video (required), thumbnail (optional)
-router.post('/videos', authenticateToken, requireRole(['creator']), upload.fields([
+router.post('/videos', authenticateToken, requireRole(['creator']), videoUpload.fields([
   { name: 'video', maxCount: 1 },
   { name: 'thumbnail', maxCount: 1 },
   { name: 'preview', maxCount: 1 }
@@ -219,17 +248,30 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
 
     const vext = (videoFile.originalname.split('.').pop() || 'mp4').toLowerCase();
     const vpath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${vext}`;
-  const videoUrl = await uploadToStorage('videos', vpath, videoFile.buffer, videoFile.mimetype || 'video/mp4', { cacheControl: 'public, max-age=604800, immutable' });
+    
+    // Read file from disk and upload (videoUpload uses diskStorage)
+    const videoBuffer = fs.readFileSync(videoFile.path);
+    const videoUrl = await uploadToStorage('videos', vpath, videoBuffer, videoFile.mimetype || 'video/mp4', { cacheControl: 'public, max-age=604800, immutable' });
 
     let thumbUrl = null;
     if (thumbFile) {
       const text = (thumbFile.originalname.split('.').pop() || 'jpg').toLowerCase();
       const tpath = `thumbnails/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${text}`;
+      // Thumbnail might be from diskStorage (when uploaded with video) or memoryStorage
+      const thumbBuffer = thumbFile.buffer || fs.readFileSync(thumbFile.path);
       try {
-        const variants = await uploadImageVariants('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg');
+        const variants = await uploadImageVariants('thumbnails', tpath, thumbBuffer, thumbFile.mimetype || 'image/jpeg');
         thumbUrl = variants.medium || variants.small || variants.original || null;
       } catch (e) {
-  thumbUrl = await uploadToStorage('thumbnails', tpath, thumbFile.buffer, thumbFile.mimetype || 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
+        thumbUrl = await uploadToStorage('thumbnails', tpath, thumbBuffer, thumbFile.mimetype || 'image/jpeg', { cacheControl: 'public, max-age=31536000, immutable' });
+      }
+      // Clean up temp file if it was disk-based
+      try {
+        if (thumbFile.path && !thumbFile.buffer && fs.existsSync(thumbFile.path)) {
+          fs.unlinkSync(thumbFile.path);
+        }
+      } catch (e) {
+        console.warn('Failed to cleanup temp thumbnail file', e);
       }
     }
 
@@ -239,7 +281,16 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
     if (previewField) {
       const pext = (previewField.originalname.split('.').pop() || 'mp4').toLowerCase();
       const ppath = `videos/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}-preview.${pext}`;
-  previewUrl = await uploadToStorage('previews', ppath, previewField.buffer, previewField.mimetype || 'video/mp4', { cacheControl: 'public, max-age=604800, immutable' });
+      const previewBuffer = previewField.buffer || fs.readFileSync(previewField.path);
+      previewUrl = await uploadToStorage('previews', ppath, previewBuffer, previewField.mimetype || 'video/mp4', { cacheControl: 'public, max-age=604800, immutable' });
+      // Clean up temp file if disk-based
+      try {
+        if (previewField.path && !previewField.buffer && fs.existsSync(previewField.path)) {
+          fs.unlinkSync(previewField.path);
+        }
+      } catch (e) {
+        console.warn('Failed to cleanup temp preview file', e);
+      }
     }
 
     // Insert video row with status 'processing' while we create optimized files in background
@@ -254,11 +305,9 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
       const { spawn } = await import('child_process');
       const node = process.execPath || 'node';
       const script = path.join(process.cwd(), 'backend', 'scripts', 'postprocess-video.js');
-      // Write uploaded buffer to a temporary file for ffmpeg to read
-      const tmpDir = path.join(process.cwd(), 'tmp', 'uploads');
-      fs.mkdirSync(tmpDir, { recursive: true });
-      const tmpFile = path.join(tmpDir, `upload-${Date.now()}-${Math.random().toString(36).slice(2)}.${vext}`);
-      fs.writeFileSync(tmpFile, videoFile.buffer);
+      
+      // videoFile.path is the temp file on disk (from diskStorage)
+      const tmpFile = videoFile.path;
 
       const child = spawn(node, [script, tmpFile, ins.rows[0].id], {
         detached: true,
@@ -270,9 +319,40 @@ router.post('/videos', authenticateToken, requireRole(['creator']), upload.field
       console.error('Failed to spawn postprocess worker', e);
     }
 
+    // Clean up uploaded video file from disk after spawning worker
+    // (worker will handle its own cleanup)
+    try {
+      if (videoFile.path && fs.existsSync(videoFile.path)) {
+        // Don't delete immediately - worker needs it. Let worker clean up after processing.
+        // fs.unlinkSync(videoFile.path);
+      }
+    } catch (e) {
+      console.warn('Failed to cleanup temp video file', e);
+    }
+
     return res.status(201).json(ins.rows[0]);
   } catch (err) {
     console.error('Video upload error:', err);
+    
+    // Clean up temp files on error
+    try {
+      const videoFile = req.files?.video?.[0];
+      const thumbFile = req.files?.thumbnail?.[0];
+      const previewField = req.files?.preview?.[0];
+      
+      if (videoFile?.path && fs.existsSync(videoFile.path)) {
+        fs.unlinkSync(videoFile.path);
+      }
+      if (thumbFile?.path && !thumbFile.buffer && fs.existsSync(thumbFile.path)) {
+        fs.unlinkSync(thumbFile.path);
+      }
+      if (previewField?.path && !previewField.buffer && fs.existsSync(previewField.path)) {
+        fs.unlinkSync(previewField.path);
+      }
+    } catch (cleanupErr) {
+      console.warn('Failed to cleanup temp files after error', cleanupErr);
+    }
+    
     res.status(500).json({ error: 'Failed to upload video' });
   }
 });
