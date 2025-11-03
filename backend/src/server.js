@@ -99,33 +99,54 @@ app.use(helmet({
 // Allow frontend origin(s) for CORS
 const primaryFrontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
 const allowedOrigins = new Set([
-  primaryFrontend,
+  primaryFrontend.replace(/\/+$/, ''), // normalize trailing slash
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  // Primary Render frontend host
   'https://cedistream.onrender.com',
+  'https://cedistreambackend.onrender.com',
 ]);
 
-// Register CORS BEFORE rate limiting and other early-exit middleware so
-// preflight, rate-limited (429) and error responses include CORS headers.
+const DEBUG_CORS = String(process.env.DEBUG_CORS || '').toLowerCase() === 'true';
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;              // curl/tools (no Origin)
+  const o = origin.replace(/\/+$/, '');  // normalize
+  if (allowedOrigins.has(o)) return true;
+
+  // Tolerate opaque/special origins that Chrome may use for blob/workers/webviews
+  if (o === 'null' || o.startsWith('blob:') || o.startsWith('video-') || o.startsWith('capacitor:')) {
+    return true;
+  }
+  return false;
+};
+
+// Register CORS BEFORE anything else
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // allow tools/curl
-    if (allowedOrigins.has(origin)) return cb(null, true);
-    return cb(null, false);
+    const ok = isAllowedOrigin(origin || '');
+    if (DEBUG_CORS) console.log('[CORS] origin:', origin, '->', ok ? 'allowed' : 'blocked');
+    cb(null, ok);
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
-// Ensure OPTIONS preflight responses always return CORS headers
-app.options('*', cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.has(origin)) return cb(null, true);
-    return cb(null, false);
-  },
-  credentials: true,
-}));
+// Always answer OPTIONS with proper headers (204) so preflight succeeds
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin || primaryFrontend || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      req.headers['access-control-request-headers'] || 'Content-Type, Authorization, X-Requested-With'
+    );
+    return res.sendStatus(204);
+  }
+  return next();
+});
 
 // Rate limiting
 const limiter = rateLimit({
