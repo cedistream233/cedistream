@@ -11,17 +11,29 @@ import { formatDistanceToNow } from 'date-fns';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 
-function Comment({ comment, contentType, contentId, onReply, onDelete, onEdit, currentUserId, canModerate = false }) {
+function Comment({ comment, contentType, contentId, onReply, onDelete, onEdit, currentUserId, canModerate = false, preloadedLikes = {} }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(comment.comment_text);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [likeState, setLikeState] = useState({ count: comment.like_count || 0, userHasLiked: comment.userHasLiked || false });
+  // Initialize like state using any preloadedLikes (passed down when expanding replies)
+  const initialLike = preloadedLikes && preloadedLikes[comment.id]
+    ? preloadedLikes[comment.id]
+    : { count: comment.like_count || 0, userHasLiked: comment.userHasLiked || false };
+  const [likeState, setLikeState] = useState(initialLike);
+  // If parent later provides preloaded info, update local state
+  useEffect(() => {
+    if (preloadedLikes && preloadedLikes[comment.id]) {
+      setLikeState(preloadedLikes[comment.id]);
+    }
+  }, [preloadedLikes, comment.id]);
   const [likeLoading, setLikeLoading] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const isCommentOwner = currentUserId && comment.user_id === currentUserId;
+  const [showReplies, setShowReplies] = useState(false);
+  const [repliesLikeCache, setRepliesLikeCache] = useState({});
 
   useEffect(() => {
     // Load like count and status for this comment
@@ -236,20 +248,57 @@ function Comment({ comment, contentType, contentId, onReply, onDelete, onEdit, c
         </div>
         {/* Nested Replies */}
         {comment.replies && comment.replies.length > 0 && (
-          <div className="mt-3 ml-3 pl-3 sm:ml-4 sm:pl-4 border-l-2 border-gray-200">
-            {comment.replies.map((reply) => (
-              <Comment
-                key={reply.id}
-                comment={reply}
-                contentType={contentType}
-                contentId={contentId}
-                onReply={onReply}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                currentUserId={currentUserId}
-                canModerate={canModerate}
-              />
-            ))}
+          <div className="mt-2">
+            <button
+              onClick={async () => {
+                const willShow = !showReplies;
+                setShowReplies(willShow);
+                if (willShow) {
+                  // prefill cache from available reply metadata so likes show instantly
+                  const initial = {};
+                  comment.replies.forEach(r => {
+                    initial[r.id] = { count: r.like_count || 0, userHasLiked: r.userHasLiked || false };
+                  });
+                  setRepliesLikeCache(initial);
+
+                  // fetch fresh like state for each reply in parallel (non-blocking)
+                  try {
+                    const ids = comment.replies.map(r => r.id);
+                    const promises = ids.map(id => fetch(`${API_URL}/api/comment-likes/${id}`).then(res => res.ok ? res.json() : null).catch(() => null));
+                    const results = await Promise.all(promises);
+                    const updated = { ...initial };
+                    results.forEach((res, idx) => {
+                      if (res) updated[ids[idx]] = res;
+                    });
+                    setRepliesLikeCache(updated);
+                  } catch (e) {
+                    // ignore network errors — we already showed initial counts
+                  }
+                }
+              }}
+              className="text-xs text-gray-600 hover:text-blue-600 font-medium mb-2"
+            >
+              {showReplies ? `Hide replies (${comment.replies.length})` : `Show replies (${comment.replies.length})`}
+            </button>
+
+            {showReplies && (
+              <div className="mt-1 ml-3 pl-3 sm:ml-4 sm:pl-4 border-l-2 border-gray-200">
+                {comment.replies.map((reply) => (
+                  <Comment
+                    key={reply.id}
+                    comment={reply}
+                    contentType={contentType}
+                    contentId={contentId}
+                    onReply={onReply}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    currentUserId={currentUserId}
+                    canModerate={canModerate}
+                    preloadedLikes={repliesLikeCache}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -266,6 +315,54 @@ export default function CommentsSection({ contentType, contentId, className = ''
   const [showComments, setShowComments] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Unique id for the new comment input so we can focus/scroll to it when replying
+  const commentInputId = `comment-input-${contentType}-${contentId}`;
+
+  // Handler passed to child comments: sets reply target and focuses the input
+  const handleReplyClick = (comment) => {
+    // ensure comments visible
+    if (!showComments) setShowComments(true);
+    setReplyingTo(comment);
+
+    // Retry-focused approach: attempt to find and focus the input several times
+    let attempts = 0;
+    const tryFocus = () => {
+      attempts += 1;
+      // Try ID first, then fallback to a textarea inside that id (in case Textarea wraps)
+      let el = document.getElementById(commentInputId);
+      if (!el) {
+        const wrapper = document.getElementById(commentInputId);
+        if (wrapper) el = wrapper.querySelector('textarea') || wrapper.querySelector('input');
+      }
+      if (!el) {
+        // fallback: search for any textarea inside the comments section
+        const maybe = document.querySelector(`#comment-input-${contentType}-${contentId}`) || document.querySelector(`textarea[id^=comment-input-]`);
+        if (maybe) el = maybe;
+      }
+
+      if (el) {
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {}
+        try {
+          el.focus();
+          if (typeof el.selectionStart === 'number') {
+            el.selectionStart = el.selectionEnd = el.value.length;
+          }
+        } catch (e) {}
+        return;
+      }
+
+      if (attempts < 8) {
+        // try again after a short delay — helps on slow mobile where keyboard/layout takes time
+        setTimeout(tryFocus, 100);
+      }
+    };
+
+    // Kick off first attempt on next microtask so DOM updates settle
+    setTimeout(tryFocus, 40);
+  };
 
   useEffect(() => {
     if (showComments) {
@@ -498,6 +595,7 @@ export default function CommentsSection({ contentType, contentId, className = ''
             
             <div className="flex gap-2">
               <Textarea
+                id={commentInputId}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
@@ -532,11 +630,11 @@ export default function CommentsSection({ contentType, contentId, className = ''
                   comment={comment}
                   contentType={contentType}
                   contentId={contentId}
-                  onReply={setReplyingTo}
+                  onReply={handleReplyClick}
                   onDelete={handleDeleteComment}
                   onEdit={handleEditComment}
-                    currentUserId={user?.id}
-                    canModerate={!!canModerate}
+                  currentUserId={user?.id}
+                  canModerate={!!canModerate}
                 />
               ))}
             </div>
