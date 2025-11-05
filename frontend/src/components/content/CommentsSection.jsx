@@ -49,8 +49,18 @@ function Comment({ comment, contentType, contentId, onReply, onDelete, onEdit, c
       return;
     }
     if (likeLoading) return;
+
+    // Optimistic update: update UI immediately and revert on failure
+    const prevState = { ...likeState };
+    const optimistic = {
+      userHasLiked: !prevState.userHasLiked,
+      count: prevState.count + (prevState.userHasLiked ? -1 : 1),
+    };
+
+    setLikeState(optimistic);
     setLikeLoading(true);
-    const method = likeState.userHasLiked ? 'DELETE' : 'POST';
+
+    const method = prevState.userHasLiked ? 'DELETE' : 'POST';
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/api/comment-likes/${comment.id}`, {
@@ -60,12 +70,44 @@ function Comment({ comment, contentType, contentId, onReply, onDelete, onEdit, c
           'Content-Type': 'application/json',
         },
       });
+
       if (res.ok) {
-        const data = await res.json();
-        setLikeState(data);
+        // If server returns JSON (POST), prefer canonical state.
+        // If server returns 204 / no-body (DELETE), don't wait for JSON — keep optimistic state.
+        const contentType = res.headers.get('content-type') || '';
+        if (res.status === 204 || !contentType.includes('application/json')) {
+          // Nothing to do, optimistic state already applied — quick return
+          setLikeLoading(false);
+          return;
+        }
+
+        // Server returned JSON — update state with canonical response
+        try {
+          const data = await res.json();
+          setLikeState(data);
+        } catch (err) {
+          // If parsing fails, keep optimistic state
+          console.warn('Failed to parse like response, keeping optimistic state', err);
+        }
+      } else {
+        // Revert optimistic update on failure
+        setLikeState(prevState);
+        // Optionally notify user
+        try {
+          const err = await res.json();
+          alert(err.error || 'Failed to update like.');
+        } catch {
+          alert('Failed to update like.');
+        }
       }
-    } catch {}
-    setLikeLoading(false);
+    } catch (error) {
+      // Network or other error: revert optimistic state
+      console.error('Failed to update comment like:', error);
+      setLikeState(prevState);
+      alert('Network error. Please try again.');
+    } finally {
+      setLikeLoading(false);
+    }
   };
 
   const handleSaveEdit = async () => {
