@@ -416,6 +416,12 @@ export default function VideoDetails() {
             {video.description && (
               <p className="text-gray-400 text-lg">{video.description}</p>
             )}
+            {/* Desktop sales summary for creators (shows near title for visibility) */}
+            {isOwner && (
+              <div className="hidden md:block text-sm text-slate-300 mt-3">
+                Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-6 mb-8 text-gray-400">
@@ -444,8 +450,9 @@ export default function VideoDetails() {
               <span className="text-gray-400">Minimum price:</span>
               <PriceDisplay price={video?.price} onEdit={handlePriceEdit} canEdit={isOwner} optimisticPrice={optimisticPrice} loading={priceLoading} />
             </div>
+            {/* Mobile-only: keep original placement inside price card */}
             {isOwner && (
-              <div className="text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+              <div className="md:hidden text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
             )}
           </div>
 

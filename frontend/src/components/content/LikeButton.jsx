@@ -5,7 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { setPostAuthIntent } from '@/utils';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Prefer relative API by default (works when frontend and backend are served together).
+// Use VITE_API_URL only when explicitly configured for cross-origin deployments.
+const API_URL = (import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) || '';
 
 export default function LikeButton({ contentType, contentId, className = '' }) {
   const [likes, setLikes] = useState({ count: 0, userHasLiked: false });

@@ -459,6 +459,9 @@ export default function AlbumDetails() {
             {album.description && (
               <p className="text-gray-400 text-lg">{album.description}</p>
             )}
+            {isOwner && (
+              <div className="hidden md:block text-sm text-slate-300 mt-3">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 mb-3 md:mb-4 text-gray-400">
@@ -497,7 +500,7 @@ export default function AlbumDetails() {
                 />
               </div>
                 {isOwner && (
-                  <div className="text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+                  <div className="md:hidden text-sm text-slate-300 mt-2">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
                 )}
             </div>
           </div>

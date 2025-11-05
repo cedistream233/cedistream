@@ -8,7 +8,8 @@ import { setPostAuthIntent } from '@/utils';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Prefer relative API by default; use VITE_API_URL only when explicitly configured
+const API_URL = (import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) || '';
 
 
 function Comment({ comment, contentType, contentId, onReply, onDelete, onEdit, currentUserId, canModerate = false, preloadedLikes = {} }) {

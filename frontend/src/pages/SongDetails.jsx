@@ -197,8 +197,12 @@ export default function SongDetails() {
         <img src={song.cover_image || 'https://via.placeholder.com/160?text=%F0%9F%8E%B5'} alt={song.title} className="w-40 h-40 rounded-lg object-cover mb-2" />
         <h1 className="text-2xl font-bold text-white mb-0.5">{song.title}</h1>
         <div className="text-gray-400 mb-1">{song.artist}</div>
+        {/* Desktop sales summary near header for visibility; keep mobile below */}
         {isOwner && (
-          <div className="text-sm text-slate-300 mt-1">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+          <>
+            <div className="hidden md:block text-sm text-slate-300 mt-1">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+            <div className="md:hidden text-sm text-slate-300 mt-1">Sold {salesSummary.count} • You received GH₵ {Number(salesSummary.creator_total || 0).toFixed(2)}{salesSummary.count === 0 ? ' (no sales yet)' : ''}</div>
+          </>
         )}
         {/* Render the player immediately; pass loading while the audio URL is being resolved */}
         {isOwner && (
