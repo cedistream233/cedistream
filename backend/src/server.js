@@ -19,6 +19,7 @@ let albumsRouter, videosRouter, purchasesRouter, paystackRouter, paystackWebhook
 let uploadsRouter, mediaRouter, authRouter, creatorsRouter, songsRouter, withdrawalsRouter;
 let leaderboardRouter, supportRouter, listTicketsHandler, adminEarningsRouter;
 let promotionsRouter, promotionsAdminRouter;
+let likesRouter, commentsRouter, commentLikesRouter;
 
 // Top-level await is supported in Node >= 14; load modules now that env is configured
 ({ query, closePool } = await import('./lib/database.js'));
@@ -37,6 +38,9 @@ let promotionsRouter, promotionsAdminRouter;
 ({ default: promotionsAdminRouter } = await import('./routes/promotionsAdmin.js'));
 ({ default: supportRouter, listTicketsHandler } = await import('./routes/support.js'));
 ({ default: paystackRouter, paystackWebhookHandler } = await import('./routes/paystack.js'));
+({ default: commentLikesRouter } = await import('./routes/commentLikes.js'));
+({ default: likesRouter } = await import('./routes/likes.js'));
+({ default: commentsRouter } = await import('./routes/comments.js'));
 
 // Only print masked Backblaze info when debugging to avoid noise in production
 const B2_DEBUG = String(process.env.BACKBLAZE_DEBUG || '').toLowerCase() === 'true';
@@ -239,6 +243,10 @@ app.use('/api/admin', adminEarningsRouter);
 app.use('/api/promotions', promotionsRouter);
 // Admin CRUD for promotions mounted under /api/admin/promotions
 app.use('/api/admin/promotions', promotionsAdminRouter);
+// Likes and comments for all content types
+app.use('/api/likes', likesRouter);
+app.use('/api/comments', commentsRouter);
+app.use('/api/comment-likes', commentLikesRouter);
 
 // serve frontend static files (adjust if your build dir differs)
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');

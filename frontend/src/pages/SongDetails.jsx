@@ -10,6 +10,8 @@ import PriceEditModal, { PriceDisplay } from '@/components/ui/PriceEditModal';
 import PayWhatYouWant from '@/components/ui/PayWhatYouWant';
 import { useToast, ToastContainer } from '@/components/ui/Toast';
 import TopSupporters from '@/components/content/TopSupporters';
+import LikeButton from '@/components/content/LikeButton';
+import CommentsSection from '@/components/content/CommentsSection';
 
 export default function SongDetails() {
   const { id } = useParams();
@@ -287,7 +289,17 @@ export default function SongDetails() {
       loading={priceLoading}
     />
   </div>
+  
+  {/* Like Button */}
+  <div className="w-full mt-4">
+    <LikeButton contentType="song" contentId={song.id} />
+  </div>
       </Card>
+
+      {/* Comments Section */}
+      <div className="mt-6">
+        <CommentsSection contentType="song" contentId={song.id} canModerate={isOwner} />
+      </div>
 
       <PriceEditModal
         isOpen={priceEditModal}

@@ -16,6 +16,8 @@ import { PriceEditModal, PriceDisplay } from '@/components/ui/PriceEditModal';
 import { useToast, ToastContainer } from '@/components/ui/Toast';
 import TopSupporters from '@/components/content/TopSupporters';
 import { useAuth } from '@/contexts/AuthContext';
+import LikeButton from '@/components/content/LikeButton';
+import CommentsSection from '@/components/content/CommentsSection';
 
 export default function AlbumDetails() {
   const navigate = useNavigate();
@@ -511,6 +513,11 @@ export default function AlbumDetails() {
                       <span>{purchased ? 'Support again' : 'Add to Cart'}</span>
                     </Button>
                   )}
+                  
+          {/* Like Button */}
+          <div className="mt-4">
+            <LikeButton contentType="album" contentId={album.id} />
+          </div>
         </div>
       </div>
 
@@ -636,6 +643,11 @@ export default function AlbumDetails() {
           </Card>
         </div>
       )}
+
+      {/* Comments Section */}
+      <div className="mt-8">
+        <CommentsSection contentType="album" contentId={album.id} canModerate={isOwner} />
+      </div>
 
       {/* Global modals/toasts */}
       <PriceEditModal

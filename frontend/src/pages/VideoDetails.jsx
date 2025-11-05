@@ -13,6 +13,8 @@ import VideoPlayer from '@/components/media/VideoPlayer';
 import TopSupporters from '@/components/content/TopSupporters';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import { useAuth } from '@/contexts/AuthContext';
+import LikeButton from '@/components/content/LikeButton';
+import CommentsSection from '@/components/content/CommentsSection';
 
 export default function VideoDetails() {
   const navigate = useNavigate();
@@ -471,7 +473,17 @@ export default function VideoDetails() {
               <span>{canAccess ? 'Support again' : 'Add to Cart'}</span>
             </Button>
           )}
+          
+          {/* Like Button */}
+          <div className="mt-4">
+            <LikeButton contentType="video" contentId={video.id} />
+          </div>
         </div>
+      </div>
+
+      {/* Comments Section */}
+      <div className="mt-8">
+        <CommentsSection contentType="video" contentId={video.id} canModerate={isOwner} />
       </div>
 
       <ChooseAmountModal visible={amountModal.visible} min={amountModal.min} onCancel={onModalCancel} onConfirm={onModalConfirm} />
