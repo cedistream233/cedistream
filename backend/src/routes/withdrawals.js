@@ -71,7 +71,7 @@ router.get('/admin', authenticateToken, requireRole(['admin']), async (req, res,
       FROM withdrawals w
       JOIN users u ON u.id = w.user_id
       WHERE w.status IN (${placeholders})${dateCond}
-      ORDER BY w.created_at ASC
+      ORDER BY w.created_at DESC
       LIMIT $${p++} OFFSET $${p++}`;
     const result = await query(sql, [...params, pageSize, offset]);
     // total count
@@ -159,7 +159,7 @@ router.get('/admin/export', authenticateToken, requireRole(['admin']), async (re
       FROM withdrawals w
       JOIN users u ON u.id = w.user_id
       ${where}
-      ORDER BY w.created_at ASC
+      ORDER BY w.created_at DESC
       LIMIT $${p++} OFFSET $${p++}`;
     const result = await query(sql, [...params, pageSize, offset]);
     const rows = result.rows || [];
