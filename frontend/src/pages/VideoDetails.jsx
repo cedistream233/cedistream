@@ -15,11 +15,13 @@ import LoadingOverlay from '@/components/ui/LoadingOverlay';
 import { useAuth } from '@/contexts/AuthContext';
 import LikeButton from '@/components/content/LikeButton';
 import CommentsSection from '@/components/content/CommentsSection';
+import { useToast, ToastContainer } from '@/components/ui/Toast';
 
 export default function VideoDetails() {
   const navigate = useNavigate();
   const { id: videoId } = useParams();
   const { updateMyUserData } = useAuth();
+  const { toasts, toast, removeToast } = useToast();
   
   const [video, setVideo] = useState(null);
   const [user, setUser] = useState(null);
@@ -321,12 +323,14 @@ export default function VideoDetails() {
       const updated = await Video.update(video.id, { price: newPrice });
       if (updated) {
         setVideo(updated);
+        toast.success('Price updated successfully!');
         setPriceEditModal(false);
       } else {
         throw new Error('Failed to update price');
       }
     } catch (error) {
       console.error('Video price update error:', error);
+      toast.error('Failed to update price. Please try again.');
     } finally {
       setPriceLoading(false);
       setOptimisticPrice(null);
@@ -502,6 +506,7 @@ export default function VideoDetails() {
         loading={priceLoading}
         itemType="video"
       />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

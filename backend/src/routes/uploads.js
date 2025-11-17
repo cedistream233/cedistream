@@ -357,6 +357,37 @@ router.post('/videos', authenticateToken, requireRole(['creator']), videoUpload.
   }
 });
 
+// Update a video's price (and only by its owner)
+router.patch('/videos/:id', authenticateToken, requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { price } = req.body || {};
+
+    // Validate input
+    const parsed = parseFloat(price);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return res.status(400).json({ error: 'Invalid price' });
+    }
+
+    // Ownership check
+    const own = await query('SELECT user_id FROM videos WHERE id = $1', [id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Video not found' });
+    if (String(own.rows[0].user_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Not authorized for this video' });
+    }
+
+    // Persist
+    const upd = await query(
+      `UPDATE videos SET price = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, parsed]
+    );
+    return res.json(upd.rows[0]);
+  } catch (err) {
+    console.error('Update video price error:', err);
+    return res.status(500).json({ error: 'Failed to update video' });
+  }
+});
+
 // Upload a single song (no album). Fields: title, description, price, genre, release_date; files: audio (required), cover (optional), preview (optional)
 router.post('/songs', authenticateToken, requireRole(['creator']), upload.fields([
   { name: 'audio', maxCount: 1 },

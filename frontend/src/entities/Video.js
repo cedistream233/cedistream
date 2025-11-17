@@ -63,6 +63,39 @@ export const Video = {
       console.warn('getVideoPreviewUrl failed:', err?.message || err);
       return null;
     }
+  },
+  async update(id, updates) {
+    const token = (typeof localStorage !== 'undefined') ? localStorage.getItem('token') : null;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    try {
+      let res = await fetch(`${config.backendUrl}/api/videos/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) return res.json();
+
+      res = await fetch(`${config.backendUrl}/api/videos/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) return res.json();
+
+      res = await fetch(`${config.backendUrl}/api/uploads/videos/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) return res.json();
+    } catch (e) {
+      // fall through to throw
+    }
+    throw new Error('Video update failed');
   }
 };
 
