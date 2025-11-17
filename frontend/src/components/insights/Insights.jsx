@@ -56,7 +56,21 @@ export default function Insights({ creatorId, token }) {
       setLoading(true);
       try {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const url = range && range !== 'all' ? `/api/creators/${creatorId}/analytics?range=${range}` : `/api/creators/${creatorId}/analytics`;
+        // Build URL: explicit date ranges for 'all' and '30' (last 30 days)
+        const todayISO = new Date().toISOString().slice(0,10);
+        const url = (() => {
+          if (range === 'all') {
+            return `/api/creators/${creatorId}/analytics?start=2025-01-01&end=${todayISO}&limit=0`;
+          }
+          if (range === '30') {
+            const start = new Date();
+            start.setDate(start.getDate() - 29); // inclusive last 30 days
+            const startISO = start.toISOString().slice(0,10);
+            return `/api/creators/${creatorId}/analytics?start=${startISO}&end=${todayISO}`;
+          }
+          return `/api/creators/${creatorId}/analytics?range=${range}`;
+        })();
+
         const res = await fetch(url, { headers });
         if (!res.ok) throw new Error('Failed to load insights');
         const data = await res.json();
