@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { CheckCircle2, Music } from 'lucide-react';
+import BackToTop from '@/components/ui/BackToTop.jsx';
 
 export default function AdminLayout({ children, showShortcuts = true }) {
   const location = useLocation();
@@ -75,6 +76,7 @@ export default function AdminLayout({ children, showShortcuts = true }) {
 
         </div>
       </div>
+      <BackToTop />
     </div>
   );
 }
