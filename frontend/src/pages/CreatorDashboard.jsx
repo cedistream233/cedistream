@@ -978,14 +978,20 @@ export default function CreatorDashboard() {
                   });
                   const data = await res.json();
                   if (!res.ok) throw new Error(data.error || 'Failed to submit withdrawal');
-                  // Refresh summary
+                  let summaryUpdated = false;
                   const sumRes = await fetch('/api/withdrawals/me/summary', { headers: { Authorization: tokenLocal ? `Bearer ${tokenLocal}` : '' } });
-                  if (sumRes.ok) setWithdrawSummary(await sumRes.json());
-                  // Append the new request to local history as pending (server returned record)
+                  if (sumRes.ok) {
+                    setWithdrawSummary(await sumRes.json());
+                    summaryUpdated = true;
+                  }
                   if (data && data.request) {
                     setWithdrawHistory(prev => [data.request, ...prev]);
-                    // locally deduct available amount so UI updates immediately
-                    setWithdrawSummary(prev => ({ ...prev, available: Math.max(0, Number(prev.available || 0) - Number(data.request.amount || 0)) }));
+                    if (!summaryUpdated) {
+                      setWithdrawSummary(prev => ({
+                        ...prev,
+                        available: Math.max(0, Number(prev.available || 0) - Number(data.request.amount || 0))
+                      }));
+                    }
                   }
                   setWithdrawOpen(false);
                   setWithdrawAmount(''); setMomo(''); setMomo2('');
